@@ -1,0 +1,8 @@
+# CoreSight Access Library
+#
+# Makefile to collect all files for a snapshot archive into DS-5
+# Copied from ./demos/Makefile.snapshot to ./bin/.../Makefile when demos built
+
+# create a snapshot file 
+cstrace.tar: snapshot.ini cstrace.bin kernel_dump.bin trace.ini
+	tar cvf $@ $^ cpu_*.ini device_*.ini
