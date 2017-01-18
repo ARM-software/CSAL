@@ -1,0 +1,62 @@
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+
+# Vc++ build files
+*tlog
+Debug/
+ipch/
+*.opensdf
+*.sdf
+*.suo
+*.user
+*.idb
+*.pdb
+*.exp
+*.ilk
+
+# ignore emacs backup saves
+*~
+
+# ignore bin test directory
+bin/
+*.log
+*.lastbuildstate
+*.manifest
+*.cache
+*.bak
+*.orig
+*.orig
+*.VC.db
+*.VC.VC.opendb
+*.iobj
+*.ipdb

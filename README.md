@@ -36,10 +36,7 @@ Optional support is provided for intrusive halting mode debug support of v7 Arch
 Installation
 ------------
 
-The sources are provided in `[DS-5 install dir]/examples/CoreSight_Access_Library.zip`
-This file should be extracted into a suitable location for use.
-
-The `.zip` file extracts to provide the following directories and files:-
+Library supplied as a git repository on github - git@github.com:ARM-software/CSAL.git
 
 `./source` : Contains all the library source .c files.
 
@@ -53,7 +50,7 @@ The `.zip` file extracts to provide the following directories and files:-
 
 `./doxygen-cfg.txt` : File to generate API documentation using __doxygen__.
 
-`./readme.md` : This readme text file - which is also processed by __doxygen__.
+`./README.md` : This readme text file - which is also processed by __doxygen__.
 
 Documentation
 -------------
@@ -147,6 +144,11 @@ Updates to APIs:-
 - `cs_trace_enable_timestamps()` updated to enable TS generation if passed a TS generator type object.
 - Updated topology detection to recognise an Embedded Logic Analyser type component.
 - Updated documentation for running Juno examples an shipping scripts to set up the platform.
+
+Version 3.0.0
+-------------
+- Transfer to github project
+- Versioning change
 
 ------------------------------------
 
