@@ -44,10 +44,10 @@ typedef void *cs_device_t;
 
 
 /** \brief Physical address 
- Defines the size type for a physical address. 
- If library compiled with <tt>\b LPAE</tt> defined then this value will be large
- enough for the 40 bit LPAE extension addresses.
- See \ref buildlib "Building the Library" for information on building the library.
+    Defines the size type for a physical address. 
+    If library compiled with <tt>\b LPAE</tt> defined then this value will be large
+    enough for the 40 bit LPAE extension addresses.
+    See \ref buildlib "Building the Library" for information on building the library.
 */
 #ifdef LPAE
 typedef unsigned long long cs_physaddr_t;
@@ -117,7 +117,7 @@ typedef int cs_cpu_t;
     connected trace topology - i.e. the set of all trace sources
     that can send trace to a single trace buffer or port.
     It is recommended that source ids are unique across the whole system.
- */
+*/
 typedef int cs_atid_t;
 
 /** \brief Power domain id for the device.
@@ -136,22 +136,22 @@ typedef unsigned int cs_power_domain_t;
  * even though there are separate architecture documents.
  */
 typedef enum {
-  DEV_UNKNOWN,  /**< Unknown device */
-  DEV_ETM,      /**< ETM (v3 or v4), or PTM */
-  DEV_ITM,      /**< ITM - Software trace stimulus */
-  DEV_STM,      /**< STM - Software trace stimulus */
-  DEV_FUNNEL,   /**< Trace Funnel */
-  DEV_REPLICATOR,   /**< Trace Replicator */
-  DEV_ETF,      /**< Embedded Trace FIFO - Trace memory controller in ETF mode. */
-  DEV_ETB,      /**< Embedded Trace Buffer - legacy trace buffer or TMC in ETB/ETR */
-  DEV_TPIU,     /**< Trace Port Interface - external interface to trace system */
-  DEV_SWO,      /**< Serial Wire Output */
-  DEV_CTI,      /**< Cross Trigger Interface*/
-  DEV_CPU_DEBUG,    /**< Core Debug registers */
-  DEV_CPU_PMU,      /**< Core PMU registers */
-  DEV_TS,           /**< Timestamp generator */
-  DEV_ELA,          /**< Embedded logic analyzer */
-  DEV_MAX           /**< End of type list */
+    DEV_UNKNOWN,  /**< Unknown device */
+    DEV_ETM,      /**< ETM (v3 or v4), or PTM */
+    DEV_ITM,      /**< ITM - Software trace stimulus */
+    DEV_STM,      /**< STM - Software trace stimulus */
+    DEV_FUNNEL,   /**< Trace Funnel */
+    DEV_REPLICATOR,   /**< Trace Replicator */
+    DEV_ETF,      /**< Embedded Trace FIFO - Trace memory controller in ETF mode. */
+    DEV_ETB,      /**< Embedded Trace Buffer - legacy trace buffer or TMC in ETB/ETR */
+    DEV_TPIU,     /**< Trace Port Interface - external interface to trace system */
+    DEV_SWO,      /**< Serial Wire Output */
+    DEV_CTI,      /**< Cross Trigger Interface*/
+    DEV_CPU_DEBUG,    /**< Core Debug registers */
+    DEV_CPU_PMU,      /**< Core PMU registers */
+    DEV_TS,           /**< Timestamp generator */
+    DEV_ELA,          /**< Embedded logic analyzer */
+    DEV_MAX           /**< End of type list */
 } cs_devtype_t;
 
 
@@ -175,7 +175,7 @@ typedef enum {
     devices with multiple core clusters.
 
     
-    */
+*/
 #ifndef LIB_MAX_CPU_DEVICES
 #define LIB_MAX_CPU_DEVICES 32
 #endif

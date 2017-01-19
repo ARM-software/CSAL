@@ -5,17 +5,17 @@
   
   \copyright   Copyright (C) ARM Limited, 2015-2016. All rights reserved.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+  http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 
 #ifndef CS_UTIL_CREATE_SNAPSHOT_H
@@ -23,22 +23,22 @@ limitations under the License.
 
 #include "csregistration.h"
 /** @defgroup cs_lib_snapshot Extract Trace and Create DS-5 Snapshots
- @ingroup cs_lib_utils
+    @ingroup cs_lib_utils
 
- These functions use the devices_t and board structures used in the registration framework, 
- to create a snapshot for import into DS-5. 
+    These functions use the devices_t and board structures used in the registration framework, 
+    to create a snapshot for import into DS-5. 
 
- Usage:
- - i)  create the relevant board and devices structures - `setup_board()`.
- - ii) configure the devices ready for trace capture.
- - iii) call `set_kernel_trace_dump_range()` to set the memory area for trace.
- - iv) call `do_dump_config()` to create the snapshot data files.
- - v) Run the trace capture session.
- - vi) call `do_fetch_trace()` to extract the capture trace.
+    Usage:
+    - i)  create the relevant board and devices structures - `setup_board()`.
+    - ii) configure the devices ready for trace capture.
+    - iii) call `set_kernel_trace_dump_range()` to set the memory area for trace.
+    - iv) call `do_dump_config()` to create the snapshot data files.
+    - v) Run the trace capture session.
+    - vi) call `do_fetch_trace()` to extract the capture trace.
 
- The snapshot is now ready for import into DS-5.
+    The snapshot is now ready for import into DS-5.
 
-@{*/
+    @{*/
 
 /*!
  * Set start and and addresses for kernel memory dump.

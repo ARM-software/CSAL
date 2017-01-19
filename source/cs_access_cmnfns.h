@@ -64,11 +64,11 @@
 #define CS_LIB_VERSION_MIN 0x02
 
 /*
-DIAG defines whether this build is capable of writing diagnostic messages.
-The actual production of individual messages is controlled by tests under
-the DTRACE/DTRACEG macros.
+  DIAG defines whether this build is capable of writing diagnostic messages.
+  The actual production of individual messages is controlled by tests under
+  the DTRACE/DTRACEG macros.
 
-Compile with -DDIAG=0 for a bare-metal build.
+  Compile with -DDIAG=0 for a bare-metal build.
 */
 #ifndef DIAG
 #define DIAG 1
@@ -76,10 +76,10 @@ Compile with -DDIAG=0 for a bare-metal build.
 
 
 /*
-CHECK defines whether this build is capable of extra self-checking.
-Note that the self-checks may involve additional memory transactions with
-the CoreSight devices, e.g. reading back registers after writing.
-The actual self-checks are controlled by the DCHECK macro.
+  CHECK defines whether this build is capable of extra self-checking.
+  Note that the self-checks may involve additional memory transactions with
+  the CoreSight devices, e.g. reading back registers after writing.
+  The actual self-checks are controlled by the DCHECK macro.
 */
 #ifndef CHECK
 #define CHECK 1
@@ -97,155 +97,155 @@ The actual self-checks are controlled by the DCHECK macro.
 struct cs_device;
 
 struct cs_device_ops {
-  void (*unregister)(struct cs_device *d);
+    void (*unregister)(struct cs_device *d);
 };
 
 
 /*
-Information relating to a single CoreSight component.
-A "component" generally corresponds to a single 4K programmable memory-mapped block.
+  Information relating to a single CoreSight component.
+  A "component" generally corresponds to a single 4K programmable memory-mapped block.
 */
 struct cs_device {
-  /* Next device in global list - no particular order */
-  struct cs_device *next;
+    /* Next device in global list - no particular order */
+    struct cs_device *next;
 
-  struct cs_device_ops ops;
+    struct cs_device_ops ops;
 
-  /* Generic properties of the device */
-  cs_physaddr_t phys_addr;
-  unsigned char volatile *local_addr;
-  unsigned char devtype_from_id;
-  cs_devtype_t type;
-  unsigned short part_number;   /**< CoreSight part number, 3 hex digits */
-  unsigned int devclass;
-  unsigned int devaff0;         /**< Device affinity register for CPU-affine devices - might be CPU's MPIDR, but might also be zero */
-  cs_cpu_t affine_cpu;          /**< Set by the user via the API */
-  cs_power_domain_t power_domain;
-  int is_unlocked:1;
-  int is_permanently_unlocked:1;
+    /* Generic properties of the device */
+    cs_physaddr_t phys_addr;
+    unsigned char volatile *local_addr;
+    unsigned char devtype_from_id;
+    cs_devtype_t type;
+    unsigned short part_number;   /**< CoreSight part number, 3 hex digits */
+    unsigned int devclass;
+    unsigned int devaff0;         /**< Device affinity register for CPU-affine devices - might be CPU's MPIDR, but might also be zero */
+    cs_cpu_t affine_cpu;          /**< Set by the user via the API */
+    cs_power_domain_t power_domain;
+    int is_unlocked:1;
+    int is_permanently_unlocked:1;
 
 #if DIAG
-  int diag_tracing:1;           /**< Diagnostic messages for actions on this device */
+    int diag_tracing:1;           /**< Diagnostic messages for actions on this device */
 #endif /* DIAG */
-  unsigned int n_api_errors;
+    unsigned int n_api_errors;
 
-  /* Trace bus topology */
-  unsigned int n_in_ports;
-  unsigned int n_out_ports;
-  struct cs_device *ins[CS_MAX_IN_PORTS];
-  unsigned char from_out_port[CS_MAX_IN_PORTS];
-  struct cs_device *outs[CS_MAX_OUT_PORTS];
-  unsigned char to_in_port[CS_MAX_OUT_PORTS];
+    /* Trace bus topology */
+    unsigned int n_in_ports;
+    unsigned int n_out_ports;
+    struct cs_device *ins[CS_MAX_IN_PORTS];
+    unsigned char from_out_port[CS_MAX_IN_PORTS];
+    struct cs_device *outs[CS_MAX_OUT_PORTS];
+    unsigned char to_in_port[CS_MAX_OUT_PORTS];
 
-  /* Device-specific properties */
-  union {
-    struct debug_props {
-      unsigned int didr;        /**< Contents of DBGDIDR */
-      unsigned int devid;       /**< Contents of DBGDEVID, or zero when not present */
-      unsigned int pcsamplereg; /**< Offset to PC sampling register */
-      unsigned int debug_arch;  /**< debug architecture */
-      struct cs_device *pmu;    /**< PMU for this CPU */
-      struct cs_device *etm;    /**< ETM for this CPU */
-      struct cs_device *cti;    /**< CTI for this CPU */
-    } debug;
-    struct pmu_props {
-      unsigned int cfgr;
-      unsigned int n_counters;  /**< Number of event counters, not including cycle counter */
-      unsigned char map_scale;  /**< Spacing in the memory map (power of 2) */
-    } pmu;
-    struct cti_props {
+    /* Device-specific properties */
+    union {
+        struct debug_props {
+            unsigned int didr;        /**< Contents of DBGDIDR */
+            unsigned int devid;       /**< Contents of DBGDEVID, or zero when not present */
+            unsigned int pcsamplereg; /**< Offset to PC sampling register */
+            unsigned int debug_arch;  /**< debug architecture */
+            struct cs_device *pmu;    /**< PMU for this CPU */
+            struct cs_device *etm;    /**< ETM for this CPU */
+            struct cs_device *cti;    /**< CTI for this CPU */
+        } debug;
+        struct pmu_props {
+            unsigned int cfgr;
+            unsigned int n_counters;  /**< Number of event counters, not including cycle counter */
+            unsigned char map_scale;  /**< Spacing in the memory map (power of 2) */
+        } pmu;
+        struct cti_props {
 #define CTI_CHANNELS 4
 #define CTI_CHANNEL_MASK ((1U << CTI_CHANNELS) - 1)  /* i.e. 0x0F for 4-channel CTI */
 #define CTI_MAX_IN_PORTS 10
 #define CTI_MAX_OUT_PORTS 10
-      unsigned char n_triggers;   /**< Generally 8, but 9 seen for Cortex-A8 */
-      unsigned char n_channels;   /**< Generally 4 */
-      struct {
-        struct cs_device *dev;
-        unsigned int devportid;
-      } src[CTI_MAX_IN_PORTS];
-      struct {
-        struct cs_device *dev;
-        unsigned int devportid;
-      } dst[CTI_MAX_OUT_PORTS];
-    } cti;
-    struct etm_props {
-      unsigned int etmidr;
-      cs_etm_static_config_t sc;
-      union {   // union of arch specifc configs - starting with ETMv4
-          cs_etm_v4_static_config_t etmv4_sc;
-      } sc_ex;
-    } etm;
-    struct etb_props {
-      unsigned int buffer_size_bytes;
-      int currently_reading:1;
-      int finished_reading:1;
-      int is_tmc_device:1;           /* This is a TMC, as opposed to e.g. a classic ETB */
-      /* For pre-TMC ETBs, the read and write pointers address words within
-         the buffer RAM - for CoreSight ETBs the buffer is always 32-bit RAM,
-         so the pointers are scaled by 4.  Only very old pre-CoreSight ETBs
-         have other RAM sizes and a RAM width register. */
+            unsigned char n_triggers;   /**< Generally 8, but 9 seen for Cortex-A8 */
+            unsigned char n_channels;   /**< Generally 4 */
+            struct {
+                struct cs_device *dev;
+                unsigned int devportid;
+            } src[CTI_MAX_IN_PORTS];
+            struct {
+                struct cs_device *dev;
+                unsigned int devportid;
+            } dst[CTI_MAX_OUT_PORTS];
+        } cti;
+        struct etm_props {
+            unsigned int etmidr;
+            cs_etm_static_config_t sc;
+            union {   // union of arch specifc configs - starting with ETMv4
+                cs_etm_v4_static_config_t etmv4_sc;
+            } sc_ex;
+        } etm;
+        struct etb_props {
+            unsigned int buffer_size_bytes;
+            int currently_reading:1;
+            int finished_reading:1;
+            int is_tmc_device:1;           /* This is a TMC, as opposed to e.g. a classic ETB */
+            /* For pre-TMC ETBs, the read and write pointers address words within
+               the buffer RAM - for CoreSight ETBs the buffer is always 32-bit RAM,
+               so the pointers are scaled by 4.  Only very old pre-CoreSight ETBs
+               have other RAM sizes and a RAM width register. */
 #define ETB_WIDTH_SCALE_SHIFT 2
-      int pointer_scale_shift:4;
-      struct tmc_props {
-        /* Use the CS_TMC_CONFIG_TYPE_XYZ macros to interpret the config_type field */
-        unsigned int config_type:2;  /* Build-time TMC configuration (ETR, ETF, ETB) */
-        unsigned int memory_width:4; /* Memory width: 2 for 32b up to 5 for 256b */
-      } tmc;      
-    } etb;
-    struct itm_props {
-      unsigned int n_ports;
-    } itm;
-    struct stm_props {
-      unsigned int n_ports;
-      unsigned int n_masters;
-      unsigned int current_master;
-      unsigned char **ext_ports;    /**< array of pointers to mappings of master ports. */
-      int basic_ports:1;
-      stm_static_config_t s_config;     /**< RO features registers */
-    } stm;
-    struct ts_gen_props {
-      cs_ts_gen_config_t config; 
-    } ts;
-  } v;
+            int pointer_scale_shift:4;
+            struct tmc_props {
+                /* Use the CS_TMC_CONFIG_TYPE_XYZ macros to interpret the config_type field */
+                unsigned int config_type:2;  /* Build-time TMC configuration (ETR, ETF, ETB) */
+                unsigned int memory_width:4; /* Memory width: 2 for 32b up to 5 for 256b */
+            } tmc;      
+        } etb;
+        struct itm_props {
+            unsigned int n_ports;
+        } itm;
+        struct stm_props {
+            unsigned int n_ports;
+            unsigned int n_masters;
+            unsigned int current_master;
+            unsigned char **ext_ports;    /**< array of pointers to mappings of master ports. */
+            int basic_ports:1;
+            stm_static_config_t s_config;     /**< RO features registers */
+        } stm;
+        struct ts_gen_props {
+            cs_ts_gen_config_t config; 
+        } ts;
+    } v;
 };
 
 #define IS_V8(dev) (dev->v.debug.debug_arch == 0x8)
 
 /*
-We maintain a list of addresses not to be probed, to avoid bus lockups.
+  We maintain a list of addresses not to be probed, to avoid bus lockups.
 */
 struct addr_exclude {
-  struct addr_exclude *next;
-  cs_physaddr_t from;
-  cs_physaddr_t to;
+    struct addr_exclude *next;
+    cs_physaddr_t from;
+    cs_physaddr_t to;
 };
 
 /*
-Global information for the system.
+  Global information for the system.
 
-Currently "scope of management of CoreSight library" <= "SoC".  I.e. there is
-no provision for the library managing multiple SoCs, or multiple physical memory
-spaces etc.
+  Currently "scope of management of CoreSight library" <= "SoC".  I.e. there is
+  no provision for the library managing multiple SoCs, or multiple physical memory
+  spaces etc.
 */
 struct global {
-  struct cs_device *device_top;
+    struct cs_device *device_top;
 #ifdef UNIX_USERSPACE
-  int mem_fd;                    /**< File handle for the memory mapped I/O */
+    int mem_fd;                    /**< File handle for the memory mapped I/O */
 #endif /* UNIX_USERSPACE */
-  int init_called:1;
-  int registration_open:1;
-  int force_writes:1;
-  int diag_tracing_default:1;    /**< Default trace setting for new devices */
-  int diag_checking:1;           /**< Default diag setting for new devices */
-  unsigned int n_api_errors;
-  unsigned int n_devices;
-  cs_power_domain_t power_domain_default;
-  struct cs_device *timestamp_device;
-  struct addr_exclude *exclusions;
-  int phys_addr_lpae:1;     /* 1 if built with LPAE */
-  int virt_addr_64bit:1;    /* 1 if built with 64 bit virtual addresses */
-  int devaff0_used:1;       /* Non-zero DEVAFF0 has been seen */
+    int init_called:1;
+    int registration_open:1;
+    int force_writes:1;
+    int diag_tracing_default:1;    /**< Default trace setting for new devices */
+    int diag_checking:1;           /**< Default diag setting for new devices */
+    unsigned int n_api_errors;
+    unsigned int n_devices;
+    cs_power_domain_t power_domain_default;
+    struct cs_device *timestamp_device;
+    struct addr_exclude *exclusions;
+    int phys_addr_lpae:1;     /* 1 if built with LPAE */
+    int virt_addr_64bit:1;    /* 1 if built with 64 bit virtual addresses */
+    int devaff0_used:1;       /* Non-zero DEVAFF0 has been seen */
 };
 
 /**
@@ -273,7 +273,7 @@ struct global {
 #endif /* DIAG */
 
 /*
-DCHECK() defines whether extra checks are done on the device.
+  DCHECK() defines whether extra checks are done on the device.
 */
 #if CHECK
 #define DCHECK(d) (G.diag_checking)
@@ -284,8 +284,8 @@ DCHECK() defines whether extra checks are done on the device.
 
 #ifdef UNIX_USERSPACE
 /*
-Check that the offset argument to mmap() is wide enough that we can map any
-physical address in /dev/mem.  This might need us to define _FILE_OFFSET_BITS=64.
+  Check that the offset argument to mmap() is wide enough that we can map any
+  physical address in /dev/mem.  This might need us to define _FILE_OFFSET_BITS=64.
 */
 typedef int check_mmap_offset_is_big_enough[1 / (sizeof(off_t) >= sizeof(cs_physaddr_t))];
 #endif /* UNIX_USERSPACE */
@@ -308,15 +308,15 @@ extern void _diagf(char const *s, ...);
 void diagf(char const *s, ...) {}
 #endif /* DIAG */
 /*
-This is the "physical address" value for a non-memory-mapped device, e.g.
-a replicator, that is represented for topology reasons
+  This is the "physical address" value for a non-memory-mapped device, e.g.
+  a replicator, that is represented for topology reasons
 */
 #define CS_NO_PHYS_ADDR 1
 
 /*
-Coresight devices must be aligned on a 4K page - this may be the case even
-if the OS kernel is using larger pages.  (We then have to get creative
-with memory mappings.)
+  Coresight devices must be aligned on a 4K page - this may be the case even
+  if the OS kernel is using larger pages.  (We then have to get creative
+  with memory mappings.)
 */
 #define is_4k_page_address(x) (((x) & 0xfff) == 0)
 

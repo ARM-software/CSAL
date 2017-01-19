@@ -1,19 +1,19 @@
 /*
-Memory-mapped access to CPU sampling debug features.
+  Memory-mapped access to CPU sampling debug features.
 
-Copyright (C) 2014 ARM Ltd.
+  Copyright (C) 2014 ARM Ltd.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+  http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 
 #include "cs_access_cmnfns.h"
@@ -22,7 +22,7 @@ limitations under the License.
 /* ---------- Local functions ------------- */
 /* this called from API fn if V8 core */
 static int cs_debug_v8_pc_sample(struct cs_device *d, cs_virtaddr_t *pc,
-                           unsigned int *cid, unsigned int *vmid)
+                                 unsigned int *cid, unsigned int *vmid)
 {
     unsigned int regval, regval_h;
     cs_virtaddr_t pc_sample = 0;
@@ -75,34 +75,34 @@ static int cs_debug_v8_pc_sample(struct cs_device *d, cs_virtaddr_t *pc,
 int cs_debug_get_pc_sample(cs_device_t dev, cs_virtaddr_t *pc,
                            unsigned int *cid, unsigned int *vmid)
 {
-  struct cs_device *d = DEV(dev);
-  assert(d->type == DEV_CPU_DEBUG);
+    struct cs_device *d = DEV(dev);
+    assert(d->type == DEV_CPU_DEBUG);
 
-  /* check for v8 architecture */
-  if(IS_V8(d))
-      return cs_debug_v8_pc_sample(d,pc,cid,vmid);
+    /* check for v8 architecture */
+    if(IS_V8(d))
+        return cs_debug_v8_pc_sample(d,pc,cid,vmid);
 
-  if (d->v.debug.pcsamplereg != 0) {
-    /* Take a PC sample whatever happens, as this causes the other
-       sample registers to be read synchronously */
-    cs_virtaddr_t samp = _cs_read(d, d->v.debug.pcsamplereg);
-    if (pc != NULL) {
-      *pc = samp;
-    }
-    if ((d->v.debug.devid & 0xF) >= 2) {
-      if (cid != NULL) {
-        *cid = _cs_read(d, CS_DBGCIDSR);
-      }
-      if ((d->v.debug.devid & 0xF) >= 3) {
-        if (vmid != NULL) {
-          *vmid = _cs_read(d, CS_DBGVIDSR);
+    if (d->v.debug.pcsamplereg != 0) {
+        /* Take a PC sample whatever happens, as this causes the other
+           sample registers to be read synchronously */
+        cs_virtaddr_t samp = _cs_read(d, d->v.debug.pcsamplereg);
+        if (pc != NULL) {
+            *pc = samp;
         }
-      }
-    }
-    return 0;
-  } else {
-    return -1;
-  } 
+        if ((d->v.debug.devid & 0xF) >= 2) {
+            if (cid != NULL) {
+                *cid = _cs_read(d, CS_DBGCIDSR);
+            }
+            if ((d->v.debug.devid & 0xF) >= 3) {
+                if (vmid != NULL) {
+                    *vmid = _cs_read(d, CS_DBGVIDSR);
+                }
+            }
+        }
+        return 0;
+    } else {
+        return -1;
+    } 
 }
 
 

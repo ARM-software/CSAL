@@ -31,12 +31,12 @@
 int cs_sink_is_enabled(cs_device_t dev);
 
 /**
-Enable a trace sink
+   Enable a trace sink
 */
 int cs_sink_enable(cs_device_t dev);
 
 /**
-Disable a trace sink to stop it generating back-pressure
+   Disable a trace sink to stop it generating back-pressure
 */
 int cs_sink_disable(cs_device_t dev);
 

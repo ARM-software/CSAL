@@ -21,14 +21,14 @@
 #define _included_cs_pmu_h
 
 /**
-\defgroup pmu PMU
+   \defgroup pmu PMU
 
-Memory-mapped access to CPU PMUs.
+   Memory-mapped access to CPU PMUs.
 
-Access via this interface may conflict with other PMU usage,
-e.g. via the Linux perf subsystem or external profilers.
+   Access via this interface may conflict with other PMU usage,
+   e.g. via the Linux perf subsystem or external profilers.
 
-@{
+   @{
 */
 
 
@@ -36,21 +36,21 @@ typedef unsigned int cs_pmu_mask_t;   /**< Mask of counters, including cycle cou
 #define CS_PMU_MASK_CYCLES ((cs_pmu_mask_t)0x80000000)   /**< Mask bit for cycle counter */
 
 /**
-Get the number of counters (exclusive of the cycle counter)
-supported by a CPU PMU.
+   Get the number of counters (exclusive of the cycle counter)
+   supported by a CPU PMU.
 */
 int cs_pmu_n_counters(cs_device_t);
 
 /**
-Read CPU PMU event counts (under mask) and/or the cycle counter.
-The cycle-counter bit (0x80000000 / CS_PMU_MASK_CYCLES) is ignored if in the mask.
-Note that the event counts are read into a packed array, starting from the
-lowest numbered selected counter.
+   Read CPU PMU event counts (under mask) and/or the cycle counter.
+   The cycle-counter bit (0x80000000 / CS_PMU_MASK_CYCLES) is ignored if in the mask.
+   Note that the event counts are read into a packed array, starting from the
+   lowest numbered selected counter.
 
-Any overflow bits in selected counters will be reset.
-This allows you to maintain (in your own code) higher order bits
-of a counter, and use the overflow bits to increment them,
-as long as you take samples reasonably frequently (i.e. several times a second).
+   Any overflow bits in selected counters will be reset.
+   This allows you to maintain (in your own code) higher order bits
+   of a counter, and use the overflow bits to increment them,
+   as long as you take samples reasonably frequently (i.e. several times a second).
 */
 int cs_pmu_get_counts(cs_device_t, cs_pmu_mask_t mask,
                       unsigned int *cycles, unsigned int *counts, cs_pmu_mask_t *overflow);
@@ -63,13 +63,13 @@ int cs_pmu_get_counts(cs_device_t, cs_pmu_mask_t mask,
  *  against newer versions of the API.
  */
 typedef struct cs_pmu {
-  unsigned int version;    /**< Version field - for future expansion */
-  unsigned int div64:1;    /**< Cycle counter divide-by-64 */
-  unsigned int cycles;     /**< Cycle counter */
-  cs_pmu_mask_t overflow;  /**< Overflow flags for event counters and cycle counter */
-  cs_pmu_mask_t mask;      /**< Mask of counts/events to program/read */
-  unsigned int counts[31];     /**< Event counts */
-  unsigned int eventtypes[31]; /**< Event types */
+    unsigned int version;    /**< Version field - for future expansion */
+    unsigned int div64:1;    /**< Cycle counter divide-by-64 */
+    unsigned int cycles;     /**< Cycle counter */
+    cs_pmu_mask_t overflow;  /**< Overflow flags for event counters and cycle counter */
+    cs_pmu_mask_t mask;      /**< Mask of counts/events to program/read */
+    unsigned int counts[31];     /**< Event counts */
+    unsigned int eventtypes[31]; /**< Event types */
 } cs_pmu_t;
 
 #define CS_PMU_VERSION_1   0x01    /**< Version 1 of the structure */

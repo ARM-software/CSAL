@@ -21,12 +21,12 @@
 #define _included_cs_debug_sample_h
 
 /**
-\defgroup debug Access to Debug Sampling Registers.
+   \defgroup debug Access to Debug Sampling Registers.
 
-Non - intrusive interface to sampling debug architecture on CPU
-Samples PC plus VMID and CONTEXTID if present from a running core via the debug registers. 
+   Non - intrusive interface to sampling debug architecture on CPU
+   Samples PC plus VMID and CONTEXTID if present from a running core via the debug registers. 
 
-@{
+   @{
 */
 
 /**

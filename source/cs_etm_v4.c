@@ -136,7 +136,7 @@ int _cs_etm_v4_config_get(struct cs_device *d, cs_etmv4_config_t *c)
     }
 
     if((c->flags & CS_ETMC_SEQUENCER) && 
-        (c->scv4->idr5.bits.numseqstate > 0))
+       (c->scv4->idr5.bits.numseqstate > 0))
     {
         /* use the actual number, unless greater than the storage we have.*/
         numregs = c->scv4->idr5.bits.numseqstate - 1;
@@ -151,7 +151,7 @@ int _cs_etm_v4_config_get(struct cs_device *d, cs_etmv4_config_t *c)
     }
 
     if((c->flags & CS_ETMC_COUNTER) && 
-        (c->scv4->idr5.bits.numcntr > 0))
+       (c->scv4->idr5.bits.numcntr > 0))
     {
         /* use the actual number, unless greater than the storage we have.*/
         numregs = c->scv4->idr5.bits.numcntr;
@@ -358,7 +358,7 @@ int _cs_etm_v4_config_put(struct cs_device *d, cs_etmv4_config_t *c)
 
     _cs_etm_enable_programming(d);
 
-   /* general configuration */
+    /* general configuration */
     if(c->flags & CS_ETMC_CONFIG)
     {
         _cs_write(d, CS_ETMV4_CONFIGR, c->configr.reg);
@@ -411,7 +411,7 @@ int _cs_etm_v4_config_put(struct cs_device *d, cs_etmv4_config_t *c)
     }
 
     if((c->flags & CS_ETMC_SEQUENCER) && 
-        (c->scv4->idr5.bits.numseqstate > 0))
+       (c->scv4->idr5.bits.numseqstate > 0))
     {
         /* use the actual number, unless greater than the storage we have.*/
         numregs = c->scv4->idr5.bits.numseqstate - 1;
@@ -427,7 +427,7 @@ int _cs_etm_v4_config_put(struct cs_device *d, cs_etmv4_config_t *c)
     }
 
     if((c->flags & CS_ETMC_COUNTER) && 
-        (c->scv4->idr5.bits.numcntr > 0))
+       (c->scv4->idr5.bits.numcntr > 0))
     {
         /* use the actual number, unless greater than the storage we have.*/
         numregs = c->scv4->idr5.bits.numcntr;
@@ -461,7 +461,7 @@ int _cs_etm_v4_config_put(struct cs_device *d, cs_etmv4_config_t *c)
             for(i = 2; i < numregs; i++)
             {
                 if(masksel & c->rsctlr_acc_mask)
-                     _cs_write(d,CS_ETMV4_RSCTLR(i), c->rsctlr[i]);
+                    _cs_write(d,CS_ETMV4_RSCTLR(i), c->rsctlr[i]);
                 masksel <<= 1;
             }
         }
@@ -593,7 +593,7 @@ int _cs_etm_v4_config_put(struct cs_device *d, cs_etmv4_config_t *c)
                     _cs_write(d,CS_ETMV4_VMIDCVR(i), c->vmid_comps[i].vmidcvr_l );
                     if(a_size == 64)
                     {
-                         _cs_write(d,CS_ETMV4_VMIDCVR(i)+4, c->vmid_comps[i].vmidcvr_h);
+                        _cs_write(d,CS_ETMV4_VMIDCVR(i)+4, c->vmid_comps[i].vmidcvr_h);
                     }
                 }
                 masksel <<= 1;
@@ -1010,13 +1010,13 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t *c)
     if(c->flags & CS_ETMC_TRACE_ENABLE)
     {
         printf("\n===Trace Enables===\n");
-         _etmv4_edesc(c->victlr & 0xFF, sz_buf1);
+        _etmv4_edesc(c->victlr & 0xFF, sz_buf1);
         printf("\tVICTLR = %08X (ViewInst Event = %s)\n", c->victlr,sz_buf1);
         _el_desc((c->victlr >> 16) & 0xB,sz_buf1);
         _el_desc((c->victlr >> 20) & 0x7,sz_buf2);
         printf("\t.exlevel_s = %01X, ELs off:%s\n\t.exlevel_ns = %01X, ELs off:%s\n",
-            (c->victlr >> 16) & 0xF,sz_buf1 ,
-            (c->victlr >> 20) & 0xF,sz_buf2);
+               (c->victlr >> 16) & 0xF,sz_buf1 ,
+               (c->victlr >> 20) & 0xF,sz_buf2);
         printf("\t.ssstatus = %d (StartStop = %s)\n",(c->victlr >> 9) & 0x1, (c->victlr & 0x200) ? "started" : "stopped"); 
         printf("\tVIIECTLR = %08X\n", c->viiectlr);
         printf("\tVISSCTLR = %08X\n", c->vissctlr);
@@ -1024,7 +1024,7 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t *c)
         
         if(c->scv4->idr0.bits.trcdata != 0)
         {
-             _etmv4_edesc(c->vdctlr & 0xFF,sz_buf1);
+            _etmv4_edesc(c->vdctlr & 0xFF,sz_buf1);
             printf("\tVDCTLR = %08X (ViewData Event = %s)\n",c->vdctlr,sz_buf1);    
             printf("\tVDSACCTLR = %08X\n", c->vdsacctlr); 
             printf("\tVDARCCTLR = %08X\n", c->vdarcctlr);
@@ -1047,7 +1047,7 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t *c)
                 _etmv4_edesc(c->seqevr[i] & 0xFF,sz_buf1);
                 _etmv4_edesc((c->seqevr[i] >> 8 ) & 0xFF,sz_buf2);
                 printf("\tSEQEVR%d = %08X, (Event-F %d->%d = %s; Event-B %d<-%d = %s)\n", 
-                    i, c->seqevr[i],i,i+1,sz_buf1,i,i+1,sz_buf2);
+                       i, c->seqevr[i],i,i+1,sz_buf1,i,i+1,sz_buf2);
             }
             _etmv4_edesc(c->seqrstevr & 0xFF,sz_buf1);
             printf("\tSEQRSTEVR = %02X, (Seqencer Reset Event = %s)\n",c->seqrstevr,sz_buf1);
@@ -1075,12 +1075,12 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t *c)
             {
                 if(c->counter_acc_mask & masksel)
                 {
-                     _etmv4_edesc(c->counter[i].cntctlr & 0xFF,sz_buf1);
-                     _etmv4_edesc((c->counter[i].cntctlr >> 8) & 0xFF,sz_buf2);
+                    _etmv4_edesc(c->counter[i].cntctlr & 0xFF,sz_buf1);
+                    _etmv4_edesc((c->counter[i].cntctlr >> 8) & 0xFF,sz_buf2);
                     printf("\tCNTCTLR%d = %08X, (%s%sCount Event = %s; Reload Event = %s)\n", 
-                        i, c->counter[i].cntctlr, c->counter[i].cntctlr & CS_ETMV4_CNTCTLR_chain ? " chain; " : "",
-                        c->counter[i].cntctlr & CS_ETMV4_CNTCTLR_rldself ? " rldself; " : "",
-                        sz_buf1,sz_buf2);
+                           i, c->counter[i].cntctlr, c->counter[i].cntctlr & CS_ETMV4_CNTCTLR_chain ? " chain; " : "",
+                           c->counter[i].cntctlr & CS_ETMV4_CNTCTLR_rldself ? " rldself; " : "",
+                           sz_buf1,sz_buf2);
                     printf("\tCNTRLDVR%d = %04X (Reload Value)\n",i, c->counter[i].cntrldvr);
                     printf("\tCNTVR%d = %04X (Counter Value)\n",i, c->counter[i].cntvr);
                 }
@@ -1088,7 +1088,7 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t *c)
             }
         }
         else
-             printf("\n===Counters not implemented===\n");
+            printf("\n===Counters not implemented===\n");
     }
 
     if(c->flags & CS_ETMC_RES_SEL)
@@ -1145,12 +1145,12 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t *c)
                     _bitnums_as_str(16,c->ss_comps[i].ssccr & 0xFFFF,sz_buf1);
 
                     printf("\tSSCCR%d = %08X, (ARPair=%02X [%s], ACSingle=%04X [%s] RST=%d)\n",i, 
-                        c->ss_comps[i].ssccr, (c->ss_comps[i].ssccr >> 16) & 0xFF, sz_buf2,
-                        c->ss_comps[i].ssccr & 0xFFFF, sz_buf1, (c->ss_comps[i].ssccr >> 24) & 0x1);
+                           c->ss_comps[i].ssccr, (c->ss_comps[i].ssccr >> 16) & 0xFF, sz_buf2,
+                           c->ss_comps[i].ssccr & 0xFFFF, sz_buf1, (c->ss_comps[i].ssccr >> 24) & 0x1);
                     printf("\tSSCSR%d = %08X, (Status=%d, Support: PC:%s; DV:%s, DA:%s, INST:%s)\n",i,c->ss_comps[i].sscsr,
-                        (c->ss_comps[i].sscsr >> 31) & 0x1, ((c->ss_comps[i].sscsr >> 3) & 0x1) ? "Y" : "N", 
-                        ((c->ss_comps[i].sscsr >> 2) & 0x1) ? "Y" : "N", ((c->ss_comps[i].sscsr >> 1) & 0x1) ? "Y" : "N", 
-                        (c->ss_comps[i].sscsr & 0x1) ? "Y" : "N");
+                           (c->ss_comps[i].sscsr >> 31) & 0x1, ((c->ss_comps[i].sscsr >> 3) & 0x1) ? "Y" : "N", 
+                           ((c->ss_comps[i].sscsr >> 2) & 0x1) ? "Y" : "N", ((c->ss_comps[i].sscsr >> 1) & 0x1) ? "Y" : "N", 
+                           (c->ss_comps[i].sscsr & 0x1) ? "Y" : "N");
                     printf("\tSSPCOCR%d = %08X\n",i, c->ss_comps[i].sspcicr);
                 }
                 masksel <<= 1;
@@ -1186,7 +1186,7 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t *c)
                         printf("%08X", c->addr_comps[i].acvr_h);
                     printf("%08X\n", c->addr_comps[i].acvr_l);
                     printf("\tACATR%d = %08X, (Type:%s, Context: %s Ctxt-comp %d," ,i, c->addr_comps[i].acatr_l,
-                        tname[(c->addr_comps[i].acatr_l)&0x3],ctxttname[(c->addr_comps[i].acatr_l >> 2 )&0x3],(c->addr_comps[i].acatr_l >> 4 )&0x7);
+                           tname[(c->addr_comps[i].acatr_l)&0x3],ctxttname[(c->addr_comps[i].acatr_l >> 2 )&0x3],(c->addr_comps[i].acatr_l >> 4 )&0x7);
                     _el_desc((c->addr_comps[i].acatr_l >> 8 )&0xF,sz_buf1);
                     _el_desc((c->addr_comps[i].acatr_l >> 12 )&0xF,sz_buf2);
                     printf("Excl ELs_S%s, Excl ELs_NS%s,",sz_buf1,sz_buf2);

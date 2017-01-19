@@ -38,9 +38,9 @@ int cs_diag_set(int n);
 int cs_shutdown(void);
 
 /**
-Release internal claims on all trace devices, e.g. by unsetting the
-internal claim bit.  This allows free use and reprogramming by an
-external debugger.
+   Release internal claims on all trace devices, e.g. by unsetting the
+   internal claim bit.  This allows free use and reprogramming by an
+   external debugger.
 */
 int cs_release(void);
 

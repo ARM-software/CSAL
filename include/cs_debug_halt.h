@@ -28,11 +28,11 @@
 #ifdef USING_V7_DBG_HALT
 
 /**
-\defgroup debug_v7_halt Intrusive halt mode debug interface to v7 debug architecture CPU
+   \defgroup debug_v7_halt Intrusive halt mode debug interface to v7 debug architecture CPU
 
- * This interface is not present on the standard implementation of the library. 
- * Added for board hardware bring up testing only.
-@{
+   * This interface is not present on the standard implementation of the library. 
+   * Added for board hardware bring up testing only.
+   @{
 */
 
 #define CS_DEBUG_CANCEL_BUS_REQUESTS  0x01   /**< Cancel any outstanding bus requests */
@@ -56,14 +56,14 @@ int cs_debug_halt(cs_device_t, unsigned int flags);
  *  Debug method-of-entry
  */
 typedef enum cs_debug_moe {
-  CS_DEBUG_MOE_REQUEST = 0,
-  CS_DEBUG_MOE_BREAKPOINT = 1,
-  CS_DEBUG_MOE_ASYNC_WATCHPOINT = 2,
-  CS_DEBUG_MOE_BKPT_INSTRUCTION = 3,
-  CS_DEBUG_MOE_EXTERNAL = 4,
-  CS_DEBUG_MOE_VECTOR_CATCH = 5,
-  CS_DEBUG_MOE_OS_UNLOCK_CATCH = 8,
-  CS_DEBUG_MOE_SYNC_WATCHPOINT = 10
+    CS_DEBUG_MOE_REQUEST = 0,
+    CS_DEBUG_MOE_BREAKPOINT = 1,
+    CS_DEBUG_MOE_ASYNC_WATCHPOINT = 2,
+    CS_DEBUG_MOE_BKPT_INSTRUCTION = 3,
+    CS_DEBUG_MOE_EXTERNAL = 4,
+    CS_DEBUG_MOE_VECTOR_CATCH = 5,
+    CS_DEBUG_MOE_OS_UNLOCK_CATCH = 8,
+    CS_DEBUG_MOE_SYNC_WATCHPOINT = 10
 } cs_debug_moe_t;
 
 /**

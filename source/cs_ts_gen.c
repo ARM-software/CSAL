@@ -1,19 +1,19 @@
 /*
-Coresight Access Library - API trace source programming functions
+  Coresight Access Library - API trace source programming functions
 
-Copyright (C) ARM Limited, 2014. All rights reserved.
+  Copyright (C) ARM Limited, 2014. All rights reserved.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+  http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 */
 
 
@@ -161,8 +161,8 @@ int cs_tsgen_config_as_ro(cs_device_t dev)
     struct cs_device *d = DEV(dev);
     if(d->type == DEV_TS)
     {
-         d->v.ts.config.if_type = TSGEN_INTERFACE_RO;
-         return 0;
+        d->v.ts.config.if_type = TSGEN_INTERFACE_RO;
+        return 0;
     }
     return -1;
 }
