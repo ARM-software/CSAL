@@ -48,7 +48,7 @@ int cs_debug_halt(cs_device_t dev, unsigned int flags)
 }
 
 
-int cs_debug_is_halted(cs_device_t dev, cs_debug_moe_t *reason)
+int cs_debug_is_halted(cs_device_t dev, cs_debug_moe_t * reason)
 {
     int flag;
     struct cs_device *d = DEV(dev);
@@ -58,7 +58,7 @@ int cs_debug_is_halted(cs_device_t dev, cs_debug_moe_t *reason)
     flag = _cs_isset(d, CS_DBGDSCR, CS_DBGDSCR_HALTED);
     if (flag && reason != NULL) {
         /* Read the MOE field */
-        *reason = (cs_debug_moe_t)((_cs_read(d, CS_DBGDSCR) >> 2) & 0xF);
+        *reason = (cs_debug_moe_t) ((_cs_read(d, CS_DBGDSCR) >> 2) & 0xF);
     }
     return flag;
 }
@@ -84,7 +84,8 @@ int cs_debug_cpu_is_active(cs_device_t dev)
        CPU from about 80% to nearly 100%. */
     for (i = 0; i < 5; ++i) {
         is_active = _cs_isset(d, CS_DBGDSCR, CS_DBGDSCR_PipeAdv);
-        if (is_active) break;
+        if (is_active)
+            break;
     }
     return is_active;
 }
@@ -98,7 +99,7 @@ int cs_debug_cpu_is_active(cs_device_t dev)
 #define R1 1
 
 #define CP15_DFAR   0xEE060F10
-#define CP15_DFSR   0xEE050F10 
+#define CP15_DFSR   0xEE050F10
 
 static int _cs_debug_exec(struct cs_device *d, unsigned int inst)
 {
@@ -129,7 +130,8 @@ int cs_debug_exec(cs_device_t dev, unsigned int inst)
 */
 #define CS_DEBUG_READ_DATA_ABORT  (-10)
 #define CS_DEBUG_READ_NO_RESPONSE (-11)
-static int cs_debug_exec_and_read(struct cs_device *d, unsigned int inst, unsigned int *pvalue)
+static int cs_debug_exec_and_read(struct cs_device *d, unsigned int inst,
+                                  unsigned int *pvalue)
 {
     int rc;
     unsigned int dscr;
@@ -150,10 +152,12 @@ static int cs_debug_exec_and_read(struct cs_device *d, unsigned int inst, unsign
             *pvalue = value;
         }
         rc = 0;
-    } else if (dscr & (CS_DBGDSCR_SDABORT_l|CS_DBGDSCR_ADABORT_l)) {
+    } else if (dscr & (CS_DBGDSCR_SDABORT_l | CS_DBGDSCR_ADABORT_l)) {
         rc = CS_DEBUG_READ_DATA_ABORT;
     } else {
-        fprintf(stderr, "** no response to debug data transfer, DBGDSCR=%08X\n", dscr);
+        fprintf(stderr,
+                "** no response to debug data transfer, DBGDSCR=%08X\n",
+                dscr);
         rc = CS_DEBUG_READ_NO_RESPONSE;
     }
     return rc;
@@ -164,7 +168,8 @@ static int cs_debug_exec_and_read(struct cs_device *d, unsigned int inst, unsign
   Write a value to the (external) DBGDTRRX and wait for it to be visible internally.
   Then execute an instruction and wait for it to complete.
 */
-static int cs_debug_write_and_exec(struct cs_device *d, unsigned int value, unsigned int inst)
+static int cs_debug_write_and_exec(struct cs_device *d, unsigned int value,
+                                   unsigned int inst)
 {
     _cs_write_wo(d, CS_DBGDTRRX, value);
     _cs_wait(d, CS_DBGDSCR, CS_DBGDSCR_RXfull);
@@ -172,7 +177,8 @@ static int cs_debug_write_and_exec(struct cs_device *d, unsigned int value, unsi
 }
 
 
-static int cs_debug_read_register(struct cs_device *d, unsigned int reg, unsigned int *pvalue)
+static int cs_debug_read_register(struct cs_device *d, unsigned int reg,
+                                  unsigned int *pvalue)
 {
     unsigned int inst;
 
@@ -189,7 +195,8 @@ static int cs_debug_read_register(struct cs_device *d, unsigned int reg, unsigne
 /*
   Read a CP15 register, using a work register.
 */
-static int cs_debug_read_cp15(struct cs_device *d, unsigned int inst, unsigned int *pvalue, unsigned int workreg)
+static int cs_debug_read_cp15(struct cs_device *d, unsigned int inst,
+                              unsigned int *pvalue, unsigned int workreg)
 {
     /* Execute MRC to read a value into the work register... */
     cs_debug_exec(d, inst | 0x00100000 | (workreg << 12));
@@ -198,23 +205,26 @@ static int cs_debug_read_cp15(struct cs_device *d, unsigned int inst, unsigned i
 }
 
 
-static int cs_debug_write_register(struct cs_device *d, unsigned int reg, unsigned int value)
+static int cs_debug_write_register(struct cs_device *d, unsigned int reg,
+                                   unsigned int value)
 {
     /* Execute an MRC from the debug transfer register, into the selected core register. */
     return cs_debug_write_and_exec(d, value, (0xEE100E15 | (reg << 12)));
 }
 
 
-static int cs_debug_write_cp15(struct cs_device *d, unsigned int inst, unsigned int value, unsigned int workreg)
+static int cs_debug_write_cp15(struct cs_device *d, unsigned int inst,
+                               unsigned int value, unsigned int workreg)
 {
     /* Write the value into the work register... */
     cs_debug_write_register(d, workreg, value);
     /* ... and execute the MCR from that work register. */
     return cs_debug_exec(d, inst | (workreg << 12));
-} 
+}
 
 
-int cs_debug_read_registers(cs_device_t dev, unsigned int mask, unsigned int *regs)
+int cs_debug_read_registers(cs_device_t dev, unsigned int mask,
+                            unsigned int *regs)
 {
     int rc;
     unsigned int i;
@@ -231,14 +241,16 @@ int cs_debug_read_registers(cs_device_t dev, unsigned int mask, unsigned int *re
     for (i = 0; i < 15; ++i) {
         if ((mask & (1U << i)) != 0) {
             rc = cs_debug_read_register(d, i, &regs[i]);
-            if (rc) break;
+            if (rc)
+                break;
         }
     }
     return rc;
 }
 
 
-int cs_debug_read_sysreg(cs_device_t dev, unsigned int reg, unsigned int *pvalue)
+int cs_debug_read_sysreg(cs_device_t dev, unsigned int reg,
+                         unsigned int *pvalue)
 {
     int rc;
     struct cs_device *d = DEV(dev);
@@ -248,14 +260,15 @@ int cs_debug_read_sysreg(cs_device_t dev, unsigned int reg, unsigned int *pvalue
 
     rc = cs_debug_read_register(d, R0, &save_r0);
     if (!rc) {
-        cs_debug_exec(d, 0xE10F0000 | (reg << 22) | (R0 << 12));   /* MRS r0,... */
+        cs_debug_exec(d, 0xE10F0000 | (reg << 22) | (R0 << 12));	/* MRS r0,... */
         cs_debug_read_register(d, R0, pvalue);
         rc = cs_debug_write_register(d, R0, save_r0);
     }
     return rc;
 }
 
-int cs_debug_read_memory(cs_device_t dev, cs_virtaddr_t addr, void *data, unsigned int size)
+int cs_debug_read_memory(cs_device_t dev, cs_virtaddr_t addr, void *data,
+                         unsigned int size)
 {
     int rc, rc1;
     struct cs_device *d = DEV(dev);
@@ -264,7 +277,7 @@ int cs_debug_read_memory(cs_device_t dev, cs_virtaddr_t addr, void *data, unsign
     /* R0 is used as the base address register */
     unsigned int save_r0;
     unsigned int save_dfar, save_dfsr;
-    unsigned char *p = (unsigned char *)data;
+    unsigned char *p = (unsigned char *) data;
 
     assert(!IS_V8(d));
 
@@ -277,10 +290,11 @@ int cs_debug_read_memory(cs_device_t dev, cs_virtaddr_t addr, void *data, unsign
         cs_debug_read_cp15(d, CP15_DFSR, &save_dfsr, R0);
         /* Now set the base address for the LDCs */
         cs_debug_write_register(d, R0, (addr & ~3));
-        while (size > 0) {      
+        while (size > 0) {
             unsigned int value;
             /* LDC p14,c5,[r0],#4 */
-            rc = cs_debug_exec_and_read(d, 0xECB05E01 | (R0 << 16), &value);
+            rc = cs_debug_exec_and_read(d, 0xECB05E01 | (R0 << 16),
+                                        &value);
             if (rc) {
                 if (rc == CS_DEBUG_READ_DATA_ABORT) {
                     unsigned int dfar, dfsr;
@@ -288,7 +302,8 @@ int cs_debug_read_memory(cs_device_t dev, cs_virtaddr_t addr, void *data, unsign
                     _cs_write_wo(d, CS_DBGDRCR, CS_DBGDRCR_CSE);
                     cs_debug_read_cp15(d, CP15_DFAR, &dfar, R0);
                     cs_debug_read_cp15(d, CP15_DFSR, &dfsr, R0);
-                    fprintf(stderr, "** debug read data abort, DFAR=%08X, DFSR=%08X (saved %08X,%08X)\n",
+                    fprintf(stderr,
+                            "** debug read data abort, DFAR=%08X, DFSR=%08X (saved %08X,%08X)\n",
                             dfar, dfsr, save_dfar, save_dfsr);
                 }
                 cs_debug_write_cp15(d, CP15_DFAR, save_dfar, R0);
@@ -303,7 +318,7 @@ int cs_debug_read_memory(cs_device_t dev, cs_virtaddr_t addr, void *data, unsign
                     --size;
                 }
             } else {
-                *(unsigned int *)p = value;
+                *(unsigned int *) p = value;
                 p += 4;
                 size -= 4;
             }
@@ -329,7 +344,7 @@ int cs_debug_restart(cs_device_t dev)
     _cs_unlock(d);
     /* "When the processor is in Debug state, it can exit Debug state by
        performing a single write to DBGDRCR with DBGDRCR.{CSE,RRQ} == 0b11." */
-    _cs_write_wo(d, CS_DBGDRCR, CS_DBGDRCR_CSE|CS_DBGDRCR_RRQ);
+    _cs_write_wo(d, CS_DBGDRCR, CS_DBGDRCR_CSE | CS_DBGDRCR_RRQ);
     rc = _cs_wait(d, CS_DBGDSCR, CS_DBGDSCR_RESTARTED);
     /* At this point either
        - the processor has exited Debug state (HALTED=0)
@@ -341,6 +356,6 @@ int cs_debug_restart(cs_device_t dev)
     return rc;
 }
 
-#endif /*  USING_V7_DBG_HALT */
+#endif				/*  USING_V7_DBG_HALT */
 
 /* end of cs_debug_halt.c */

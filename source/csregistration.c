@@ -44,8 +44,9 @@ static const struct board *do_probe_board(const struct board *board_list)
     int cpu_number = -1;
 
     if (!fl) {
-        if(registration_verbose)    
-            printf("CSREG: Failed to open /proc/cpuinfo - cannot detect the board\n");
+        if (registration_verbose)
+            printf
+                ("CSREG: Failed to open /proc/cpuinfo - cannot detect the board\n");
         return NULL;
     }
 
@@ -57,20 +58,21 @@ static const struct board *do_probe_board(const struct board *board_list)
             for (i = 1; i < len; ++i) {
                 if (line[i] == '(') {
                     /* Convert "Myboard (test)" into "Myboard" etc. */
-                    line[i-1] = '\0';
+                    line[i - 1] = '\0';
                     break;
                 }
-            } 
+            }
             for (b = board_list; b->do_registration; b++) {
                 if (strcmp(line + 11, b->hardware) == 0) {
-                    if(registration_verbose >= 2)    
-                        printf("CSREG: Detected '%s' board\n", b->hardware);
+                    if (registration_verbose >= 2)
+                        printf("CSREG: Detected '%s' board\n",
+                               b->hardware);
                     board = b;
                     break;
                 }
             }
             if (!board) {
-                if(registration_verbose)    
+                if (registration_verbose)
                     printf("CSREG: Board '%s' not known\n", line + 11);
             }
         } else if (strncmp(line, "processor\t: ", 12) == 0) {
@@ -92,61 +94,65 @@ static const struct board *do_probe_board(const struct board *board_list)
 }
 #endif
 
-static int do_registration(const struct board *board, struct cs_devices_t *devices)
+static int do_registration(const struct board *board,
+                           struct cs_devices_t *devices)
 {
-    /* clear the devices structure */ 
-    memset(devices,0,sizeof(struct cs_devices_t));
-  
+    /* clear the devices structure */
+    memset(devices, 0, sizeof(struct cs_devices_t));
+
     if (board->do_registration(devices) != 0) {
-        if(registration_verbose)    
-            printf("CSREG: Failed to register board '%s'\n", board->hardware);
+        if (registration_verbose)
+            printf("CSREG: Failed to register board '%s'\n",
+                   board->hardware);
         return -1;
     }
 
     /* No more registrations */
     if (cs_registration_complete() != 0) {
-        if(registration_verbose)    
-            printf("CSREG: Registration problems on cs_registration_complete()\n");
+        if (registration_verbose)
+            printf
+                ("CSREG: Registration problems on cs_registration_complete()\n");
         return -1;
     }
     if (cs_error_count() > 0) {
-        if(registration_verbose)    
+        if (registration_verbose)
             printf("CSREG: Errors recorded during registration\n");
         return -1;
     }
-    if(registration_verbose)    
+    if (registration_verbose)
         printf("CSREG: Registration complete.\n");
     return 0;
 }
 
-static int initilise_board(const struct board **board, struct cs_devices_t *devices)
-{ 
+static int initilise_board(const struct board **board,
+                           struct cs_devices_t *devices)
+{
     if (cs_init() < 0) {
-        if(registration_verbose)    
+        if (registration_verbose)
             printf("CSREG: Failed cs_init()\n");
         return -1;
     }
 
     if (do_registration(*board, devices) < 0) {
-        if(registration_verbose)    
-            printf("CSREG: Registration failed in setup_board()\n"); 
+        if (registration_verbose)
+            printf("CSREG: Registration failed in setup_board()\n");
         return -1;
     }
     return 0;
 }
 
-int setup_board(const struct board **board, struct cs_devices_t *devices, const struct board *board_list)
+int setup_board(const struct board **board, struct cs_devices_t *devices,
+                const struct board *board_list)
 {
     if (!board || !devices || !board_list) {
-        if(registration_verbose)    
+        if (registration_verbose)
             printf("CSREG: Invalid parameters to setup_board()\n");
         return -1;
     }
-
 #ifndef BAREMETAL
     *board = do_probe_board(board_list);
     if (!*board) {
-        if(registration_verbose)    
+        if (registration_verbose)
             printf("CSREG: Failed to detect the board!\n");
         return -1;
     }
@@ -154,15 +160,17 @@ int setup_board(const struct board **board, struct cs_devices_t *devices, const 
     *board = &board_list[0];
 #endif
 
-    return initilise_board(board,devices);
+    return initilise_board(board, devices);
 }
 
-int setup_named_board(const char *board_name, const struct board **board, struct cs_devices_t *devices, const struct board *board_list)
+int setup_named_board(const char *board_name, const struct board **board,
+                      struct cs_devices_t *devices,
+                      const struct board *board_list)
 {
     const struct board *b = NULL;
 
     if (!board || !devices || !board_list || !board_name) {
-        if(registration_verbose)    
+        if (registration_verbose)
             printf("CSREG: Invalid parameters to setup_board()\n");
         return -1;
     }
@@ -170,18 +178,20 @@ int setup_named_board(const char *board_name, const struct board **board, struct
     *board = NULL;
     for (b = board_list; b->do_registration; b++) {
         if (strcmp(board_name, b->hardware) == 0) {
-            if(registration_verbose >= 2)    
+            if (registration_verbose >= 2)
                 printf("CSREG: Selected '%s' board\n", b->hardware);
             *board = b;
             break;
         }
     }
 
-    if(*board == NULL) {
-        if(registration_verbose)    
-            printf("CSREG: Unable to find name %s in setup_named_board()\n", board_name);
+    if (*board == NULL) {
+        if (registration_verbose)
+            printf
+                ("CSREG: Unable to find name %s in setup_named_board()\n",
+                 board_name);
         return -1;
     }
 
-    return initilise_board(board,devices);
+    return initilise_board(board, devices);
 }

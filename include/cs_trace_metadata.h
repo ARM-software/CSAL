@@ -43,7 +43,9 @@
  *  \param name_buf_size Size of name buffer
  *  \return         Number of bytes written, or needed
  */
-int cs_get_trace_metadata(int mtype, cs_device_t dev, int trace_id, char *buf, unsigned int size, char* name_buf, unsigned int name_buf_size);
+int cs_get_trace_metadata(int mtype, cs_device_t dev, int trace_id,
+			  char *buf, unsigned int size, char *name_buf,
+			  unsigned int name_buf_size);
 
 
 /** @} */

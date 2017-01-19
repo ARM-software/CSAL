@@ -73,7 +73,7 @@ typedef enum cs_debug_moe {
  *  \param dev      device descriptor for CPU
  *  \param reason   pointer to receive method-of-entry code
  */
-int cs_debug_is_halted(cs_device_t dev, cs_debug_moe_t *reason);
+int cs_debug_is_halted(cs_device_t dev, cs_debug_moe_t * reason);
 
 /**
  *  Attempt to check if a CPU is currently executing instructions.
@@ -97,8 +97,8 @@ int cs_debug_cpu_is_active(cs_device_t);
 int cs_debug_exec(cs_device_t dev, unsigned int inst);
 
 
-#define CS_SYSREG_APSR  0x0000    /**< System register selector: Application PSR */
-#define CS_SYSREG_SPSR  0x0001    /**< System register selector: Saved PSR */
+#define CS_SYSREG_APSR  0x0000	  /**< System register selector: Application PSR */
+#define CS_SYSREG_SPSR  0x0001	  /**< System register selector: Saved PSR */
 /**
  *  Read a system register on a halted CPU.
  *
@@ -106,7 +106,8 @@ int cs_debug_exec(cs_device_t dev, unsigned int inst);
  *  \param reg    System register to read (e.g. CS_SYSREG_APSR)
  *  \param pvalue Pointer to receive system register value
  */
-int cs_debug_read_sysreg(cs_device_t dev, unsigned int reg, unsigned int *pvalue);
+int cs_debug_read_sysreg(cs_device_t dev, unsigned int reg,
+			 unsigned int *pvalue);
 
 
 /**
@@ -117,7 +118,8 @@ int cs_debug_read_sysreg(cs_device_t dev, unsigned int reg, unsigned int *pvalue
  *  \param pdata  pointer to receive data
  *  \param size   size of data to read, in bytes
  */
-int cs_debug_read_memory(cs_device_t dev, cs_virtaddr_t addr, void *pdata, unsigned int size);
+int cs_debug_read_memory(cs_device_t dev, cs_virtaddr_t addr, void *pdata,
+			 unsigned int size);
 
 
 /**
@@ -135,13 +137,14 @@ int cs_debug_restart(cs_device_t dev);
  *  \param mask   mask of registers to read (bit 0 for R0 etc.)
  *  \param regs   area to read registers to - results are not packed
  */
-int cs_debug_read_registers(cs_device_t dev, unsigned int mask, unsigned int *regs);
+int cs_debug_read_registers(cs_device_t dev, unsigned int mask,
+			    unsigned int *regs);
 
 
 /** @} */
 
-#endif /*  USING_V7_DBG_HALT */
+#endif				/*  USING_V7_DBG_HALT */
 
-#endif /* _included_cs_debug_halt_h */
+#endif				/* _included_cs_debug_halt_h */
 
 /* end of  cs_debug_halt.h */

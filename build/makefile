@@ -176,7 +176,7 @@ dist: $(distfile)
 
 # readme.html
 
-$(distfile): $(sources) ../doxygen-cfg.txt ../readme.md ../readme.xml 
+$(distfile): $(sources) ../doxygen-cfg.txt ../README.md ../LICENCE
 	tar -czf $@ $^
 	tar -tzf $@
 

@@ -87,7 +87,8 @@ int cs_trace_swstim_get_port_count(cs_device_t dev);
  *  \param port   the stimulus port index - must be in valid range for the device
  *  \param value  the stimulus message value (payload)
  */
-int cs_trace_stimulus(cs_device_t dev, unsigned int port, unsigned int value);
+int cs_trace_stimulus(cs_device_t dev, unsigned int port,
+		      unsigned int value);
 
 /*!
  * Enable triggers on stimulus port write.
@@ -102,7 +103,8 @@ int cs_trace_stimulus(cs_device_t dev, unsigned int port, unsigned int value);
  *
  * @return int  : 0 for success.
  */
-int cs_trace_swstim_enable_trigger(cs_device_t dev, unsigned int mask, unsigned int value);
+int cs_trace_swstim_enable_trigger(cs_device_t dev, unsigned int mask,
+				   unsigned int value);
 
 /*!
  * Enable all SW stimulus ports on the device.
@@ -153,7 +155,7 @@ int cs_trace_swstim_set_sync_repeat(cs_device_t dev, unsigned int value);
  *  \return             Zero on success, error code otherwise
  */
 int cs_stm_config_master(cs_device_t dev, unsigned int master,
-                         cs_physaddr_t port_0_addr);
+			 cs_physaddr_t port_0_addr);
 /*!
  * Select STM master to be used in cs_trace_stimulus() or cs_stm_ext_write()
  *
@@ -187,7 +189,9 @@ int cs_stm_select_master(cs_device_t dev, unsigned int master);
  *
  * @return int  : 0 for successful operation.
 */
-int cs_stm_ext_write(cs_device_t dev, const unsigned int port, const unsigned char *value, const int length, const int trans_type);  
+int cs_stm_ext_write(cs_device_t dev, const unsigned int port,
+		     const unsigned char *value, const int length,
+		     const int trans_type);
 
 /*!
  * Reads a set of configuration registers from the STM. 
@@ -199,7 +203,7 @@ int cs_stm_ext_write(cs_device_t dev, const unsigned int port, const unsigned ch
  *
  * @return int  : 0 for successful operation.
  */
-int cs_stm_config_get(cs_device_t dev, stm_config_t *dyn_config);
+int cs_stm_config_get(cs_device_t dev, stm_config_t * dyn_config);
 
 /*!
  * Writes a set of configuration registers to the STM. 
@@ -211,13 +215,12 @@ int cs_stm_config_get(cs_device_t dev, stm_config_t *dyn_config);
  *
  * @return int  : 0 for successful operation.
  */
-int cs_stm_config_put(cs_device_t dev, stm_config_t *dyn_config);
+int cs_stm_config_put(cs_device_t dev, stm_config_t * dyn_config);
 
 /** @} */
 
 /** @}*/
 
-#endif /* _included_cs_sw_stim_h */
+#endif				/* _included_cs_sw_stim_h */
 
 /* end of  cs_sw_stim.h */
-

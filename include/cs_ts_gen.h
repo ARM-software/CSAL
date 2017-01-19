@@ -49,7 +49,7 @@
  */
 typedef enum {
     TSGEN_INTERFACE_CTRL,     /**< interface is the control interface - used for both CS and secure control of system generic time. */
-    TSGEN_INTERFACE_RO        /**< interface is the read-only access interface - used if generator using system generic time. */
+    TSGEN_INTERFACE_RO	      /**< interface is the read-only access interface - used if generator using system generic time. */
 } cs_ts_gen_interface_t;
 
 
@@ -88,7 +88,7 @@ typedef struct cs_ts_gen_config {
  *
  * @return uint64_t  : 0 for success, -1 if device is not a TS gen, or value pointer is NULL
  */
-int cs_tsgen_readvalue(cs_device_t dev, uint64_t *value);
+int cs_tsgen_readvalue(cs_device_t dev, uint64_t * value);
 
 /*!
  *  @brief Set the TS generator timestamp value.
@@ -153,7 +153,7 @@ int cs_tsgen_set_freq_id(cs_device_t dev, uint32_t freq);
  *
  * @return int  : 0 for success, -1 if not a TS gen or RO type.
  */
-int cs_tsgen_get_freq_id(cs_device_t dev, uint32_t *freq);
+int cs_tsgen_get_freq_id(cs_device_t dev, uint32_t * freq);
 
 /*!
  *   @brief Mark libray object attached to RO interface.
@@ -175,4 +175,4 @@ int cs_tsgen_config_as_ro(cs_device_t dev);
 
 /** @}*/
 
-#endif /* _included_cs_ts_gen_h */
+#endif				/* _included_cs_ts_gen_h */

@@ -89,12 +89,13 @@ int cs_sink_disable(cs_device_t dev)
     _cs_unlock(d);
     if (d->type == DEV_TPIU) {
         /* TPIU */
-        _cs_set(d, CS_TPIU_FLFMT_CTRL, CS_TPIU_FLFMT_CTRL_StopFl);   /* Stop flush */
+        _cs_set(d, CS_TPIU_FLFMT_CTRL, CS_TPIU_FLFMT_CTRL_StopFl);	/* Stop flush */
         /* When we request a flush via FOnMan, the FOnMan reads back as 1 while the
            flush is in progress, then goes to 0.  So don't try to read back. */
         _cs_set_wo(d, CS_TPIU_FLFMT_CTRL, CS_TPIU_FLFMT_CTRL_FOnMan);
         /* This is the indicator that the flush sequence has completed. */
-        return _cs_wait(d, CS_TPIU_FLFMT_STATUS, CS_TPIU_FLFMT_STATUS_FtStopped);
+        return _cs_wait(d, CS_TPIU_FLFMT_STATUS,
+                        CS_TPIU_FLFMT_STATUS_FtStopped);
     } else if (d->type == DEV_SWO) {
         /* SWO */
         /* Stopping and flushing the SWO is not supported */
@@ -116,13 +117,16 @@ int cs_sink_disable(cs_device_t dev)
         }
         /* "Disable trace capture" by unsetting TraceCaptEn */
         rc = _cs_write(d, CS_ETB_CTRL, 0x0);
-        if (rc) return rc;
+        if (rc)
+            return rc;
         /* Wait for formatter to flush */
         rc = _cs_wait(d, CS_ETB_STATUS, CS_ETB_STATUS_FtEmpty);
-        if (rc) return rc;
+        if (rc)
+            return rc;
         /* After FtEmpty: "Formatter pipeline is empty. All data is stored to RAM." */
         /* "Capture is fully disabled, or complete, when FtStopped goes high" */
-        rc = _cs_wait(d, CS_ETB_FLFMT_STATUS, CS_ETB_FLFMT_STATUS_FtStopped);
+        rc = _cs_wait(d, CS_ETB_FLFMT_STATUS,
+                      CS_ETB_FLFMT_STATUS_FtStopped);
         return rc;
     } else {
         return -1;
@@ -160,7 +164,9 @@ int cs_set_buffer_trigger_counter(cs_device_t dev, unsigned int bytes)
     assert(bytes <= cs_get_buffer_size_bytes(dev));
     _cs_unlock(d);
     /* For TMCs this is defined as a count of 32-bit words.  For CoreSight ETBs it's the same. */
-    return _cs_write(d, CS_ETB_TRIGGER_COUNT, bytes >> (d->v.etb.is_tmc_device ? 2 : ETB_WIDTH_SCALE_SHIFT));
+    return _cs_write(d, CS_ETB_TRIGGER_COUNT,
+                     bytes >> (d->v.etb.
+                               is_tmc_device ? 2 : ETB_WIDTH_SCALE_SHIFT));
 }
 
 /*
@@ -198,8 +204,7 @@ int cs_get_buffer_unread_bytes(cs_device_t dev)
             unread = (wrptr - rdptr) << shift;
         } else {
             unread = d->v.etb.buffer_size_bytes -
-                (rdptr << shift) +
-                (wrptr << shift);
+                (rdptr << shift) + (wrptr << shift);
         }
     }
     return unread;
@@ -217,7 +222,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     assert(cs_device_has_class(dev, CS_DEVCLASS_BUFFER));
 
     /* The buffer into which the user wants to read trace, must be 8-byte aligned. */
-    assert(((unsigned long)buf & 3) == 0);
+    assert(((unsigned long) buf & 3) == 0);
 
     _cs_unlock(d);
     /* Put the buffer into a state where the read-pointer is the correct
@@ -244,15 +249,14 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     d->v.etb.currently_reading = 1;
 
     /* Read data into the user's buffer */
-    op = (unsigned int *)buf;
+    op = (unsigned int *) buf;
     if (DTRACE(d)) {
-        diagf("!ctrl=%08X status=%08X flstatus=%08X readptr=%08X writeptr=%08X unread=%04X\n",
-              _cs_read(d, CS_ETB_CTRL),
-              _cs_read(d, CS_ETB_STATUS),
-              _cs_read(d, CS_ETB_FLFMT_STATUS),
-              _cs_read(d, CS_ETB_RAM_RD_PTR),
-              _cs_read(d, CS_ETB_RAM_WR_PTR),
-              unread);
+        diagf
+            ("!ctrl=%08X status=%08X flstatus=%08X readptr=%08X writeptr=%08X unread=%04X\n",
+             _cs_read(d, CS_ETB_CTRL), _cs_read(d, CS_ETB_STATUS),
+             _cs_read(d, CS_ETB_FLFMT_STATUS), _cs_read(d,
+                                                        CS_ETB_RAM_RD_PTR),
+             _cs_read(d, CS_ETB_RAM_WR_PTR), unread);
     }
 
     /* Work out a total amount to read in this call.
@@ -270,7 +274,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     if (d->v.etb.is_tmc_device) {
         to_read &= ~((1U << d->v.etb.tmc.memory_width) - 1);
     } else {
-        to_read &= ~3;     /* round down to 32-bit words */
+        to_read &= ~3;		/* round down to 32-bit words */
     }
 
     words_left_to_read = to_read >> 2;
@@ -284,9 +288,10 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
        When a full memory width of data has been read, the RAM Read Pointer is
        incremented to the next memory word." */
     etb_read_reg = _cs_get_register_address(d, CS_ETB_RAM_DATA);
-    int xx = 0;    /* TBD and following lines */
+    int xx = 0;			/* TBD and following lines */
     if (0) {
-        fprintf(stderr, "TraceCaptEn=%u TMCReady=%u Empty=%u CBUFLEVEL=0x%x\n",
+        fprintf(stderr,
+                "TraceCaptEn=%u TMCReady=%u Empty=%u CBUFLEVEL=0x%x\n",
                 _cs_isset(d, CS_ETB_CTRL, CS_ETB_CTRL_TraceCaptEn),
                 _cs_isset(d, CS_ETB_STATUS, CS_TMC_STATUS_TMCReady),
                 _cs_isset(d, CS_ETB_STATUS, CS_TMC_STATUS_Empty),
@@ -295,8 +300,8 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     while (words_left_to_read > 0) {
         unsigned int data = *etb_read_reg;
         //printf("%u: read %08x, read ptr now %08x\n", xx/4, data, _cs_read(d, CS_ETB_RAM_RD_PTR));
-        __asm__ __volatile__("dsb sy");  /* TBD */
-        ++xx;   /* TBD */
+        __asm__ __volatile__("dsb sy");	/* TBD */
+        ++xx;			/* TBD */
         if (data != 0xFFFFFFFF) {
             *op++ = data;
         } else {
@@ -307,7 +312,8 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
                don't expect to ever see it.
             */
             if (DTRACE(d)) {
-                diagf("  read all 1s (%08X): readptr=%08X\n", data, _cs_read(d, CS_ETB_RAM_RD_PTR));
+                diagf("  read all 1s (%08X): readptr=%08X\n", data,
+                      _cs_read(d, CS_ETB_RAM_RD_PTR));
             }
             *op++ = data;
         }
@@ -324,7 +330,8 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
                subsequent reads will read 0xFFFFFFFF. */
             unsigned int checkff = *etb_read_reg;
             if (checkff != 0xFFFFFFFF) {
-                diagf("  TMC ETB read 0x%08X, expected 0xFFFFFFFF\n", checkff);
+                diagf("  TMC ETB read 0x%08X, expected 0xFFFFFFFF\n",
+                      checkff);
             }
             /* Now we can move from Stopped to Disabled. */
             _cs_clear(d, CS_ETB_CTRL, CS_ETB_CTRL_TraceCaptEn);
@@ -371,14 +378,17 @@ int cs_empty_trace_buffer(cs_device_t dev)
            So, temporarily disable StopTrig. */
         unsigned int flc = _cs_read(d, CS_ETB_FLFMT_CTRL);
         if (flc & (CS_ETB_FLFMT_CTRL_StopTrig | CS_ETB_FLFMT_CTRL_StopFl)) {
-            _cs_write(d, CS_ETB_FLFMT_CTRL, flc & ~(CS_ETB_FLFMT_CTRL_StopTrig | CS_ETB_FLFMT_CTRL_StopFl));
+            _cs_write(d, CS_ETB_FLFMT_CTRL,
+                      flc & ~(CS_ETB_FLFMT_CTRL_StopTrig |
+                              CS_ETB_FLFMT_CTRL_StopFl));
         }
         do {
             ++retries;
             if (retries > 3) {
                 unsigned int status = _cs_read(d, CS_ETB_STATUS);
                 unsigned int flstat = _cs_read(d, CS_ETB_FLFMT_STATUS);
-                return cs_report_device_error(d, "can't reset the wrapped flag, status=%08X, fl.status=%08X",
+                return cs_report_device_error(d,
+                                              "can't reset the wrapped flag, status=%08X, fl.status=%08X",
                                               status, flstat);
             }
             /* Set the write pointer to the start as we don't want to wrap again */
@@ -429,14 +439,15 @@ int cs_clear_trace_buffer(cs_device_t dev, unsigned int data)
 }
 
 /* This is a back door into ETB - not normally expected to be used */
-int cs_insert_trace_data(cs_device_t dev, void const *buf, unsigned int size)
+int cs_insert_trace_data(cs_device_t dev, void const *buf,
+                         unsigned int size)
 {
     struct cs_device *d = DEV(dev);
-    unsigned int const *ip = (unsigned int const *)buf;
+    unsigned int const *ip = (unsigned int const *) buf;
     unsigned int optr, nptr;
 
     assert(cs_device_has_class(dev, CS_DEVCLASS_BUFFER));
-    assert(((unsigned long)buf & 3) == 0);
+    assert(((unsigned long) buf & 3) == 0);
     assert((size & 3) == 0);
 
     _cs_unlock(d);
@@ -456,7 +467,8 @@ int cs_insert_trace_data(cs_device_t dev, void const *buf, unsigned int size)
         if (0) {
             nptr = _cs_read(d, CS_ETB_RAM_WR_PTR);
             if (optr == nptr) {
-                return cs_report_device_error(d, "failed to increment write-pointer");
+                return cs_report_device_error(d,
+                                              "failed to increment write-pointer");
             }
         }
     }

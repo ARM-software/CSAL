@@ -28,7 +28,7 @@
 /* *** init and management API *** */
 int cs_init(void)
 {
-    memset(&G,0,sizeof(struct global));
+    memset(&G, 0, sizeof(struct global));
 
 #ifdef UNIX_USERSPACE
     int fd = open("/dev/mem", O_RDWR);
@@ -37,20 +37,20 @@ int cs_init(void)
         return cs_report_error("can't open /dev/mem");
     }
     G.mem_fd = fd;
-#endif /* UNIX_USERSPACE */
+#endif				/* UNIX_USERSPACE */
     G.init_called = 1;
     G.registration_open = 1;
-    G.force_writes = 1;    /* While we're debugging it... */
+    G.force_writes = 1;		/* While we're debugging it... */
 #if CHECK
     G.diag_checking = 1;
 #else
     G.diag_checking = 0;
-#endif /* CHECK */
- 
-    G.diag_tracing_default = 0;   /* tracing off by default */
+#endif				/* CHECK */
+
+    G.diag_tracing_default = 0;	/* tracing off by default */
 
 #ifdef LPAE
-    G.phys_addr_lpae = 1;     /* 1 if built with LPAE */
+    G.phys_addr_lpae = 1;	/* 1 if built with LPAE */
 #else
     G.phys_addr_lpae = 0;
 #endif
@@ -68,7 +68,7 @@ int cs_diag_set(int n)
 {
 #ifdef DIAG
     G.diag_tracing_default = n;
-#endif /* DIAG */
+#endif				/* DIAG */
     return 0;
 }
 
@@ -86,7 +86,7 @@ int cs_shutdown(void)
         /* Now remove memory-mapped access */
         close(G.mem_fd);
         G.mem_fd = 0;
-#endif /* UNIX_USERSPACE */
+#endif				/* UNIX_USERSPACE */
         G.init_called = 0;
         G.registration_open = 0;
     }
@@ -114,7 +114,8 @@ int cs_release(void)
     for (d = G.device_top; d != NULL; d = d->next) {
         if (_cs_isclaimed(d, CS_CLAIM_INTERNAL)) {
             if (DTRACE(d)) {
-                diagf("!unclaiming device at %" CS_PHYSFMT "", d->phys_addr);
+                diagf("!unclaiming device at %" CS_PHYSFMT "",
+                      d->phys_addr);
             }
             _cs_unclaim(d, CS_CLAIM_INTERNAL);
         }
@@ -143,7 +144,8 @@ int cs_checkpoint(void)
 
 unsigned short cs_library_version()
 {
-    return (((unsigned short)CS_LIB_VERSION_MAJ & 0xFF) << 8) | ((unsigned short)CS_LIB_VERSION_MIN & 0xFF); 
+    return (((unsigned short) CS_LIB_VERSION_MAJ & 0xFF) << 8) |
+        ((unsigned short) CS_LIB_VERSION_MIN & 0xFF);
 }
 
 

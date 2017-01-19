@@ -58,13 +58,13 @@
 
   Board specific `do_registration` must set this correctly for the board.
 */
-struct cs_devices_t { 
+struct cs_devices_t {
     unsigned int cpu_id[LIB_MAX_CPU_DEVICES]; /**< CoreSight Core IDs for each of the cores in the system */
     cs_device_t ptm[LIB_MAX_CPU_DEVICES]; /**< Trace source device (ETM/PTM) associated with each core */
     cs_device_t itm;   /**< SWSTIM source on the system (ITM or STM). */
     cs_device_t etb;   /**< ETB style trace buffer (ETB/ETF) for the cores and optionally SWSTIM source. */
     cs_device_t itm_etb;  /**< if non-NULL, alternate ETB for the SWSTIM source if not captured in main ETB. */
-    cs_device_t trace_sinks[LIB_CSREG_MAX_TRACE_SINKS];   /**< Additional sinks (for later library expansion) */
+    cs_device_t trace_sinks[LIB_CSREG_MAX_TRACE_SINKS];	  /**< Additional sinks (for later library expansion) */
     cs_device_t trace_alt_srcs[LIB_CSREG_MAX_TRACE_ALT_SRC];  /**< Additional none-cores sources (for later library expansion) */
 };
 
@@ -79,8 +79,9 @@ struct board {
      *
      * @return int  : 0 if successful registration.
      */
-    int (*do_registration)(struct cs_devices_t *devices); /**< pointer to board specific registration function */
-    int n_cpu;    /**< number of CPUs on the board. */
+    int (*do_registration) (struct cs_devices_t * devices);
+							  /**< pointer to board specific registration function */
+    int n_cpu;	  /**< number of CPUs on the board. */
     const char *hardware; /**< Name of the hardware - to be matched to a read from `/proc/cpuinfo` */
 };
 
@@ -105,7 +106,8 @@ struct board {
  *
  * @return int  : 0 if successfully detected board and registered devices.
  */
-int setup_board(const struct board **board, struct cs_devices_t *devices, const struct board *board_list);
+int setup_board(const struct board **board, struct cs_devices_t *devices,
+		const struct board *board_list);
 
 /*! Array of CoreSight CPU IDs ordered by core index. 
     
@@ -140,7 +142,9 @@ extern int registration_verbose;
  *
  * @return int  :  0 if successfully selected board and registered devices.
  */
-int setup_named_board(const char *board_name, const struct board **board, struct cs_devices_t *devices, const struct board *board_list);
+int setup_named_board(const char *board_name, const struct board **board,
+		      struct cs_devices_t *devices,
+		      const struct board *board_list);
 
 /** @}*/
 

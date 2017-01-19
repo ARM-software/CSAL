@@ -29,8 +29,7 @@ int _cs_path_enable(struct cs_device *d, int enabled)
     int rc = 0;
     if (DTRACE(d)) {
         diagf("!%sable path from %" CS_PHYSFMT "\n",
-              (enabled ? "en" : "dis"),
-              d->phys_addr);
+              (enabled ? "en" : "dis"), d->phys_addr);
     }
     for (n = 0; n < d->n_out_ports; ++n) {
         struct cs_device *od = d->outs[n];
@@ -40,20 +39,24 @@ int _cs_path_enable(struct cs_device *d, int enabled)
                 /* Recursively enable this funnel's output path */
                 _cs_path_enable(od, enabled);
                 if (DTRACE(d)) {
-                    diagf("!%sable input port %u of funnel %" CS_PHYSFMT "\n",
-                          (enabled ? "en" : "dis"), od_in_port, od->phys_addr);
+                    diagf("!%sable input port %u of funnel %" CS_PHYSFMT
+                          "\n", (enabled ? "en" : "dis"), od_in_port,
+                          od->phys_addr);
                 }
                 _cs_unlock(od);
-                rc = _cs_set_mask(od, CS_FUNNEL_CTRL, (1U << od_in_port), (enabled << od_in_port));
+                rc = _cs_set_mask(od, CS_FUNNEL_CTRL, (1U << od_in_port),
+                                  (enabled << od_in_port));
                 if (DTRACE(od)) {
-                    diagf("!funnel inputs now %08X\n", _cs_read(od, CS_FUNNEL_CTRL));
+                    diagf("!funnel inputs now %08X\n",
+                          _cs_read(od, CS_FUNNEL_CTRL));
                 }
                 if (rc != 0) {
                     break;
                 }
             } else if (cs_device_is_replicator(od)) {
                 if (DTRACE(od)) {
-                    diagf("!%sable replicator\n", (enabled ? "en" : "dis"));
+                    diagf("!%sable replicator\n",
+                          (enabled ? "en" : "dis"));
                 }
                 /* Scan the replicator's out-ports in case they are funnel inputs */
                 _cs_path_enable(od, enabled);
@@ -77,11 +80,9 @@ int cs_set_trace_source_id(cs_device_t dev, cs_atid_t id)
         if (rc != 0) {
             return rc;
         }
-        if(CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4)
-        {
-            _cs_write(d,CS_ETMV4_TRACEIDR,id);
-        }
-        else
+        if (CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
+            _cs_write(d, CS_ETMV4_TRACEIDR, id);
+        } else
             _cs_write(d, CS_ETMTRACEIDR, id);
     } else if ((d->type == DEV_ITM) || (d->type == DEV_STM)) {
         _cs_swstim_set_trace_id(d, id);
@@ -98,15 +99,14 @@ int cs_set_trace_source_id(cs_device_t dev, cs_atid_t id)
 
 cs_atid_t cs_get_trace_source_id(cs_device_t dev)
 {
-    cs_atid_t id = (cs_atid_t)(-1);
+    cs_atid_t id = (cs_atid_t) (-1);
 
     struct cs_device *d = DEV(dev);
     assert(cs_device_has_class(dev, CS_DEVCLASS_SOURCE));
     if (cs_device_has_class(dev, CS_DEVCLASS_CPU)) {
-        if(CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
+        if (CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
             id = _cs_read(d, CS_ETMV4_TRACEIDR);
-        }
-        else {
+        } else {
             id = _cs_read(d, CS_ETMTRACEIDR);
         }
     } else if (d->type == DEV_ITM) {
@@ -124,7 +124,7 @@ int cs_trace_enable(cs_device_t dev)
     int rc;
     struct cs_device *d = DEV(dev);
     assert(cs_device_has_class(dev, CS_DEVCLASS_SOURCE));
-    _cs_path_enable(d, /*enabled=*/1);
+    _cs_path_enable(d, /*enabled= */ 1);
     _cs_unlock(d);
     if (cs_device_has_class(dev, CS_DEVCLASS_CPU)) {
         /* Enable PTM trace */
@@ -133,7 +133,7 @@ int cs_trace_enable(cs_device_t dev)
             return rc;
         }
         if (_cs_etm_version(d) < CS_ETMVERSION_PTM) {
-            _cs_set(d, CS_ETMCR, CS_ETMCR_ETMEN); /* ETM v3 only */
+            _cs_set(d, CS_ETMCR, CS_ETMCR_ETMEN);	/* ETM v3 only */
         } else {
             /* on PTM that bit is reserved */
         }
@@ -152,10 +152,10 @@ int cs_trace_is_enabled(cs_device_t dev)
     struct cs_device *d = DEV(dev);
     assert(cs_device_has_class(dev, CS_DEVCLASS_SOURCE));
     if (cs_device_has_class(dev, CS_DEVCLASS_CPU)) {
-        if(CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
-            is_enabled = _cs_isset(d,CS_ETMV4_PRGCTLR,CS_ETMV4_PRGCTLR_en);
-        }
-        else {
+        if (CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
+            is_enabled =
+                _cs_isset(d, CS_ETMV4_PRGCTLR, CS_ETMV4_PRGCTLR_en);
+        } else {
             is_enabled = !_cs_isset(d, CS_ETMCR, CS_ETMCR_ProgBit);
         }
     }
@@ -171,18 +171,17 @@ int cs_trace_disable(cs_device_t dev)
     _cs_unlock(d);
     /* Take any source-specific actions to disable trace */
     if (cs_device_has_class(dev, CS_DEVCLASS_CPU)) {
-        if(CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
+        if (CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
             /* ETMv4 - sufficent to enable programming */
             _cs_etm_v4_enable_programming(d);
-        }
-        else {
+        } else {
             /* ETM/PTM */
             if (_cs_etm_version(d) < CS_ETMVERSION_PTM) {
                 _cs_clear(d, CS_ETMCR, CS_ETMCR_ETMEN);
             } else {
                 /* on PTM that bit is reserved */
             }
-    
+
             /* Now we should wait for the FIFO to drain (before we turn off the
                sink into which it's draining) - there's a comment on ProgBit
                "This bit remains 0 while there is any data in the FIFO.  This ensures
@@ -195,10 +194,11 @@ int cs_trace_disable(cs_device_t dev)
         _cs_swstim_trace_disable(d);
     } else {
         /* TBD: */
-        return cs_report_device_error(d, "can't disable this trace source");
+        return cs_report_device_error(d,
+                                      "can't disable this trace source");
     }
     /* Disable funnel inputs that this source is connected to */
-    return _cs_path_enable(d, /*enabled=*/0);
+    return _cs_path_enable(d, /*enabled= */ 0);
 }
 
 
@@ -209,7 +209,8 @@ int cs_trace_enable_timestamps(cs_device_t dev, int enabled)
         _cs_unlock(d);
         _cs_set_bit(d, CS_ITM_CTRL, CS_ITM_CTRL_TSSEn, enabled);
         if (DTRACE(d)) {
-            diagf("ITM control register: %08X\n", _cs_read(d, CS_ITM_CTRL));
+            diagf("ITM control register: %08X\n",
+                  _cs_read(d, CS_ITM_CTRL));
         }
         return 0;
     } else if (d->type == DEV_STM) {
@@ -219,14 +220,14 @@ int cs_trace_enable_timestamps(cs_device_t dev, int enabled)
     } else if (d->type == DEV_ETM) {
         /* We assume that the ETM is in programming mode */
         _cs_unlock(d);
-        if(CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
-            return _cs_set_bit(d, CS_ETMV4_CONFIGR, CS_ETMV4_CONFIGR_TS, enabled);
-        }
-        else {
+        if (CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
+            return _cs_set_bit(d, CS_ETMV4_CONFIGR, CS_ETMV4_CONFIGR_TS,
+                               enabled);
+        } else {
             return _cs_set_bit(d, CS_ETMCR, CS_ETMCR_TSEn, enabled);
         }
     } else if (d->type == DEV_TS) {
-        return _cs_tsgen_enable(d,enabled);
+        return _cs_tsgen_enable(d, enabled);
     } else {
         return -1;
     }
@@ -242,13 +243,16 @@ int cs_trace_enable_cycle_accurate(cs_device_t dev, int enable)
         if (CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
             /* "TRCCCCTLR... must be programmed if TRCCONFIGR_CCI==1." */
             if (enable) {
-                unsigned int const CCITMIN = _cs_read(d, CS_ETMv4_IDR3) & 0xfff;
+                unsigned int const CCITMIN =
+                    _cs_read(d, CS_ETMv4_IDR3) & 0xfff;
                 _cs_write(d, CS_ETMV4_CCCTLR, CCITMIN);
             }
             /* enable cycle count on instruction trace */
-            return _cs_set_bit(d, CS_ETMV4_CONFIGR, CS_ETMV4_CONFIGR_CCI, enable);
+            return _cs_set_bit(d, CS_ETMV4_CONFIGR, CS_ETMV4_CONFIGR_CCI,
+                               enable);
         } else {
-            return _cs_set_bit(d, CS_ETMCR, CS_ETMCR_CycleAccurate, enable);
+            return _cs_set_bit(d, CS_ETMCR, CS_ETMCR_CycleAccurate,
+                               enable);
         }
     } else {
         return -1;
@@ -256,13 +260,15 @@ int cs_trace_enable_cycle_accurate(cs_device_t dev, int enable)
 }
 
 
-int cs_replicator_set_filter(cs_device_t dev, unsigned int outport, unsigned int filter)
+int cs_replicator_set_filter(cs_device_t dev, unsigned int outport,
+                             unsigned int filter)
 {
     struct cs_device *d = DEV(dev);
     assert(cs_device_is_replicator(d));
     assert(outport <= 1);
     if (cs_device_is_non_mmio(d)) {
-        return cs_report_device_error(d, "attempt to program non-programmable replicator");
+        return cs_report_device_error(d,
+                                      "attempt to program non-programmable replicator");
     }
     filter &= 0xFF;
     _cs_unlock(d);

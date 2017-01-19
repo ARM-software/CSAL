@@ -26,9 +26,10 @@
 /* ---------- Local functions ------------- */
 static int cs_scan_romtable(cs_physaddr_t rom_addr, void const *tabv);
 
-static unsigned int raw_read(unsigned char const *local, unsigned int offset)
+static unsigned int raw_read(unsigned char const *local,
+                             unsigned int offset)
 {
-    return *(unsigned int const volatile *)(local + offset);
+    return *(unsigned int const volatile *) (local + offset);
 }
 
 static int cs_addr_is_excluded(cs_physaddr_t addr)
@@ -87,13 +88,14 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
 
     assert(is_4k_page_address(addr));
     if (DTRACEG) {
-        diagf("!Registering device or ROM table at %" CS_PHYSFMT "\n", addr);
+        diagf("!Registering device or ROM table at %" CS_PHYSFMT "\n",
+              addr);
     }
     if (cs_addr_is_excluded(addr)) {
         diagf("!skipping excluded device at %" CS_PHYSFMT "\n", addr);
         return ERRDESC;
     }
-    local = (unsigned char *)io_map(addr, 4096, /*writable=*/1);
+    local = (unsigned char *) io_map(addr, 4096, /*writable= */ 1);
     if (!local) {
         cs_report_error("can't map device at %" CS_PHYSFMT "", addr);
         return ERRDESC;
@@ -107,7 +109,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         /* Recursively scan a secondary ROM table */
         cs_scan_romtable(addr, local);
         io_unmap(local, 4096);
-        return ERRDESC;   /* not a device */
+        return ERRDESC;		/* not a device */
     }
 
     if (cs_class == CS_CLASS_CORESIGHT) {
@@ -127,7 +129,9 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         devaff1 = cs_device_read(d, CS_DEVAFF1);
         devid = cs_device_read(d, CS_DEVID);
         /* Get the 3-digit PrimeCell device number */
-        d->part_number = ((_cs_read(d, CS_PIDR1) & 0xF) << 8) | (_cs_read(d, CS_PIDR0) & 0xFF);
+        d->part_number =
+            ((_cs_read(d, CS_PIDR1) & 0xF) << 8) | (_cs_read(d, CS_PIDR0) &
+                                                    0xFF);
 
         /* For example, device type 0x13 is major=3, minor=1 */
         major = (d->devtype_from_id >> 0) & 15;
@@ -141,9 +145,12 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         /* Show basic information for the device. The first two numbers
            indicate the CoreSight device class. */
         diagf(" %u.%u %03X", major, minor, d->part_number);
-        if (0) diagf(" %08X %08X %08X", devaff0, devaff1, cs_device_read(d, CS_DEVARCH));
+        if (0)
+            diagf(" %08X %08X %08X", devaff0, devaff1,
+                  cs_device_read(d, CS_DEVARCH));
         diagf(" %08X", devid);
-        diagf(" %02X/%02X", _cs_read(d, CS_CLAIMCLR) & 0xFF, _cs_read(d, CS_CLAIMSET) & 0xFF);
+        diagf(" %02X/%02X", _cs_read(d, CS_CLAIMCLR) & 0xFF,
+              _cs_read(d, CS_CLAIMSET) & 0xFF);
 
         /* See http://wiki.arm.com/Eng/PerphIDRegs */
         if (major == 1) {
@@ -162,19 +169,23 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 d->type = DEV_ETB;
                 d->devclass |= CS_DEVCLASS_BUFFER;
                 /* Find buffer size */
-                if (d->part_number == 0x961) { /* TMC */
+                if (d->part_number == 0x961) {	/* TMC */
                     d->v.etb.is_tmc_device = 1;
                     /* The TMC configuration type is a static property of the way the RTL was configured:
                        0 for ETB, 1 for ETR, 2 for ETF. */
                     d->v.etb.tmc.config_type = ((devid >> 6) & 0x3);
-                    d->v.etb.buffer_size_bytes = _cs_read(d, CS_ETB_RAM_DEPTH) << 2;
+                    d->v.etb.buffer_size_bytes =
+                        _cs_read(d, CS_ETB_RAM_DEPTH) << 2;
                     d->v.etb.pointer_scale_shift = 0;
                     d->v.etb.tmc.memory_width = ((devid >> 8) & 0x7);
                 } else {
                     d->v.etb.is_tmc_device = 0;
-                    d->v.etb.buffer_size_bytes = _cs_read(d, CS_ETB_RAM_DEPTH) << ETB_WIDTH_SCALE_SHIFT;
+                    d->v.etb.buffer_size_bytes =
+                        _cs_read(d,
+                                 CS_ETB_RAM_DEPTH) <<
+                        ETB_WIDTH_SCALE_SHIFT;
                     d->v.etb.pointer_scale_shift = ETB_WIDTH_SCALE_SHIFT;
-                }      
+                }
             }
         } else if (major == 2) {
             /* Trace links */
@@ -186,7 +197,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 d->type = DEV_FUNNEL;
                 /* For a funnel, find the number of in-ports */
                 d->n_in_ports = (devid & 0xf);
-                if (d->n_in_ports == 0) { 
+                if (d->n_in_ports == 0) {
                     d->n_in_ports = 8;
                 }
             } else if (minor == 3) {
@@ -202,9 +213,10 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 /*_cs_write(d, CS_TMC_MODE, 0); pick teh mode later */
                 d->v.etb.is_tmc_device = 1;
                 /* Find buffer size - for TMC this is always in 32-bit words */
-                d->v.etb.buffer_size_bytes = _cs_read(d, CS_ETB_RAM_DEPTH) << 2;
+                d->v.etb.buffer_size_bytes =
+                    _cs_read(d, CS_ETB_RAM_DEPTH) << 2;
                 d->v.etb.pointer_scale_shift = 0;
-                d->v.etb.tmc.config_type = ((devid >> 6) & 0x3);   /* For a link, expect ETF */
+                d->v.etb.tmc.config_type = ((devid >> 6) & 0x3);	/* For a link, expect ETF */
                 d->v.etb.tmc.memory_width = ((devid >> 8) & 0x7);
             } else if (minor == 2) {
                 d->type = DEV_REPLICATOR;
@@ -215,7 +227,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         } else if (major == 3) {
             /* Trace sources */
             d->devclass |= CS_DEVCLASS_SOURCE;
-            d->n_out_ports = 1;    /* ETMv4 might have two */
+            d->n_out_ports = 1;	/* ETMv4 might have two */
             if (minor == 1) {
                 /* CPU trace source - be careful, the CPU might be powered off */
                 d->type = DEV_ETM;
@@ -227,14 +239,14 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                    d->v.etm.etmidr = _cs_read(d, CS_ETMIDR);
                    } else {
                    d->v.etm.etmidr = 0;
-                   }*/
+                   } */
                 /* always read the ETMIDR - establish the ETM architecture version */
-                d->v.etm.etmidr = _cs_read(d, CS_ETMIDR); /* same place on each etm */
+                d->v.etm.etmidr = _cs_read(d, CS_ETMIDR);	/* same place on each etm */
 
                 /* Store static configuration of ETM/PTM in device struct */
-        
+
                 /* init the static structure */
-                _cs_etm_static_config_init(d);       
+                _cs_etm_static_config_init(d);
 
             } else if (minor == 4) {
                 /* ITM */
@@ -250,7 +262,8 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 d->ops.unregister = cs_stm_device_unregister;
                 d->v.stm.n_ports = devid & 0x1FFFF;
                 _cs_stm_config_static_init(d);
-                d->v.stm.n_masters = d->v.stm.s_config.spfeat3.bits.nummast + 1;
+                d->v.stm.n_masters =
+                    d->v.stm.s_config.spfeat3.bits.nummast + 1;
                 /* [17:16] SPTYPE Stimulus Port type support:
                    b00 = Only Basic Stimulus Ports implemented.
                    b01 = Only Extended Stimulus Ports implemented.
@@ -259,7 +272,8 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 switch (d->v.stm.s_config.spfeat2.bits.sptype) {
                 case 0x0:
                     if (d->v.stm.n_ports > 32) {
-                        cs_report_error("STM can handle max. 32 basic ports");
+                        cs_report_error
+                            ("STM can handle max. 32 basic ports");
                         return ERRDESC;
                     }
                     d->v.stm.basic_ports = 1;
@@ -269,8 +283,9 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                     /* Fall-through */
                 case 0x1:
                     /* Allocate the array of pointers to the port ranges */
-                    d->v.stm.ext_ports = (unsigned char **)malloc(sizeof(unsigned char *) *
-                                                                  d->v.stm.n_masters);
+                    d->v.stm.ext_ports =
+                        (unsigned char **) malloc(sizeof(unsigned char *) *
+                                                  d->v.stm.n_masters);
                     memset(d->v.stm.ext_ports, 0,
                            sizeof(unsigned char *) * d->v.stm.n_masters);
                     d->v.stm.current_master = 0;
@@ -292,18 +307,15 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         } else if (major == 5) {
             /* Debug logic */
             if (minor == 1) {
-                d->devclass |= CS_DEVCLASS_DEBUG|CS_DEVCLASS_CPU;
+                d->devclass |= CS_DEVCLASS_DEBUG | CS_DEVCLASS_CPU;
                 d->type = DEV_CPU_DEBUG;
-                if((d->part_number & 0xF00) == (0xD00))
-                {
+                if ((d->part_number & 0xF00) == (0xD00)) {
                     /* v8 Arch core */
                     d->v.debug.debug_arch = 0x8;
-                    d->v.debug.didr = _cs_read(d, CS_V8EDDFR_l); /* bottom half of EDDFR contains similar stuff to v7 DIDR. */
+                    d->v.debug.didr = _cs_read(d, CS_V8EDDFR_l);	/* bottom half of EDDFR contains similar stuff to v7 DIDR. */
                     d->v.debug.devid = _cs_read(d, CS_V8EDDEVID);
                     d->v.debug.pcsamplereg = CS_DBGPCSR_40;
-                }
-                else
-                { 
+                } else {
                     /* v7 arch core */
                     d->v.debug.debug_arch = 0x7;
                     d->v.debug.didr = _cs_read(d, CS_DBGDIDR);
@@ -323,10 +335,9 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                         d->v.debug.pcsamplereg = CS_DBGPCSR_40;
                     }
                 }
-            }
-            else if (minor == 7) {
+            } else if (minor == 7) {
                 /* logic analysers - Stygian or ELA-500 */
-                d->devclass |= CS_DEVCLASS_TRIGSRC |  CS_DEVCLASS_ELA;
+                d->devclass |= CS_DEVCLASS_TRIGSRC | CS_DEVCLASS_ELA;
                 d->type = DEV_ELA;
             }
         } else if (major == 6) {
@@ -346,10 +357,11 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                     }
                 }
                 /* Set up the scale for indexing into the PMU counters in memory */
-                d->v.pmu.map_scale = ((d->v.pmu.cfgr & 0x00003f00) == 0x00003f00) ? 3 : 2;
+                d->v.pmu.map_scale =
+                    ((d->v.pmu.cfgr & 0x00003f00) == 0x00003f00) ? 3 : 2;
             } else {
                 /* Device PMU */
-                d->v.pmu.n_counters = -1;   /* unknown */
+                d->v.pmu.n_counters = -1;	/* unknown */
             }
         }
 
@@ -361,7 +373,9 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         }
     } else if (cs_class == CS_CLASS_PRIMECELL) {
         /* Wouldn't normally be seen in a CoreSight ROM table. */
-        unsigned int part_number = ((raw_read(local, CS_PIDR1) & 0xF) << 8) | (raw_read(local, CS_PIDR0) & 0xFF);
+        unsigned int part_number =
+            ((raw_read(local, CS_PIDR1) & 0xF) << 8) |
+            (raw_read(local, CS_PIDR0) & 0xFF);
         if (part_number == 0x101) {
             d = cs_device_new(addr, local);
             assert(d != NULL);
@@ -372,7 +386,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
             d->type = DEV_TS;
             G.timestamp_device = d;
             /* assume CS timestamp gen which must have control interface. */
-            d->v.ts.config.if_type = TSGEN_INTERFACE_CTRL;    
+            d->v.ts.config.if_type = TSGEN_INTERFACE_CTRL;
 
             diagf("%" CS_PHYSFMT ":", addr);
 
@@ -395,35 +409,50 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                set to indicate the MPIDR of the CPU.  Note that CPU CTIs don't seem
                to have DEVAFF0 set - which means they're indistinguishable from
                non-CPU CTIs. */
-            diagf(" CPU %u.%u", (d->devaff0 >> 8) & 0xff, (d->devaff0) & 0xff);      
+            diagf(" CPU %u.%u", (d->devaff0 >> 8) & 0xff,
+                  (d->devaff0) & 0xff);
         }
-        if (d->devclass & CS_DEVCLASS_SOURCE)  diagf(" SOURCE");
+        if (d->devclass & CS_DEVCLASS_SOURCE)
+            diagf(" SOURCE");
         if (d->devclass & CS_DEVCLASS_SWSTIM) {
-            diagf(" SWSTIM(%u)", cs_trace_swstim_get_port_count(DEVDESC(d)));
+            diagf(" SWSTIM(%u)",
+                  cs_trace_swstim_get_port_count(DEVDESC(d)));
             if (d->type == DEV_STM) {
                 diagf(" [STM %s, %u-bit, %u masters]",
-                      (d->v.stm.basic_ports ? ((d->v.stm.ext_ports == 0) ? "basic ports only" : "basic and ext ports") : "ext ports only"),
+                      (d->v.stm.
+                       basic_ports ? ((d->v.stm.ext_ports == 0) ?
+                                      "basic ports only" :
+                                      "basic and ext ports") :
+                       "ext ports only"),
                       (d->v.stm.s_config.spfeat2.bits.dsize ? 64 : 32),
                       d->v.stm.n_masters);
             }
         }
-        if (d->devclass & CS_DEVCLASS_TRIGSRC) diagf(" TRIG_SRC");
+        if (d->devclass & CS_DEVCLASS_TRIGSRC)
+            diagf(" TRIG_SRC");
         if (d->devclass & CS_DEVCLASS_ELA) {
             diagf(" LOGIC ANALYSER");
         }
-        if (d->devclass & CS_DEVCLASS_LINK)    diagf(" LINK");
-        if (d->devclass & CS_DEVCLASS_SINK)    diagf(" SINK");
+        if (d->devclass & CS_DEVCLASS_LINK)
+            diagf(" LINK");
+        if (d->devclass & CS_DEVCLASS_SINK)
+            diagf(" SINK");
         if (d->devclass & CS_DEVCLASS_BUFFER) {
-            if ((d->type == DEV_ETB) && d->v.etb.is_tmc_device && (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETR)) {
-                diagf(" BUFFER(ETR r/w size: %uK)", cs_get_buffer_size_bytes(DEVDESC(d)) / 1024);
-            }
-            else
-                diagf(" BUFFER(%uK)", cs_get_buffer_size_bytes(DEVDESC(d)) / 1024);
+            if ((d->type == DEV_ETB) && d->v.etb.is_tmc_device
+                && (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETR)) {
+                diagf(" BUFFER(ETR r/w size: %uK)",
+                      cs_get_buffer_size_bytes(DEVDESC(d)) / 1024);
+            } else
+                diagf(" BUFFER(%uK)",
+                      cs_get_buffer_size_bytes(DEVDESC(d)) / 1024);
         }
-        if (d->devclass & CS_DEVCLASS_PORT)    diagf(" PORT");
-        if (d->devclass & CS_DEVCLASS_CTI)     diagf(" CTI");
-        if ((d->devclass & CS_DEVCLASS_LINK) || (d->devclass & CS_DEVCLASS_SINK)) {
-            switch(d->type) {
+        if (d->devclass & CS_DEVCLASS_PORT)
+            diagf(" PORT");
+        if (d->devclass & CS_DEVCLASS_CTI)
+            diagf(" CTI");
+        if ((d->devclass & CS_DEVCLASS_LINK)
+            || (d->devclass & CS_DEVCLASS_SINK)) {
+            switch (d->type) {
             case DEV_ETF:
                 assert(d->v.etb.is_tmc_device);
                 diagf(" [TMC: ETF configuration]");
@@ -431,39 +460,50 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
             case DEV_ETB:
                 if (d->v.etb.is_tmc_device) {
                     /* can't be ETF as this is filtered out earlier */
-                    diagf(" [TMC: %s configuration]", (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETR) ? "ETR" : "ETB");
+                    diagf(" [TMC: %s configuration]",
+                          (d->v.etb.tmc.config_type ==
+                           CS_TMC_CONFIG_TYPE_ETR) ? "ETR" : "ETB");
                 } else {
                     diagf(" [ETB]");
                 }
                 break;
-            case DEV_TPIU: diagf(" [TPIU]"); break;
-            case DEV_SWO:  diagf(" [SWO]"); break;
-            case DEV_FUNNEL: diagf(" [FUNNEL: %u in ports]", d->n_in_ports); break;
-            case DEV_REPLICATOR: diagf(" [REPLICATOR: %u out ports]", d->n_out_ports); break;
+            case DEV_TPIU:
+                diagf(" [TPIU]");
+                break;
+            case DEV_SWO:
+                diagf(" [SWO]");
+                break;
+            case DEV_FUNNEL:
+                diagf(" [FUNNEL: %u in ports]", d->n_in_ports);
+                break;
+            case DEV_REPLICATOR:
+                diagf(" [REPLICATOR: %u out ports]", d->n_out_ports);
+                break;
             }
         }
         if (d->devclass & CS_DEVCLASS_DEBUG) {
             diagf(" DEBUG");
-            if(d->v.debug.debug_arch == 0x8) /* v8 debug */
-            {
-                if((d->v.debug.didr & 0xF) == 0x6)
+            if (d->v.debug.debug_arch == 0x8) {	/* v8 debug */
+                if ((d->v.debug.didr & 0xF) == 0x6)
                     diagf(" v8");
                 else
                     diagf(" unknown");
                 diagf(" (%u bkpt)", ((d->v.debug.didr >> 12) & 0xF) + 1);
                 diagf(" (%u wpt)", ((d->v.debug.didr >> 20) & 0xF) + 1);
-                diagf(" (%u ctx_cmp)", ((d->v.debug.didr >> 28) & 0xF) + 1);
-                if((d->v.debug.devid & 0xF) > 0)
-                {
-                    switch(d->v.debug.devid & 0xF)
-                    {
-                    case 2: diagf(" sample: PCSR, CIDSR"); break;
-                    case 3: diagf(" sample: PCSR, CIDSR, VIDSR"); break;
+                diagf(" (%u ctx_cmp)",
+                      ((d->v.debug.didr >> 28) & 0xF) + 1);
+                if ((d->v.debug.devid & 0xF) > 0) {
+                    switch (d->v.debug.devid & 0xF) {
+                    case 2:
+                        diagf(" sample: PCSR, CIDSR");
+                        break;
+                    case 3:
+                        diagf(" sample: PCSR, CIDSR, VIDSR");
+                        break;
                     }
                 }
-            }
-            else /* v7 debug */
-            {
+            } else {		/* v7 debug */
+
                 switch ((d->v.debug.didr >> 16) & 0xF) {
                 case 1:
                     diagf(" v6");
@@ -503,8 +543,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 if (dscr & CS_DBGDSCR_HALTED) {
                     unsigned int moe = (dscr >> 2) & 0xF;
                     diagf(" halted(%u)", moe);
-                }
-                else {
+                } else {
                     diagf(" running");
                 }
             }
@@ -512,7 +551,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         if (d->devclass & CS_DEVCLASS_PMU) {
             diagf(" PMU (%u counters)", d->v.pmu.n_counters);
         }
-        if (d->devclass & (CS_DEVCLASS_DEBUG|CS_DEVCLASS_PMU)) {
+        if (d->devclass & (CS_DEVCLASS_DEBUG | CS_DEVCLASS_PMU)) {
             /* CS_DBGAUTHSTATUS == CS_PMAUTHSTATUS */
             unsigned int auth = _cs_read(d, CS_DBGAUTHSTATUS);
             /* There are 4 types of authentication:
@@ -520,19 +559,21 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
             /* Each has 3 states: 00 (n.imp.), 10 (imp.dis), 11 (imp.en) */
             diagf(" auth=%02X", auth);
         }
-        if (d->devclass & CS_DEVCLASS_TIMESTAMP) diagf(" TIMESTAMP");
+        if (d->devclass & CS_DEVCLASS_TIMESTAMP)
+            diagf(" TIMESTAMP");
         switch (d->type) {
         case DEV_ETM:
-        {
+	    {
             /* Major version number: 2: ETMv3, 3: PTM, 4: ETMv4 */
             unsigned int major = ((d->v.etm.etmidr) >> 8) & 0xF;
             unsigned int minor = ((d->v.etm.etmidr) >> 4) & 0xF;
             diagf(" %cTMv%u.%u",
                   ((major == 3) ? 'P' : 'E'),
-                  ((major < 3) ? (major + 1) : (major == 3) ? 1 : major),
+                  ((major < 3) ? (major + 1) : (major ==
+                                                3) ? 1 : major),
                   minor);
-        }
-        break;
+	    }
+	    break;
         }
         diagf("\n");
         /* Keep it mapped */
@@ -565,19 +606,21 @@ static void cs_set_default_power_domain(cs_power_domain_t pd)
 static int cs_scan_romtable(cs_physaddr_t rom_addr, void const *tabv)
 {
     unsigned int i;
-    unsigned int const *tab = (unsigned int const *)tabv;
+    unsigned int const *tab = (unsigned int const *) tabv;
 
     if (DTRACEG) {
-        diagf("!Scanning ROM table at %" CS_PHYSFMT " (mapped to %p)\n", rom_addr, tabv);
+        diagf("!Scanning ROM table at %" CS_PHYSFMT " (mapped to %p)\n",
+              rom_addr, tabv);
     }
     assert(G.registration_open);
-    if (CS_CLASS_OF(tab[CS_CIDR1/4]) != CS_CLASS_ROMTABLE) {
-        return cs_report_error("page at %" CS_PHYSFMT " is not a CoreSight ROM table", rom_addr);
+    if (CS_CLASS_OF(tab[CS_CIDR1 / 4]) != CS_CLASS_ROMTABLE) {
+        return cs_report_error("page at %" CS_PHYSFMT
+                               " is not a CoreSight ROM table", rom_addr);
     }
     /* "The first entry is at address 0x000. Each subsequent entry is at
        the next 4-byte boundary, until a value of 0x00000000 is read which
        is the final entry." */
-    for (i = 0; i <= (0xEFC/4); ++i) {
+    for (i = 0; i <= (0xEFC / 4); ++i) {
         unsigned int entry = tab[i];
         if (entry == 0x00000000) {
             break;
@@ -596,7 +639,8 @@ static int cs_scan_romtable(cs_physaddr_t rom_addr, void const *tabv)
     return 0;
 }
 
-static void _cs_link_affinity(struct cs_device *dbg, struct cs_device *other)
+static void _cs_link_affinity(struct cs_device *dbg,
+                              struct cs_device *other)
 {
     assert(dbg->type == DEV_CPU_DEBUG);
     switch (other->type) {
@@ -618,7 +662,7 @@ static void _cs_link_affinity(struct cs_device *dbg, struct cs_device *other)
 
 static int cs_device_has_atb_out(struct cs_device *d)
 {
-    return (d->devclass & (CS_DEVCLASS_SOURCE|CS_DEVCLASS_LINK)) != 0;
+    return (d->devclass & (CS_DEVCLASS_SOURCE | CS_DEVCLASS_LINK)) != 0;
 }
 
 static int cs_device_outport_is_valid(struct cs_device *d, unsigned int p)
@@ -628,7 +672,7 @@ static int cs_device_outport_is_valid(struct cs_device *d, unsigned int p)
 
 static int cs_device_has_atb_in(struct cs_device *d)
 {
-    return (d->devclass & (CS_DEVCLASS_LINK|CS_DEVCLASS_SINK)) != 0;
+    return (d->devclass & (CS_DEVCLASS_LINK | CS_DEVCLASS_SINK)) != 0;
 }
 
 static int cs_device_inport_is_valid(struct cs_device *d, unsigned int p)
@@ -652,9 +696,10 @@ int cs_register_romtable(cs_physaddr_t rom_addr)
         diagf("!registering ROM table at %" CS_PHYSFMT "\n", rom_addr);
     }
     assert(G.init_called);
-    tab = (unsigned int *)io_map(rom_addr, 4096, /*writable=*/0);
+    tab = (unsigned int *) io_map(rom_addr, 4096, /*writable= */ 0);
     if (!tab) {
-        return cs_report_error("can't map ROM table at %" CS_PHYSFMT "", rom_addr);
+        return cs_report_error("can't map ROM table at %" CS_PHYSFMT "",
+                               rom_addr);
     }
     rc = cs_scan_romtable(rom_addr, tab);
     io_unmap(tab, 4096);
@@ -682,7 +727,8 @@ cs_device_t cs_device_register(cs_physaddr_t addr)
 
 int cs_exclude_range(cs_physaddr_t from, cs_physaddr_t to)
 {
-    struct addr_exclude *a = (struct addr_exclude *)malloc(sizeof(struct addr_exclude));
+    struct addr_exclude *a =
+        (struct addr_exclude *) malloc(sizeof(struct addr_exclude));
     if (a == NULL) {
         return -1;
     }
@@ -713,9 +759,10 @@ int cs_device_set_affinity(cs_device_t dev, cs_cpu_t cpu)
             if (e != d && e->affine_cpu == cpu) {
                 _cs_link_affinity(d, e);
             }
-        } 
+        }
     } else {
-        cs_device_t ed = cs_cpu_get_device(cpu, CS_DEVCLASS_CPU|CS_DEVCLASS_DEBUG);
+        cs_device_t ed =
+            cs_cpu_get_device(cpu, CS_DEVCLASS_CPU | CS_DEVCLASS_DEBUG);
         if (ed != ERRDESC) {
             _cs_link_affinity(DEV(ed), d);
         }
@@ -723,7 +770,8 @@ int cs_device_set_affinity(cs_device_t dev, cs_cpu_t cpu)
     return 0;
 }
 
-int cs_device_set_power_domain(cs_device_t dev, cs_power_domain_t power_domain)
+int cs_device_set_power_domain(cs_device_t dev,
+                               cs_power_domain_t power_domain)
 {
     struct cs_device *d = DEV(dev);
     d->power_domain = power_domain;
@@ -875,8 +923,7 @@ cs_device_t cs_cpu_get_device(cs_cpu_t cpu, unsigned int cls)
 {
     struct cs_device *d;
     for (d = G.device_top; d != NULL; d = d->next) {
-        if (d->affine_cpu == cpu &&
-            (d->devclass & cls) == cls) {
+        if (d->affine_cpu == cpu && (d->devclass & cls) == cls) {
             break;
         }
     }
@@ -884,7 +931,7 @@ cs_device_t cs_cpu_get_device(cs_cpu_t cpu, unsigned int cls)
         return DEVDESC(d);
     } else {
         return ERRDESC;
-    } 
+    }
 }
 
 cs_device_t cs_device_get(cs_physaddr_t addr)

@@ -83,7 +83,7 @@ int cs_empty_trace_buffer(cs_device_t dev);
  *  \param dev   The buffer device (e.g. ETB)
  *  \param data  Data to write in - e.g. 0, 0xCDCDCDCD etc.
  */
-int cs_clear_trace_buffer(cs_device_t dev, unsigned int data);  
+int cs_clear_trace_buffer(cs_device_t dev, unsigned int data);
 
 /** Insert trace data into a buffer device.
  *  This is provided mainly for testing purposes.
@@ -94,11 +94,12 @@ int cs_clear_trace_buffer(cs_device_t dev, unsigned int data);
  *  \param buf   Trace data to write into the buffer
  *  \param size  Size of the data, in bytes
  */
-int cs_insert_trace_data(cs_device_t dev, void const *buf, unsigned int size);
+int cs_insert_trace_data(cs_device_t dev, void const *buf,
+			 unsigned int size);
 
 
 /** @} */
 
-#endif /* _included_cs_trace_sink_h */
+#endif				/* _included_cs_trace_sink_h */
 
 /* end of  cs_trace_sink.h */

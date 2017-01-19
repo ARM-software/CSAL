@@ -56,7 +56,8 @@ int cs_trace_enable_cycle_accurate(cs_device_t dev, int enable);
  *  \note           Set a 1 bit in the filter to discard trace for the
  *                  selected ids.
  */
-int cs_replicator_set_filter(cs_device_t dev, unsigned int port, unsigned int filter);
+int cs_replicator_set_filter(cs_device_t dev, unsigned int port,
+			     unsigned int filter);
 
 /**
    Get the current global timestamp from the system timestamp generator, if available.
@@ -67,6 +68,6 @@ int cs_get_global_timestamp(unsigned long long *ts);
 
 
 
-#endif /* _included_cs_trace_source_h */
+#endif				/* _included_cs_trace_source_h */
 
 /* end of  cs_trace_source.h */

@@ -61,7 +61,8 @@ unsigned int cs_device_read(cs_device_t dev, unsigned int offset);
   *   \param offset  register address offset, in bytes
   *   \param data    value to write to the register.
   */
-int cs_device_write(cs_device_t dev, unsigned int offset, unsigned int data);
+int cs_device_write(cs_device_t dev, unsigned int offset,
+		    unsigned int data);
 
 /** Write a value to a device register.
   *
@@ -71,7 +72,8 @@ int cs_device_write(cs_device_t dev, unsigned int offset, unsigned int data);
   *   \param offset  register address offset, in bytes
   *   \param data    value to write to the register.
   */
-int cs_device_write_only(cs_device_t dev, unsigned int offset, unsigned int data);
+int cs_device_write_only(cs_device_t dev, unsigned int offset,
+			 unsigned int data);
 
 /** Write a value to a device register using a bitmask. 
   *
@@ -84,7 +86,8 @@ int cs_device_write_only(cs_device_t dev, unsigned int offset, unsigned int data
   *   \param data    value to write to the register.
   *   \param bitmask bits to write - a '1' bit in the mask will write the bit from the data value.
   */
-int cs_device_write_masked(cs_device_t dev, unsigned int offset, unsigned int data, unsigned int bitmask);
+int cs_device_write_masked(cs_device_t dev, unsigned int offset,
+			   unsigned int data, unsigned int bitmask);
 
 /**
  *   Set bit(s) in a device register, using a read-modify-write operation.
@@ -102,7 +105,8 @@ int cs_device_set(cs_device_t dev, unsigned int offset, unsigned int bits);
  *   \param offset  register offset, in bytes
  *   \param bits    bits to clear - a '1' bit in the mask will clear the bit.
  */
-int cs_device_clear(cs_device_t dev, unsigned int offset, unsigned int bits);
+int cs_device_clear(cs_device_t dev, unsigned int offset,
+		    unsigned int bits);
 
 /**
  *   Wait for bit(s) in a device register, to achieve a given state.
@@ -118,7 +122,9 @@ int cs_device_clear(cs_device_t dev, unsigned int offset, unsigned int bits);
  *   \param p_last_val pointer to storage for the last read value of the register.
  * 
  */
-int cs_device_wait(cs_device_t dev, unsigned int offset, unsigned int bit_mask,  cs_reg_waitbits_op_t operation, unsigned int pattern, unsigned int *p_last_val);
+int cs_device_wait(cs_device_t dev, unsigned int offset,
+		   unsigned int bit_mask, cs_reg_waitbits_op_t operation,
+		   unsigned int pattern, unsigned int *p_last_val);
 
 /**
  *   Number of repeat register checks the library will do when waiting on bits to
@@ -135,6 +141,6 @@ void cs_device_set_wait_repeats(int n_wait_repeat_count);
 
 /** @} */
 
-#endif /* _included_cs_reg_access_h */
+#endif				/* _included_cs_reg_access_h */
 
 /* end of  cs_reg_access.h */

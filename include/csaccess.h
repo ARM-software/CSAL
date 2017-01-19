@@ -21,19 +21,19 @@
 #define _included_csaccess_h
 
 /* Include headers for the various components */
-#include "cs_types.h"          /**< define of the general API types */
+#include "cs_types.h"	       /**< define of the general API types */
 #include "cs_init_manage.h"    /**< Library initialisation and management */
 #include "cs_topology.h"       /**< rom table and topology generation and iteration */
 #include "cs_reg_access.h"     /**< generic coresight component register access */
 #include "cs_trace_source.h"   /**< Generic trace source programming */
-#include "cs_etm.h"            /**< ETM and PTM specific trace source programming */
-#include "cs_sw_stim.h"        /**< SW stimulus - ITM, STM - trace ports */
+#include "cs_etm.h"	       /**< ETM and PTM specific trace source programming */
+#include "cs_sw_stim.h"	       /**< SW stimulus - ITM, STM - trace ports */
 #include "cs_trace_sink.h"     /**< Generic trace sinks and buffers programming */
-#include "cs_cti_ect.h"        /**< handle CTI and ECT programming */
+#include "cs_cti_ect.h"	       /**< handle CTI and ECT programming */
 #include "cs_debug_sample.h"   /**< access core debug registers - PC sampling  */
-#include "cs_pmu.h"            /**< access core PMU registers - event sampling */
-#include "cs_ts_gen.h"         /**< access CS timestamp generator */
+#include "cs_pmu.h"	       /**< access core PMU registers - event sampling */
+#include "cs_ts_gen.h"	       /**< access CS timestamp generator */
 
-#endif /* included */
+#endif				/* included */
 
 /* end of csaccess.h */

@@ -26,12 +26,12 @@
 #define ARM_CS_STM_TYPES_H_INCLUDED
 
 /**
-\defgroup stm_types STM Data types.
-@ingroup sw_stim
+   \defgroup stm_types STM Data types.
+   @ingroup sw_stim
 
- Data types representing register programming models for STM
+   Data types representing register programming models for STM
 
-@{
+   @{
 */
 
 /** 
@@ -39,7 +39,7 @@
  *  Features register 1 for the STM implmentation.
  */
 typedef union stm_spfeat1 {
-    unsigned int reg;   /**< complete register value */
+    unsigned int reg;	/**< complete register value */
     struct {
         unsigned int prot:4;
         unsigned int ts:2;
@@ -52,7 +52,7 @@ typedef union stm_spfeat1 {
         unsigned int hwten:2;
         unsigned int syncen:2;
         unsigned int swoen:2;
-    } bits;     /**< register bitfields */
+    } bits;	/**< register bitfields */
 } stm_spfeat1_ut;
 
 /** 
@@ -60,7 +60,7 @@ typedef union stm_spfeat1 {
  *  Features register 2 for the STM implmentation.
  */
 typedef union stm_spfeat2 {
-    unsigned int reg;   /**< complete register value */
+    unsigned int reg;	/**< complete register value */
     struct {
         unsigned int spter:2;
         unsigned int sper:1;
@@ -72,7 +72,7 @@ typedef union stm_spfeat2 {
         unsigned int res_11:1;
         unsigned int dsize:4;
         unsigned int sptype:2;
-    } bits;     /**< register bitfields */
+    } bits;	/**< register bitfields */
 } stm_spfeat2_ut;
 
 /** 
@@ -80,10 +80,10 @@ typedef union stm_spfeat2 {
  *  Features register 3 for the STM implmentation.
  */
 typedef union stm_spfeat3 {
-    unsigned int reg;   /**< complete register value */       
+    unsigned int reg;	/**< complete register value */
     struct {
         unsigned int nummast:7;
-    } bits;     /**< register bitfields */
+    } bits;	/**< register bitfields */
 } stm_spfeat3_ut;
 
 /**
@@ -117,7 +117,7 @@ typedef union stm_tcsr {
  */
 typedef struct stm_static_config {
 /** @name feature registers
-@{*/
+    @{*/
     /** feature registers */
     stm_spfeat1_ut spfeat1; /**< sp feat register 1 */
     stm_spfeat2_ut spfeat2; /**< sp feat register 2 */
@@ -135,7 +135,7 @@ typedef struct stm_static_config {
 typedef struct stm_config {
 
 /** @name Stimulus port control registers
-@{*/    
+    @{*/
     unsigned int sper;
     unsigned int spter;
     unsigned int privmaskr;
@@ -147,7 +147,7 @@ typedef struct stm_config {
 /** @}*/
 
 /** @name Primary control and status registers 
-@{*/
+    @{*/
     stm_tcsr_t tcsr;
     unsigned int syncr;
 /** @}*/
@@ -157,27 +157,27 @@ typedef struct stm_config {
 
 
 /** @name STM config operation flags.
-  Bitflags defining the register blocks to read or write in dynamic config structure.
-@{*/
-#define CS_STMC_NONE    0x0000  /**< clear the flags */
-#define CS_STMC_CTRL    0x0001  /**< TCSR */
-#define CS_STMC_SYNC    0x0002  /**< SYNCR */
-#define CS_STMC_PENA    0x0004  /**< Port enable regs (SPER, SPTER, SPSCR, SPMCR, PRIVMASKR */
-#define CS_STMC_OVER    0x0008  /**< Override regs (OVERIDERR, MOVERRIDER) */
-#define CS_STMC_TRIG    0x0010  /**< Trigger control (SPTRIGCSR) */
-#define CS_STMC_ALL     0xFFFF  /**< access all config registers */
+    Bitflags defining the register blocks to read or write in dynamic config structure.
+    @{*/
+#define CS_STMC_NONE    0x0000	/**< clear the flags */
+#define CS_STMC_CTRL    0x0001	/**< TCSR */
+#define CS_STMC_SYNC    0x0002	/**< SYNCR */
+#define CS_STMC_PENA    0x0004	/**< Port enable regs (SPER, SPTER, SPSCR, SPMCR, PRIVMASKR */
+#define CS_STMC_OVER    0x0008	/**< Override regs (OVERIDERR, MOVERRIDER) */
+#define CS_STMC_TRIG    0x0010	/**< Trigger control (SPTRIGCSR) */
+#define CS_STMC_ALL     0xFFFF	/**< access all config registers */
 /** @}*/
 
 /** @name STM extended operation types
-   Extended stimulus transaction types. 
-   These are converted into offsets into the base port address for the type.
-@{*/
+    Extended stimulus transaction types. 
+    These are converted into offsets into the base port address for the type.
+    @{*/
 
 #define G_DMTS      0
 #define G_DM        1
 #define G_DTS       2
 #define G_D         3
-#define I_DMTS      4 
+#define I_DMTS      4
 #define I_DM        5
 #define I_DTS       6
 #define I_D         7
@@ -200,7 +200,6 @@ typedef struct stm_config {
 
 /* TBD add in hw event and dma configs.*/
 
-#endif // ARM_CS_STM_TYPES_H_INCLUDED
+#endif				// ARM_CS_STM_TYPES_H_INCLUDED
 
 /* End of File cs_stm_types.h */
-

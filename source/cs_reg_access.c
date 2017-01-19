@@ -32,14 +32,16 @@ int cs_device_write(cs_device_t dev, unsigned int off, unsigned int data)
     return _cs_write(DEV(dev), off, data);
 }
 
-int cs_device_write_only(cs_device_t dev, unsigned int off, unsigned int data)
+int cs_device_write_only(cs_device_t dev, unsigned int off,
+                         unsigned int data)
 {
     /* Unlock the device if it is locked */
     _cs_unlock(DEV(dev));
     return _cs_write_wo(DEV(dev), off, data);
 }
 
-int cs_device_write_masked(cs_device_t dev, unsigned int offset, unsigned int data, unsigned int bitmask)
+int cs_device_write_masked(cs_device_t dev, unsigned int offset,
+                           unsigned int data, unsigned int bitmask)
 {
 /* Unlock the device if it is locked */
     _cs_unlock(DEV(dev));
@@ -59,12 +61,16 @@ int cs_device_clear(cs_device_t dev, unsigned int off, unsigned int bits)
     return _cs_clear(DEV(dev), off, bits);
 }
 
-int cs_device_wait(cs_device_t dev, unsigned int offset, unsigned int bit_mask, cs_reg_waitbits_op_t operation, unsigned int pattern, unsigned int *p_last_val)
+int cs_device_wait(cs_device_t dev, unsigned int offset,
+                   unsigned int bit_mask, cs_reg_waitbits_op_t operation,
+                   unsigned int pattern, unsigned int *p_last_val)
 {
-    assert((operation >= CS_REG_WAITBITS_ALL_1) && (operation <  CS_REG_WAITBITS_END ));
+    assert((operation >= CS_REG_WAITBITS_ALL_1)
+           && (operation < CS_REG_WAITBITS_END));
     _cs_unlock(DEV(dev));
 
-    return _cs_waitbits(DEV(dev),offset,bit_mask,operation, pattern, p_last_val);
+    return _cs_waitbits(DEV(dev), offset, bit_mask, operation, pattern,
+                        p_last_val);
 }
 
 void cs_device_set_wait_repeats(int n_wait_repeat_count)

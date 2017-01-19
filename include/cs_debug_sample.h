@@ -43,7 +43,8 @@
  *  \param vmid  pointer to receive VMID sample
  *  @return 0 if valid sample was obtained. -1 if sampling is not possible at present time.
  */
-int cs_debug_get_pc_sample(cs_device_t dev, cs_virtaddr_t *pc, unsigned int *cid, unsigned int *vmid);
+int cs_debug_get_pc_sample(cs_device_t dev, cs_virtaddr_t * pc,
+			   unsigned int *cid, unsigned int *vmid);
 
 
 /** @} */
@@ -54,10 +55,9 @@ int cs_debug_get_pc_sample(cs_device_t dev, cs_virtaddr_t *pc, unsigned int *cid
 
 #include "cs_debug_halt.h"
 
-#endif /*  USING_V7_DBG_HALT */
+#endif				/*  USING_V7_DBG_HALT */
 
 
-#endif /* _included_cs_debug_sample_h */
+#endif				/* _included_cs_debug_sample_h */
 
 /* end of  cs_debug_sample.h */
-

@@ -68,7 +68,7 @@ typedef union {
  * 
  */
 typedef union {
-    unsigned int reg;   /**< complete register value */
+    unsigned int reg;	/**< complete register value */
     struct {
         unsigned int revision:4;      /**< Revision */
         unsigned int trcarchmin:4;    /**< ETM arch version minor */
@@ -166,7 +166,7 @@ typedef union {
         unsigned int redfuncntr:1;
     } bits; /**< register bitfields */
 } etm_v4_idr5_ut;
-  
+
 /** \brief ETMv4 static structure
     Structure representing the static RO configuration for the ETMv4. 
     Read from target hardware on component registration.
@@ -178,12 +178,12 @@ typedef struct {
     etm_v4_idr3_ut idr3;    /**< ID register 3 */
     etm_v4_idr4_ut idr4;    /**< ID register 4 */
     etm_v4_idr5_ut idr5;    /**< ID register 5 */
-    unsigned int   idr8;    /**< ID register 8 */
-    unsigned int   idr9;    /**< ID register 9 */
-    unsigned int   idr10;    /**< ID register 10 */
-    unsigned int   idr11;    /**< ID register 11 */
-    unsigned int   idr12;    /**< ID register 12 */
-    unsigned int   idr13;    /**< ID register 13 */
+    unsigned int idr8;	    /**< ID register 8 */
+    unsigned int idr9;	    /**< ID register 9 */
+    unsigned int idr10;	     /**< ID register 10 */
+    unsigned int idr11;	     /**< ID register 11 */
+    unsigned int idr12;	     /**< ID register 12 */
+    unsigned int idr13;	     /**< ID register 13 */
 } cs_etm_v4_static_config_t;
 
 /** \brief Get ETMv4 static structure.
@@ -194,11 +194,12 @@ typedef struct {
     \param sc_ptr pointer to the common static structure
     \return pointer to the cs_etm_v4_static_config_t structure.
 */
-cs_etm_v4_static_config_t *get_etmv4_sc_ptr(cs_etm_static_config_t *sc_ptr);
+cs_etm_v4_static_config_t *get_etmv4_sc_ptr(cs_etm_static_config_t *
+                                            sc_ptr);
 
 /** \brief ETMv4 Trace Config reg stucture.
  * enables trace features.
- */ 
+ */
 typedef union {
     unsigned int reg; /**< complete register value */
     struct {
@@ -232,20 +233,20 @@ typedef struct cs_etmv4_config {
     Version and access control set by `cs_etm_config_init_ex()` call.
     @{*/
     /** Actions: specify which fields to set/get */
-    unsigned int flags;         /**< Configurations to action - register blocks to read or write on ETM hardware */
-    unsigned int *idr;          /**< Pointer to ETMIDR - e.g. ETM version */
+    unsigned int flags;		/**< Configurations to action - register blocks to read or write on ETM hardware */
+    unsigned int *idr;		/**< Pointer to ETMIDR - e.g. ETM version */
     cs_etm_v4_static_config_t *scv4; /**< Pointer to ETMv4 static configuration */
-/** @}*/  
+/** @}*/
 /** @name Trace Control 
     General trace control configuration read/written with #CS_ETMC_CONFIG bit set in flags.
-    @{*/ 
+    @{*/
     cs_etm_v4_configr_t configr;  /**< Trace feature configuration */
-    unsigned int stallcrlr;       /**< Stall Control */
-    unsigned int syncpr;          /**< synchronisation period */
-    unsigned int ccctlr;          /**< Cycle count control  */
-    unsigned int bbctlr;          /**< Branch broadcast control */
-    unsigned int traceidr;        /**< Trace source ID  */
-    unsigned int qctlr;           /**< Q packet control */
+    unsigned int stallcrlr;	  /**< Stall Control */
+    unsigned int syncpr;	  /**< synchronisation period */
+    unsigned int ccctlr;	  /**< Cycle count control  */
+    unsigned int bbctlr;	  /**< Branch broadcast control */
+    unsigned int traceidr;	  /**< Trace source ID  */
+    unsigned int qctlr;		  /**< Q packet control */
 /** @}*/
 /** @name Trace Events
     Trace event selection and control accessed with #CS_ETMC_EVENTSELECT bit set in flags.
@@ -253,27 +254,27 @@ typedef struct cs_etmv4_config {
     Flags #CS_ETMC_TS_EVENT, #CS_ETMC_TRIGGER_EVENT #CS_ETMC_EXTOUT unused in ETMv4 as functionality has been
     combined in the event select and enable registers.
     @{*/
-    unsigned int eventctlr0r;     /**< Event selection */
-    unsigned int eventctlr1r;     /**< Event enables */
-    unsigned int tsctlr;          /**< Global Timestamp control event */
+    unsigned int eventctlr0r;	  /**< Event selection */
+    unsigned int eventctlr1r;	  /**< Event enables */
+    unsigned int tsctlr;	  /**< Global Timestamp control event */
 /** @}*/
 /** @name Trace Enable
     Trace ViewInst, ViewData, start/stop and enable event configuration accessed with #CS_ETMC_TRACE_ENABLE bit set in flags
     @{*/
-    unsigned int victlr;          /**< ViewInst control */
-    unsigned int viiectlr;        /**< ViewInst include/exclude control */
-    unsigned int vissctlr;        /**< ViewInst Start/Stop control */
-    unsigned int vipcssctlr;      /**< ViewInst Start/Stop PE comparator control */
+    unsigned int victlr;	  /**< ViewInst control */
+    unsigned int viiectlr;	  /**< ViewInst include/exclude control */
+    unsigned int vissctlr;	  /**< ViewInst Start/Stop control */
+    unsigned int vipcssctlr;	  /**< ViewInst Start/Stop PE comparator control */
 
-    unsigned int vdctlr;          /**< ViewData control */
-    unsigned int vdsacctlr;       /**< ViewData inc/exc single address comparator control*/
-    unsigned int vdarcctlr;       /**< ViewData inc/exc address range comparator control*/
+    unsigned int vdctlr;	  /**< ViewData control */
+    unsigned int vdsacctlr;	  /**< ViewData inc/exc single address comparator control*/
+    unsigned int vdarcctlr;	  /**< ViewData inc/exc address range comparator control*/
 /** @}*/
 /** @name Sequencer
     Trace sequencer programming access when #CS_ETMC_SEQUENCER is set in flags.
     @{*/
-#define ETMv4_NUM_SEQ_EVT_MAX 3 /**< Max number of sequencer state transition event registers. */
-    unsigned int seqevr[ETMv4_NUM_SEQ_EVT_MAX];   /**< Sequencer state transition event */
+#define ETMv4_NUM_SEQ_EVT_MAX 3	/**< Max number of sequencer state transition event registers. */
+    unsigned int seqevr[ETMv4_NUM_SEQ_EVT_MAX];	  /**< Sequencer state transition event */
     unsigned int seqrstevr;   /**< Sequencer reset control  */
     unsigned int seqstr;      /**< Sequencer state */
 /** @}*/
@@ -284,17 +285,17 @@ typedef struct cs_etmv4_config {
 #define ETMv4_NUM_COUNTERS_MAX 4    /**< Max number of counters */
     /** Group of registers to program a counter. */
     struct _cntrs {
-        unsigned int cntrldvr;  /**< counter reload values */
-        unsigned int cntctlr;   /**< counter control */
-        unsigned int cntvr;     /**< counter value */
-    } counter[ETMv4_NUM_COUNTERS_MAX];    /**< set of counter registers */
+        unsigned int cntrldvr;	/**< counter reload values */
+        unsigned int cntctlr;	/**< counter control */
+        unsigned int cntvr;	/**< counter value */
+    } counter[ETMv4_NUM_COUNTERS_MAX];	  /**< set of counter registers */
     unsigned int counter_acc_mask; /**< Selection mask for counters to read / write (bin n = 1, access counter n. )*/
 /** @}*/
 
 /** @name Resource Selection
     Trace resource selectors, external input selection - accessed when #CS_ETMC_RES_SEL set in flags
     @{*/
-#define ETMv4_NUM_RES_SEL_CTL_MAX 32    /**< Number of resource selection registers (/2 for pairs) */
+#define ETMv4_NUM_RES_SEL_CTL_MAX 32	/**< Number of resource selection registers (/2 for pairs) */
     unsigned int rsctlr[ETMv4_NUM_RES_SEL_CTL_MAX];   /**< Resource selectors */
     unsigned int extinselr;   /**< External Input select */
     unsigned int rsctlr_acc_mask;      /**< Select rsctlrs to access, n=2-31 (0 and 1 are reserved and never accessed) */
@@ -303,13 +304,13 @@ typedef struct cs_etmv4_config {
 /** @name Single Shot control 
     Single shot comparator control - accessed when #CS_ETMC_SSHOT_CTRL set in flags
     @{*/
-#define ETMv4_NUM_SS_COMP_MAX 8 /**< max number of SS comparator controls */
+#define ETMv4_NUM_SS_COMP_MAX 8	/**< max number of SS comparator controls */
     /** Group of registers to program a single shot comparator. */
     struct _sscmp {
         unsigned int ssccr;   /**< SS comparator control */
         unsigned int sscsr;   /**< SS comparator status */
         unsigned int sspcicr; /**< SS PE comparator input  */
-    } ss_comps[ETMv4_NUM_SS_COMP_MAX];    /**< Set of Single Shot comparator resources */
+    } ss_comps[ETMv4_NUM_SS_COMP_MAX];	  /**< Set of Single Shot comparator resources */
     unsigned int ss_comps_acc_mask;   /**< Bitfield Select ss_comps to access */
 /** @}*/
 
@@ -335,10 +336,10 @@ typedef struct cs_etmv4_config {
 #define ETMv4_NUM_DATA_COMP_MAX 16  /**< max number of data value comparators */
     /** Group of registers to program a data comparator. */
     struct _dvcmp {
-        unsigned int dvcvr_l;     /**< data comparator value lo [31:0]  */
-        unsigned int dvcvr_h;     /**< data comparator value hi [63:32] */
-        unsigned int dvcmr_l;     /**< data comparator mask lo [31:0]  */
-        unsigned int dvcmr_h;     /**< data comparator mask hi [63:32] */
+        unsigned int dvcvr_l;	  /**< data comparator value lo [31:0]  */
+        unsigned int dvcvr_h;	  /**< data comparator value hi [63:32] */
+        unsigned int dvcmr_l;	  /**< data comparator mask lo [31:0]  */
+        unsigned int dvcmr_h;	  /**< data comparator mask hi [63:32] */
     } data_comps[ETMv4_NUM_DATA_COMP_MAX];    /**< set of data value comparators */
     unsigned int data_comps_acc_mask; /**< bitfield selects data comps to access */
 /** @}*/
@@ -349,8 +350,8 @@ typedef struct cs_etmv4_config {
 #define ETMv4_NUM_CXID_COMP_MAX 8   /**< max number of context ID comparators */
     /** Group of registers to program a context ID comparator */
     struct _ctxtidcmp {
-        unsigned int cidcvr_l;    /**< context ID comparator value lo [31:0] */
-        unsigned int cidcvr_h;    /**< context ID comparator value hi [63:32] */
+        unsigned int cidcvr_l;	  /**< context ID comparator value lo [31:0] */
+        unsigned int cidcvr_h;	  /**< context ID comparator value hi [63:32] */
     } cxid_comps[ETMv4_NUM_CXID_COMP_MAX];    /**< set of context ID comparators */
     unsigned int cidcctlr0;   /**< context ID comparator control 0 */
     unsigned int cidcctlr1;   /**< context ID comparator control 1 */
@@ -363,12 +364,12 @@ typedef struct cs_etmv4_config {
 #define ETMv4_NUM_VMID_COMP_MAX 8   /**< max number of VMID comparators */
     /** Group of registers to program a VMID comparator. */
     struct _vmidcmp {
-        unsigned int vmidcvr_l;       /**< VMID comparator value lo [31:0] */
-        unsigned int vmidcvr_h;       /**< VMID comparator value hi [63:32] */
+        unsigned int vmidcvr_l;	      /**< VMID comparator value lo [31:0] */
+        unsigned int vmidcvr_h;	      /**< VMID comparator value hi [63:32] */
     } vmid_comps[ETMv4_NUM_VMID_COMP_MAX];    /**< set of VMID comparators */
-    unsigned int vmidcctlr0;          /**< VMID comparator control 0 */
-    unsigned int vmidcctlr1;          /**< VMID comparator control 0 */
-    unsigned int vmid_comps_acc_mask;     /**< bitfield selects VMID comps to access - control always accessed */
+    unsigned int vmidcctlr0;	      /**< VMID comparator control 0 */
+    unsigned int vmidcctlr1;	      /**< VMID comparator control 0 */
+    unsigned int vmid_comps_acc_mask;	  /**< bitfield selects VMID comps to access - control always accessed */
 /** @}*/
 } cs_etmv4_config_t;
 

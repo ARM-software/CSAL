@@ -67,7 +67,7 @@ int cs_etm_config_put(cs_device_t dev, struct cs_etm_config *etm_config);
 #ifndef UNIX_KERNEL
 /** Print an ETMv3/PTM configuration. (not available in the UNIX_KERNEL build) */
 int cs_etm_config_print(struct cs_etm_config *);
-#endif 
+#endif
 
 /** @} */
 
@@ -161,7 +161,6 @@ int cs_etm_static_config_init(struct cs_etm_static_config *);
 
 
 
-#endif /* _included_cs_etm_h */
+#endif				/* _included_cs_etm_h */
 
 /* end of  cs_etm.h */
-

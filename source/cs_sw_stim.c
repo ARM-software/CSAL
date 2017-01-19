@@ -32,16 +32,14 @@ unsigned int cs_stm_get_ext_ports_size(struct cs_device *d)
 
 int _cs_swstim_trace_enable(struct cs_device *d)
 {
-    if(d->type == DEV_ITM) {
+    if (d->type == DEV_ITM) {
         _cs_set(d, CS_ITM_CTRL, CS_ITM_CTRL_ITMEn);
         return 0;
-    }
-    else if(d->type == DEV_STM) {
+    } else if (d->type == DEV_STM) {
         _cs_set(d, CS_STM_TCSR, CS_STM_TCSR_EN);
         return 0;
-    }
-    else
-        return cs_report_device_error(d, "not swstim device");        
+    } else
+        return cs_report_device_error(d, "not swstim device");
 }
 
 int _cs_swstim_trace_disable(struct cs_device *d)
@@ -58,13 +56,13 @@ int _cs_swstim_trace_disable(struct cs_device *d)
         if (d->v.stm.ext_ports) {
             unsigned char *master0 = d->v.stm.ext_ports[0];
             if (master0) {
-                +*(unsigned int volatile *)master0;
+                +*(unsigned int volatile *) master0;
             }
         }
         _cs_clear(d, CS_STM_TCSR, CS_STM_TCSR_EN);
         _cs_waitnot(d, CS_STM_TCSR, CS_STM_TCSR_BUSY);
     } else {
-        return cs_report_device_error(d, "not swstim device");        
+        return cs_report_device_error(d, "not swstim device");
     }
     return 0;
 }
@@ -72,11 +70,13 @@ int _cs_swstim_trace_disable(struct cs_device *d)
 int _cs_swstim_set_trace_id(struct cs_device *d, cs_atid_t id)
 {
     if (d->type == DEV_ITM) {
-        _cs_set_mask(d, CS_ITM_CTRL, 0x007F0000, ((unsigned int)id << 16));
+        _cs_set_mask(d, CS_ITM_CTRL, 0x007F0000,
+                     ((unsigned int) id << 16));
     } else if (d->type == DEV_STM) {
-        _cs_set_mask(d, CS_STM_TCSR, 0x007F0000, ((unsigned int)id << 16));
+        _cs_set_mask(d, CS_STM_TCSR, 0x007F0000,
+                     ((unsigned int) id << 16));
     } else {
-        return cs_report_device_error(d, "not swstim device"); 
+        return cs_report_device_error(d, "not swstim device");
     }
     return 0;
 }
@@ -89,8 +89,7 @@ int _cs_stm_config_static_init(struct cs_device *d)
 #if 0
     fprintf(stderr, "FEAT1R=0x%08x FEAT2R=0x%08x FEAT3R=0x%08x\n",
             _cs_read(d, CS_STM_FEAT1R),
-            _cs_read(d, CS_STM_FEAT2R),
-            _cs_read(d, CS_STM_FEAT3R));
+            _cs_read(d, CS_STM_FEAT2R), _cs_read(d, CS_STM_FEAT3R));
 #endif
     return 0;
 }
@@ -115,11 +114,13 @@ int cs_trace_swstim_get_port_count(cs_device_t dev)
   would in general be expected to acquire a memory mapping to a segment
   of the stimulus area, supporting all sizes and flavors of STP packet.
 */
-int cs_trace_stimulus(cs_device_t dev, unsigned int port, unsigned int value)
+int cs_trace_stimulus(cs_device_t dev, unsigned int port,
+                      unsigned int value)
 {
     struct cs_device *d = DEV(dev);
 
-    assert(cs_device_has_class(dev, CS_DEVCLASS_SOURCE|CS_DEVCLASS_SWSTIM));
+    assert(cs_device_has_class
+           (dev, CS_DEVCLASS_SOURCE | CS_DEVCLASS_SWSTIM));
     assert(port < cs_trace_swstim_get_port_count(dev));
 
     if (d->type == DEV_ITM) {
@@ -128,36 +129,44 @@ int cs_trace_stimulus(cs_device_t dev, unsigned int port, unsigned int value)
         return _cs_write_wo(d, CS_ITM_STIMPORT(port), value);
     } else if (d->type == DEV_STM) {
         if (d->v.stm.ext_ports) {
-            unsigned char *master = d->v.stm.ext_ports[d->v.stm.current_master];
-            if(master == NULL)
-                return cs_report_device_error(d, "STM master memory address not configured.");
-            *(unsigned int volatile *)(master + CS_STM_EXT_PORT_I_DMTS(port)) = value;
+            unsigned char *master =
+                d->v.stm.ext_ports[d->v.stm.current_master];
+            if (master == NULL)
+                return cs_report_device_error(d,
+                                              "STM master memory address not configured.");
+            *(unsigned int volatile *) (master +
+                                        CS_STM_EXT_PORT_I_DMTS(port)) =
+                value;
             return 0;
         } else if (d->v.stm.basic_ports) {
             return _cs_write_wo(d, CS_STM_STIMR(port), value);
         } else {
-            return cs_report_device_error(d, "No STM stimulus ports available!");
+            return cs_report_device_error(d,
+                                          "No STM stimulus ports available!");
         }
     } else {
         return cs_report_device_error(d, "trace stimulus unimplemented");
     }
 }
 
-int cs_trace_swstim_enable_trigger(cs_device_t dev, unsigned int mask, unsigned int value)
+int cs_trace_swstim_enable_trigger(cs_device_t dev, unsigned int mask,
+                                   unsigned int value)
 {
     int ret = 0;
     struct cs_device *d = DEV(dev);
-    assert(cs_device_has_class(dev, CS_DEVCLASS_SOURCE|CS_DEVCLASS_SWSTIM));
+    assert(cs_device_has_class
+           (dev, CS_DEVCLASS_SOURCE | CS_DEVCLASS_SWSTIM));
 
     _cs_unlock(d);
     if (d->type == DEV_ITM) {
         ret = _cs_set_mask(d, CS_ITM_TRTRIG, mask, value);
-    }
-    else if(d->type == DEV_STM) {
+    } else if (d->type == DEV_STM) {
         /* STM has similar functionality using SPTER */
-        ret = _cs_set_mask(d, CS_STM_SPTER, mask, value);       
+        ret = _cs_set_mask(d, CS_STM_SPTER, mask, value);
     } else {
-        ret = cs_report_device_error(d, "can't enable triggers for this device");
+        ret =
+            cs_report_device_error(d,
+                                   "can't enable triggers for this device");
     }
     return ret;
 }
@@ -169,8 +178,7 @@ int cs_trace_swstim_enable_all_ports(cs_device_t dev)
     if (d->type == DEV_ITM) {
         /* Enable all stimulus ports */
         _cs_write(d, CS_ITM_TRCEN, 0xFFFFFFFF);
-    }
-    else if(d->type == DEV_STM) {
+    } else if (d->type == DEV_STM) {
         /* clear master select - all masters enabled */
         if (d->v.stm.n_masters > 1)
             _cs_clear(d, CS_STM_SPMSCR, CS_STM_SPMSCR_MASTCTL);
@@ -179,9 +187,9 @@ int cs_trace_swstim_enable_all_ports(cs_device_t dev)
             _cs_clear(d, CS_STM_SPSCR, CS_STM_SPSCR_PORTCTL);
         /* enable all ports in the group. */
         _cs_write(d, CS_STM_SPER, 0xFFFFFFFF);
-    }
-    else
-        return cs_report_device_error(d, "not swstim - can't enable ports for this device");
+    } else
+        return cs_report_device_error(d,
+                                      "not swstim - can't enable ports for this device");
     return 0;
 }
 
@@ -193,9 +201,9 @@ int cs_trace_swstim_set_sync_repeat(cs_device_t dev, unsigned int value)
         _cs_write(d, CS_ITM_SYNCCTRL, value);
     } else if (d->type == DEV_STM) {
         _cs_write(d, CS_STM_SYNCR, (value & 0xFFF));
-    }
-    else 
-        return cs_report_device_error(d, "not swstim - can't set sync repeat for this device");
+    } else
+        return cs_report_device_error(d,
+                                      "not swstim - can't set sync repeat for this device");
     return 0;
 }
 
@@ -214,18 +222,20 @@ int cs_stm_config_master(cs_device_t dev, unsigned int master,
     assert(!d->v.stm.ext_ports[master]);
 
     size = cs_stm_get_ext_ports_size(d);
-    local_addr = (unsigned char *)io_map(port_0_addr, size, /*writable=*/1);
+    local_addr =
+        (unsigned char *) io_map(port_0_addr, size, /*writable= */ 1);
     if (local_addr) {
         /* Check (as far as we can) that this really does look like an STM stimulus area.
            "All STM memory-mapped registers presented on the AXI are write-only.
            Reads always return an AXI OKAY read response and the read data is
            zero regardless of the STM state." */
         unsigned int tw0, tw1;
-        tw0 = *(unsigned int volatile *)local_addr;
-        tw1 = *(unsigned int volatile *)(local_addr + size - 4);
+        tw0 = *(unsigned int volatile *) local_addr;
+        tw1 = *(unsigned int volatile *) (local_addr + size - 4);
         if (tw0 != 0 || tw1 != 0) {
             io_unmap(local_addr, size);
-            return cs_report_device_error(d, "not swstim - stimulus area is not reading back as zero");
+            return cs_report_device_error(d,
+                                          "not swstim - stimulus area is not reading back as zero");
         }
         d->v.stm.ext_ports[master] = local_addr;
         return 0;
@@ -242,83 +252,88 @@ int cs_stm_select_master(cs_device_t dev, unsigned int master)
     assert(d->v.stm.ext_ports != NULL);
     assert(master < d->v.stm.n_masters);
 
-    if(d->v.stm.ext_ports[master] == 0)
-        return cs_report_device_error(d, "STM - cannot set unconfigured master address.");
+    if (d->v.stm.ext_ports[master] == 0)
+        return cs_report_device_error(d,
+                                      "STM - cannot set unconfigured master address.");
     d->v.stm.current_master = master;
     return 0;
 }
 
 static unsigned int const s_op_offsets[] = {
-    0x00, /* G_DMTS   */  
-    0x08, /* G_DM     */
-    0x10, /* G_DTS    */   
-    0x18, /* G_D      */      
-    0x80, /* I_DMTS   */
-    0x88, /* I_DM     */
-    0x90, /* I_DTS    */
-    0x98, /* I_D      */
-    0x60, /* G_FLAGTS */
-    0x68, /* G_FLAG   */
-    0x70, /* G_TRIGTS */
-    0x78, /* G_TRIG   */
-    0xE0, /* I_FLAGTS */
-    0xE8, /* I_FLAG   */
-    0xF0, /* I_TRIGTS */
-    0xF8  /* I_TRIG   */  
+    0x00,			/* G_DMTS   */
+    0x08,			/* G_DM     */
+    0x10,			/* G_DTS    */
+    0x18,			/* G_D      */
+    0x80,			/* I_DMTS   */
+    0x88,			/* I_DM     */
+    0x90,			/* I_DTS    */
+    0x98,			/* I_D      */
+    0x60,			/* G_FLAGTS */
+    0x68,			/* G_FLAG   */
+    0x70,			/* G_TRIGTS */
+    0x78,			/* G_TRIG   */
+    0xE0,			/* I_FLAGTS */
+    0xE8,			/* I_FLAG   */
+    0xF0,			/* I_TRIGTS */
+    0xF8			/* I_TRIG   */
 };
 
-int cs_stm_ext_write(cs_device_t dev, const unsigned int port, const unsigned char *value, const int length, const int trans_type)
+int cs_stm_ext_write(cs_device_t dev, const unsigned int port,
+                     const unsigned char *value, const int length,
+                     const int trans_type)
 {
     struct cs_device *d = DEV(dev);
-    int write_unit_size = d->v.stm.s_config.spfeat2.bits.dsize == 1 ? 8 : 4; /* byte size starts out @ fundamnetal data size for the unit */
+    int write_unit_size = d->v.stm.s_config.spfeat2.bits.dsize == 1 ? 8 : 4;	/* byte size starts out @ fundamnetal data size for the unit */
     unsigned char *master = d->v.stm.ext_ports[d->v.stm.current_master];
-    int bytes_written = 0;   
+    int bytes_written = 0;
 
-    if(master == 0)
-        return cs_report_device_error(d, "STM - cannot write to unconfigured master address.");
+    if (master == 0)
+        return cs_report_device_error(d,
+                                      "STM - cannot write to unconfigured master address.");
 
 
     assert(d->type == DEV_STM);
     assert(STM_OP_VALID(trans_type));
     assert((value != 0) || !STM_OP_DATA(trans_type));
-    assert(port < cs_trace_swstim_get_port_count(dev));      
+    assert(port < cs_trace_swstim_get_port_count(dev));
     assert(master != NULL);
     assert((value == 0) || (length > 0));
 
-    if(STM_OP_DATA(trans_type))
-    {
-        while((length - bytes_written) >= write_unit_size)
-        {
-            if(write_unit_size == 4)
-                *(uint32_t volatile *)(master + port*256 + s_op_offsets[trans_type]) = *(uint32_t *)(value+bytes_written);    
+    if (STM_OP_DATA(trans_type)) {
+        while ((length - bytes_written) >= write_unit_size) {
+            if (write_unit_size == 4)
+                *(uint32_t volatile *) (master + port * 256 +
+                                        s_op_offsets[trans_type]) =
+                    *(uint32_t *) (value + bytes_written);
             else
-                *(uint64_t volatile *)(master + port*256 + s_op_offsets[trans_type]) = *(uint64_t *)(value+bytes_written);
+                *(uint64_t volatile *) (master + port * 256 +
+                                        s_op_offsets[trans_type]) =
+                    *(uint64_t *) (value + bytes_written);
             bytes_written += write_unit_size;
         }
 
-        while(bytes_written < length)
-        {
-            if(length - bytes_written >= 4)
-            {
-                *(uint32_t volatile *)(master + port*256 + s_op_offsets[trans_type]) = *(uint32_t *)(value+bytes_written);    
+        while (bytes_written < length) {
+            if (length - bytes_written >= 4) {
+                *(uint32_t volatile *) (master + port * 256 +
+                                        s_op_offsets[trans_type]) =
+                    *(uint32_t *) (value + bytes_written);
                 bytes_written += 4;
-            }
-            else if(length - bytes_written >= 2)
-            {
-                *(uint16_t volatile *)(master + port*256 + s_op_offsets[trans_type]) = *(uint16_t *)(value+bytes_written);    
+            } else if (length - bytes_written >= 2) {
+                *(uint16_t volatile *) (master + port * 256 +
+                                        s_op_offsets[trans_type]) =
+                    *(uint16_t *) (value + bytes_written);
                 bytes_written += 2;
-            }
-            else
-            {
-                *(uint8_t volatile *)(master + port*256 + s_op_offsets[trans_type]) = *(uint8_t *)(value+bytes_written);    
+            } else {
+                *(uint8_t volatile *) (master + port * 256 +
+                                       s_op_offsets[trans_type]) =
+                    *(uint8_t *) (value + bytes_written);
                 bytes_written++;
             }
         }
-    }
-    else
-    {
+    } else {
         /* none data - just write a 0 value */
-        *(uint32_t volatile *)(master + port*256 + s_op_offsets[trans_type]) = 0;
+        *(uint32_t volatile *) (master + port * 256 +
+                                s_op_offsets[trans_type]) = 0;
     }
     return 0;
 }
@@ -333,7 +348,7 @@ int cs_stm_ext_write(cs_device_t dev, const unsigned int port, const unsigned ch
   #define CS_STMC_ALL     0xFFFF
 */
 
-int cs_stm_config_get(cs_device_t dev, stm_config_t *dyn_config)
+int cs_stm_config_get(cs_device_t dev, stm_config_t * dyn_config)
 {
     struct cs_device *d = DEV(dev);
 
@@ -341,33 +356,33 @@ int cs_stm_config_get(cs_device_t dev, stm_config_t *dyn_config)
 
     _cs_unlock(d);
 
-    if(dyn_config->config_op_flags & CS_STMC_CTRL)
-        dyn_config->tcsr.reg = _cs_read(d,CS_STM_TCSR);
+    if (dyn_config->config_op_flags & CS_STMC_CTRL)
+        dyn_config->tcsr.reg = _cs_read(d, CS_STM_TCSR);
 
-    if(dyn_config->config_op_flags & CS_STMC_SYNC)
-        dyn_config->syncr = _cs_read(d,CS_STM_SYNCR);
+    if (dyn_config->config_op_flags & CS_STMC_SYNC)
+        dyn_config->syncr = _cs_read(d, CS_STM_SYNCR);
 
-    if(dyn_config->config_op_flags & CS_STMC_PENA) {
-        dyn_config->sper = _cs_read(d,CS_STM_SPER);
-        dyn_config->spter = _cs_read(d,CS_STM_SPTER);
-        dyn_config->spscr = _cs_read(d,CS_STM_SPSCR);
-        dyn_config->spmscr = _cs_read(d,CS_STM_SPMSCR);
-        dyn_config->privmaskr = _cs_read(d,CS_STM_PRIVMASKR);
+    if (dyn_config->config_op_flags & CS_STMC_PENA) {
+        dyn_config->sper = _cs_read(d, CS_STM_SPER);
+        dyn_config->spter = _cs_read(d, CS_STM_SPTER);
+        dyn_config->spscr = _cs_read(d, CS_STM_SPSCR);
+        dyn_config->spmscr = _cs_read(d, CS_STM_SPMSCR);
+        dyn_config->privmaskr = _cs_read(d, CS_STM_PRIVMASKR);
     }
 
-    if(dyn_config->config_op_flags & CS_STMC_OVER) {
-        dyn_config->spoverrider = _cs_read(d,CS_STM_SPOVERRIDER);
-        dyn_config->spmoverrider = _cs_read(d,CS_STM_SPMOVERRIDER);
+    if (dyn_config->config_op_flags & CS_STMC_OVER) {
+        dyn_config->spoverrider = _cs_read(d, CS_STM_SPOVERRIDER);
+        dyn_config->spmoverrider = _cs_read(d, CS_STM_SPMOVERRIDER);
     }
 
-    if(dyn_config->config_op_flags & CS_STMC_TRIG) {
-        dyn_config->sptrigcsr = _cs_read(d,CS_STM_SPTRIGCSR);
+    if (dyn_config->config_op_flags & CS_STMC_TRIG) {
+        dyn_config->sptrigcsr = _cs_read(d, CS_STM_SPTRIGCSR);
     }
 
     return 0;
 }
 
-int cs_stm_config_put(cs_device_t dev, stm_config_t *dyn_config)
+int cs_stm_config_put(cs_device_t dev, stm_config_t * dyn_config)
 {
     struct cs_device *d = DEV(dev);
 
@@ -375,27 +390,27 @@ int cs_stm_config_put(cs_device_t dev, stm_config_t *dyn_config)
 
     _cs_unlock(d);
 
-    if(dyn_config->config_op_flags & CS_STMC_CTRL)
-        _cs_write(d,CS_STM_TCSR,dyn_config->tcsr.reg);
+    if (dyn_config->config_op_flags & CS_STMC_CTRL)
+        _cs_write(d, CS_STM_TCSR, dyn_config->tcsr.reg);
 
-    if(dyn_config->config_op_flags & CS_STMC_SYNC)
-        _cs_write(d,CS_STM_SYNCR,dyn_config->syncr);
+    if (dyn_config->config_op_flags & CS_STMC_SYNC)
+        _cs_write(d, CS_STM_SYNCR, dyn_config->syncr);
 
-    if(dyn_config->config_op_flags & CS_STMC_PENA) {
-        _cs_write(d,CS_STM_SPER, dyn_config->sper);
-        _cs_write(d,CS_STM_SPTER,dyn_config->spter);
-        _cs_write(d,CS_STM_SPSCR,dyn_config->spscr);
-        _cs_write(d,CS_STM_SPMSCR,dyn_config->spmscr);
-        _cs_write(d,CS_STM_PRIVMASKR,dyn_config->privmaskr);
+    if (dyn_config->config_op_flags & CS_STMC_PENA) {
+        _cs_write(d, CS_STM_SPER, dyn_config->sper);
+        _cs_write(d, CS_STM_SPTER, dyn_config->spter);
+        _cs_write(d, CS_STM_SPSCR, dyn_config->spscr);
+        _cs_write(d, CS_STM_SPMSCR, dyn_config->spmscr);
+        _cs_write(d, CS_STM_PRIVMASKR, dyn_config->privmaskr);
     }
 
-    if(dyn_config->config_op_flags & CS_STMC_OVER) {
-        _cs_write(d,CS_STM_SPOVERRIDER,dyn_config->spoverrider);
-        _cs_write(d,CS_STM_SPMOVERRIDER,dyn_config->spmoverrider);
+    if (dyn_config->config_op_flags & CS_STMC_OVER) {
+        _cs_write(d, CS_STM_SPOVERRIDER, dyn_config->spoverrider);
+        _cs_write(d, CS_STM_SPMOVERRIDER, dyn_config->spmoverrider);
     }
 
-    if(dyn_config->config_op_flags & CS_STMC_TRIG) {
-        _cs_write(d,CS_STM_SPTRIGCSR,dyn_config->sptrigcsr);
+    if (dyn_config->config_op_flags & CS_STMC_TRIG) {
+        _cs_write(d, CS_STM_SPTRIGCSR, dyn_config->sptrigcsr);
     }
     return 0;
 }

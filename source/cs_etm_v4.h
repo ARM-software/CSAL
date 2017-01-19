@@ -24,18 +24,17 @@
 #include "cs_etmv4_types.h"
 
 int _cs_etm_v4_static_config_init(struct cs_device *d);
-int _cs_etm_v4_config_init(struct cs_device *d, cs_etmv4_config_t *c);
-int _cs_etm_v4_config_get(struct cs_device *d, cs_etmv4_config_t *c);
-int _cs_etm_v4_config_put(struct cs_device *d, cs_etmv4_config_t *c);
+int _cs_etm_v4_config_init(struct cs_device *d, cs_etmv4_config_t * c);
+int _cs_etm_v4_config_get(struct cs_device *d, cs_etmv4_config_t * c);
+int _cs_etm_v4_config_put(struct cs_device *d, cs_etmv4_config_t * c);
 int _cs_etm_v4_clean(struct cs_device *d);
 int _cs_etm_v4_disable_programming(struct cs_device *d);
 int _cs_etm_v4_enable_programming(struct cs_device *d);
 
 #ifndef UNIX_KERNEL
-int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t *c);
+int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t * c);
 #endif
 
-#endif /* _included_cs_etm_v4_h */
+#endif				/* _included_cs_etm_v4_h */
 
 /* end of  cs_etm_v4.h */
-

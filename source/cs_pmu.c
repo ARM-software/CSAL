@@ -30,12 +30,14 @@ int cs_pmu_n_counters(cs_device_t dev)
 
 static cs_pmu_mask_t cs_pmu_mask(struct cs_device const *d)
 {
-    return CS_PMU_MASK_CYCLES | (((cs_pmu_mask_t)1U << d->v.pmu.n_counters) - 1);
+    return CS_PMU_MASK_CYCLES |
+        (((cs_pmu_mask_t) 1U << d->v.pmu.n_counters) - 1);
 }
 
 
 int cs_pmu_get_counts(cs_device_t dev, unsigned int mask,
-                      unsigned int *cycles, unsigned int *counts, unsigned int *overflow)
+                      unsigned int *cycles, unsigned int *counts,
+                      unsigned int *overflow)
 {
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_CPU_PMU);
@@ -45,7 +47,7 @@ int cs_pmu_get_counts(cs_device_t dev, unsigned int mask,
         } else {
             /* The architecture doesn't guarantee single-copy atomic access,
                and recommends a high-low-high read sequence. */
-            *cycles = (unsigned int)_cs_read64(d, CS_PMEVCNTR64(31));
+            *cycles = (unsigned int) _cs_read64(d, CS_PMEVCNTR64(31));
         }
     }
     if (overflow != NULL) {
@@ -83,7 +85,8 @@ int cs_pmu_get_counts(cs_device_t dev, unsigned int mask,
         mask &= (1U << d->v.pmu.n_counters) - 1;
         for (i = 0, j = 0; mask != 0; ++i) {
             if ((mask & 1) != 0) {
-                counts[j++] = _cs_read(d, CS_PMEVCNTR(i, d->v.pmu.map_scale));
+                counts[j++] =
+                    _cs_read(d, CS_PMEVCNTR(i, d->v.pmu.map_scale));
             }
             mask >>= 1;
         }
@@ -92,13 +95,14 @@ int cs_pmu_get_counts(cs_device_t dev, unsigned int mask,
 }
 
 
-int cs_pmu_read_status(cs_device_t dev, unsigned int flags, cs_pmu_t *status)
+int cs_pmu_read_status(cs_device_t dev, unsigned int flags,
+                       cs_pmu_t * status)
 {
     struct cs_device *d = DEV(dev);
     unsigned int pmcr = 0;
 
     assert(d->type == DEV_CPU_PMU);
-    if (flags & (CS_PMU_DISABLE|CS_PMU_DIV64|CS_PMU_ENABLE)) {
+    if (flags & (CS_PMU_DISABLE | CS_PMU_DIV64 | CS_PMU_ENABLE)) {
         pmcr = _cs_read(d, CS_PMCR);
         if (flags & CS_PMU_DISABLE) {
             _cs_write(d, CS_PMCR, pmcr & ~CS_PMCR_E);
@@ -119,7 +123,7 @@ int cs_pmu_read_status(cs_device_t dev, unsigned int flags, cs_pmu_t *status)
     }
     /* Mask off the unimplemented counters bits - but leave the cycle counter. */
     status->mask &= cs_pmu_mask(d);
-    if (flags & (CS_PMU_EVENTTYPES|CS_PMU_COUNTS)) {
+    if (flags & (CS_PMU_EVENTTYPES | CS_PMU_COUNTS)) {
         unsigned int i;
         cs_pmu_mask_t mask = status->mask;
         for (i = 0; i < 31 && mask != 0; ++i) {
@@ -128,7 +132,8 @@ int cs_pmu_read_status(cs_device_t dev, unsigned int flags, cs_pmu_t *status)
                     status->eventtypes[i] = _cs_read(d, CS_PMXEVTYPER(i));
                 }
                 if (flags & CS_PMU_COUNTS) {
-                    status->counts[i] = _cs_read(d, CS_PMEVCNTR(i, d->v.pmu.map_scale));
+                    status->counts[i] =
+                        _cs_read(d, CS_PMEVCNTR(i, d->v.pmu.map_scale));
                 }
             }
             mask >>= 1;
@@ -141,20 +146,21 @@ int cs_pmu_read_status(cs_device_t dev, unsigned int flags, cs_pmu_t *status)
 }
 
 
-int cs_pmu_write_status(cs_device_t dev, unsigned int flags, cs_pmu_t const *status)
+int cs_pmu_write_status(cs_device_t dev, unsigned int flags,
+                        cs_pmu_t const *status)
 {
     struct cs_device *d = DEV(dev);
-    unsigned int pmcr = 0;   /* Init for compiler benefit only - alwasy read/modify/write */
+    unsigned int pmcr = 0;	/* Init for compiler benefit only - alwasy read/modify/write */
     assert(d->type == DEV_CPU_PMU);
 
     _cs_unlock(d);
-    if (flags & (CS_PMU_DISABLE|CS_PMU_DIV64|CS_PMU_ENABLE)) {
+    if (flags & (CS_PMU_DISABLE | CS_PMU_DIV64 | CS_PMU_ENABLE)) {
         pmcr = _cs_read(d, CS_PMCR);
         if (flags & CS_PMU_DISABLE) {
             _cs_write(d, CS_PMCR, pmcr & ~CS_PMCR_E);
         }
     }
-    if (flags & (CS_PMU_EVENTTYPES|CS_PMU_COUNTS)) {
+    if (flags & (CS_PMU_EVENTTYPES | CS_PMU_COUNTS)) {
         unsigned int i;
         cs_pmu_mask_t mask = status->mask;
         for (i = 0; i <= 31 && mask != 0; ++i) {
@@ -163,8 +169,9 @@ int cs_pmu_write_status(cs_device_t dev, unsigned int flags, cs_pmu_t const *sta
                     _cs_write(d, CS_PMXEVTYPER(i), status->eventtypes[i]);
                 }
                 if (flags & CS_PMU_COUNTS) {
-                    _cs_write(d, CS_PMEVCNTR(i, d->v.pmu.map_scale), status->counts[i]);
-                } 
+                    _cs_write(d, CS_PMEVCNTR(i, d->v.pmu.map_scale),
+                              status->counts[i]);
+                }
             }
             mask >>= 1;
         }
@@ -183,7 +190,7 @@ int cs_pmu_write_status(cs_device_t dev, unsigned int flags, cs_pmu_t const *sta
     if (flags & CS_PMU_DIV64) {
         pmcr = (pmcr & ~0x08) | (status->div64 << 3);
     }
-    if (flags & (CS_PMU_ENABLE|CS_PMU_DIV64)) {
+    if (flags & (CS_PMU_ENABLE | CS_PMU_DIV64)) {
         _cs_write(d, CS_PMCR, pmcr);
     }
     return 0;
@@ -200,7 +207,8 @@ int cs_pmu_reset(cs_device_t dev, unsigned int flags)
            Read-back should show that exactly these counters are now enabled. */
         _cs_write(d, CS_PMCNTENSET, cs_pmu_mask(d));
     }
-    if (flags & (CS_PMU_CYCLES|CS_PMU_COUNTS|CS_PMU_ENABLE|CS_PMU_DISABLE)) {
+    if (flags &
+        (CS_PMU_CYCLES | CS_PMU_COUNTS | CS_PMU_ENABLE | CS_PMU_DISABLE)) {
         unsigned int pmcr = _cs_read(d, CS_PMCR);
         if (flags & CS_PMU_CYCLES) {
             pmcr |= CS_PMCR_C;
@@ -240,5 +248,3 @@ int cs_pmu_is_enabled(cs_device_t dev)
 }
 
 /* end of cspmu.c */
-
-

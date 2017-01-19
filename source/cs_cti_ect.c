@@ -29,7 +29,7 @@
 struct cs_channel {
     unsigned int n_src;
     unsigned int n_dst;
-    unsigned int n_cti;    /* Number of distinct CTIs involved */
+    unsigned int n_cti;		/* Number of distinct CTIs involved */
     /* Arbitrary array size just for prototyping this API, not a limit of CS architecture */
 #define CS_CHAN_LIMIT 16
 #define CS_CHAN_CTI_LIMIT 16
@@ -54,7 +54,7 @@ static unsigned int cs_cti_get_global_channels(cs_device_t cti)
  */
 static int cs_ect_is_local(cs_channel_t chan)
 {
-    struct cs_channel *c = (struct cs_channel *)chan;
+    struct cs_channel *c = (struct cs_channel *) chan;
     assert(c->n_cti != 0);
     return c->n_cti == 1;
 }
@@ -65,7 +65,7 @@ static int cs_ect_is_local(cs_channel_t chan)
 static int cs_channel_uses_cti(cs_channel_t chan, cs_device_t cti)
 {
     unsigned int i;
-    struct cs_channel const *c = (struct cs_channel const *)chan;
+    struct cs_channel const *c = (struct cs_channel const *) chan;
     assert(DEV(cti)->type == DEV_CTI);
     for (i = 0; i < c->n_cti; ++i) {
         if (cti == c->ctis[i])
@@ -77,9 +77,9 @@ static int cs_channel_uses_cti(cs_channel_t chan, cs_device_t cti)
 static int cs_ect_add_cti(struct cs_channel *c, cs_device_t cti)
 {
     if (cs_channel_uses_cti(c, cti)) {
-        return 0;    /* already used - nothing to do */
+        return 0;		/* already used - nothing to do */
     } else {
-        if (c->n_cti == CS_CHAN_CTI_LIMIT-1) {
+        if (c->n_cti == CS_CHAN_CTI_LIMIT - 1) {
             return -1;
         } else {
             c->ctis[c->n_cti++] = cti;
@@ -118,7 +118,8 @@ int cs_cti_disable(cs_device_t dev)
     return _cs_clear(d, CS_CTICONTROL, CS_CTICONTROL_GLBEN);
 }
 
-int cs_cti_set_trigin_channels(cs_device_t cti, unsigned int ctiport, unsigned int mask)
+int cs_cti_set_trigin_channels(cs_device_t cti, unsigned int ctiport,
+                               unsigned int mask)
 {
     struct cs_device *d = DEV(cti);
     assert(d->type == DEV_CTI);
@@ -128,7 +129,8 @@ int cs_cti_set_trigin_channels(cs_device_t cti, unsigned int ctiport, unsigned i
     return _cs_write(d, CS_CTIINEN(ctiport), mask);
 }
 
-int cs_cti_set_trigout_channels(cs_device_t cti, unsigned int ctiport, unsigned int mask)
+int cs_cti_set_trigout_channels(cs_device_t cti, unsigned int ctiport,
+                                unsigned int mask)
 {
     struct cs_device *d = DEV(cti);
     assert(d->type == DEV_CTI);
@@ -185,7 +187,7 @@ int cs_cti_set_active_channel(cs_device_t cti, unsigned int channel)
     assert(channel < d->v.cti.n_channels);
 
     _cs_unlock(d);
-    return _cs_set(d,CS_CTIAPPSET,(0x1U << channel));
+    return _cs_set(d, CS_CTIAPPSET, (0x1U << channel));
 }
 
 int cs_cti_clear_active_channel(cs_device_t cti, unsigned int channel)
@@ -195,7 +197,7 @@ int cs_cti_clear_active_channel(cs_device_t cti, unsigned int channel)
     assert(channel < d->v.cti.n_channels);
 
     _cs_unlock(d);
-    return _cs_set(d,CS_CTIAPPCLEAR,(0x1U << channel));
+    return _cs_set(d, CS_CTIAPPCLEAR, (0x1U << channel));
 }
 
 int cs_cti_clear_all_active_channels(cs_device_t cti)
@@ -207,7 +209,7 @@ int cs_cti_clear_all_active_channels(cs_device_t cti)
 
     _cs_unlock(d);
     clear_mask = ((0x1U << d->v.cti.n_channels) - 1);
-    return _cs_set(d,CS_CTIAPPCLEAR,clear_mask);
+    return _cs_set(d, CS_CTIAPPCLEAR, clear_mask);
 }
 
 unsigned int cs_cti_trigin_status(cs_device_t cti)
@@ -256,12 +258,15 @@ void cs_cti_diag(void)
     for (d = G.device_top; d != NULL; d = d->next) {
         unsigned int sin, sout, cact, cgate, cin, cout;
         unsigned int i, j;
-        if (d->type != DEV_CTI) continue;
+        if (d->type != DEV_CTI)
+            continue;
         diagf("CTI at %" CS_PHYSFMT "", d->phys_addr);
         if (d->affine_cpu != CS_CPU_UNKNOWN && d->affine_cpu != CS_NO_CPU) {
             diagf(" (cpu #%u)", d->affine_cpu);
         }
-        diagf(" (%sabled)", (_cs_isset(d, CS_CTICONTROL, CS_CTICONTROL_GLBEN) ? "en" : "dis"));
+        diagf(" (%sabled)",
+              (_cs_isset(d, CS_CTICONTROL, CS_CTICONTROL_GLBEN) ? "en" :
+               "dis"));
         diagf(":\n");
         /* Show static and dynamic configuration, and status */
         sin = _cs_read(d, CS_CTITRIGINSTATUS);
@@ -271,11 +276,13 @@ void cs_cti_diag(void)
         cin = _cs_read(d, CS_CTICHINSTATUS);
         cout = _cs_read(d, CS_CTICHOUTSTATUS);
 
-        diagf("  TIN=%02X TOUT=%02X CIN=%02X COUT=%02X CACTIVE=%02X CGATE=%02X\n",
-              sin, sout, cin, cout, cact, cgate);
+        diagf
+            ("  TIN=%02X TOUT=%02X CIN=%02X COUT=%02X CACTIVE=%02X CGATE=%02X\n",
+             sin, sout, cin, cout, cact, cgate);
         diagf("  channels (%u):\n", d->v.cti.n_channels);
         if (cact != 0 || cin != 0 || cout != 0 ||
-            cgate != CTI_CHANNEL_MASK || cs_cti_used_channels(DEVDESC(d)) != 0) {
+            cgate != CTI_CHANNEL_MASK
+            || cs_cti_used_channels(DEVDESC(d)) != 0) {
             for (i = 0; i < d->v.cti.n_channels; ++i) {
                 diagf("    #%u:", i);
                 for (j = 0; j < d->v.cti.n_triggers; ++j) {
@@ -299,21 +306,20 @@ void cs_cti_diag(void)
             }
         } else {
             diagf("    none in use\n");
-        } 
+        }
 
         diagf("  incoming triggers (%u):\n", d->v.cti.n_triggers);
         for (i = 0; i < d->v.cti.n_triggers; ++i) {
             unsigned int chans = _cs_read(d, CS_CTIINEN(i));
             int is_active = (sin & (1U << i)) != 0;
             struct cs_device *dev = d->v.cti.src[i].dev;
-            if (dev == NULL &&
-                chans == 0 &&
-                !is_active) {
+            if (dev == NULL && chans == 0 && !is_active) {
                 continue;
             }
             diagf("    #%u:", i);
             if (d->v.cti.src[i].dev != NULL) {
-                diagf(" %s:%" CS_PHYSFMT "", cs_device_type_name(dev), dev->phys_addr);
+                diagf(" %s:%" CS_PHYSFMT "", cs_device_type_name(dev),
+                      dev->phys_addr);
                 diagf(".%u ", d->v.cti.src[i].devportid);
             }
             if (chans != 0) {
@@ -329,14 +335,13 @@ void cs_cti_diag(void)
             unsigned int chans = _cs_read(d, CS_CTIOUTEN(i));
             int is_active = (sout & (1U << i)) != 0;
             struct cs_device *dev = d->v.cti.dst[i].dev;
-            if (dev == NULL &&
-                chans == 0 &&
-                !is_active) {
+            if (dev == NULL && chans == 0 && !is_active) {
                 continue;
             }
             diagf("    #%u:", i);
             if (d->v.cti.dst[i].dev != NULL) {
-                diagf(" %s:%" CS_PHYSFMT "", cs_device_type_name(dev), dev->phys_addr);
+                diagf(" %s:%" CS_PHYSFMT "", cs_device_type_name(dev),
+                      dev->phys_addr);
                 diagf(".%u ", d->v.cti.dst[i].devportid);
             }
             if (chans != 0) {
@@ -385,7 +390,8 @@ cs_device_t cs_trigdst_cti(cs_trigdst_t dst)
 }
 
 
-int cs_cti_connect_trigsrc(cs_device_t dev, unsigned int devport, cs_trigsrc_t src)
+int cs_cti_connect_trigsrc(cs_device_t dev, unsigned int devport,
+                           cs_trigsrc_t src)
 {
     struct cs_device *d = DEV(src.cti);
     assert(DEV(dev)->type != DEV_CTI);
@@ -395,7 +401,8 @@ int cs_cti_connect_trigsrc(cs_device_t dev, unsigned int devport, cs_trigsrc_t s
     return 0;
 }
 
-int cs_cti_connect_trigdst(cs_trigdst_t dst, cs_device_t dev, unsigned int devport)
+int cs_cti_connect_trigdst(cs_trigdst_t dst, cs_device_t dev,
+                           unsigned int devport)
 {
     struct cs_device *d = DEV(dst.cti);
     assert(DEV(dev)->type != DEV_CTI);
@@ -410,9 +417,11 @@ cs_trigsrc_t cs_trigsrc(cs_device_t dev, unsigned int devportid)
     struct cs_device *d;
     for (d = G.device_top; d != NULL; d = d->next) {
         unsigned int i;
-        if (d->type != DEV_CTI) continue;
+        if (d->type != DEV_CTI)
+            continue;
         for (i = 0; i < d->v.cti.n_triggers; ++i) {
-            if (d->v.cti.src[i].dev == DEV(dev) && d->v.cti.src[i].devportid == devportid) {
+            if (d->v.cti.src[i].dev == DEV(dev)
+                && d->v.cti.src[i].devportid == devportid) {
                 return cs_cti_trigsrc(DEVDESC(d), i);
             }
         }
@@ -430,10 +439,12 @@ cs_trigdst_t cs_trigdst(cs_device_t dev, unsigned int devportid)
     struct cs_device *d;
     for (d = G.device_top; d != NULL; d = d->next) {
         unsigned int i;
-        if (d->type != DEV_CTI) continue;
+        if (d->type != DEV_CTI)
+            continue;
         /* Check all outbound triggers */
         for (i = 0; i < d->v.cti.n_triggers; ++i) {
-            if (d->v.cti.dst[i].dev == DEV(dev) && d->v.cti.dst[i].devportid == devportid) {
+            if (d->v.cti.dst[i].dev == DEV(dev)
+                && d->v.cti.dst[i].devportid == devportid) {
                 return cs_cti_trigdst(DEVDESC(d), i);
             }
         }
@@ -458,7 +469,8 @@ cs_trigdst_t cs_trigdst(cs_device_t dev, unsigned int devportid)
 
 cs_channel_t cs_ect_get_channel(void)
 {
-    struct cs_channel *c = (struct cs_channel *)malloc(sizeof(struct cs_channel));
+    struct cs_channel *c =
+        (struct cs_channel *) malloc(sizeof(struct cs_channel));
     assert(c != NULL);
     memset(c, 0, sizeof(struct cs_channel));
     return c;
@@ -466,8 +478,8 @@ cs_channel_t cs_ect_get_channel(void)
 
 int cs_ect_add_trigsrc(cs_channel_t chan, cs_trigsrc_t src)
 {
-    struct cs_channel *c = (struct cs_channel *)chan;
-    if (c->n_src == CS_CHAN_LIMIT-1) {
+    struct cs_channel *c = (struct cs_channel *) chan;
+    if (c->n_src == CS_CHAN_LIMIT - 1) {
         return -1;
     } else {
         c->sources[c->n_src++] = src;
@@ -477,8 +489,8 @@ int cs_ect_add_trigsrc(cs_channel_t chan, cs_trigsrc_t src)
 
 int cs_ect_add_trigdst(cs_channel_t chan, cs_trigdst_t dst)
 {
-    struct cs_channel *c = (struct cs_channel *)chan;
-    if (c->n_dst == CS_CHAN_LIMIT-1) {
+    struct cs_channel *c = (struct cs_channel *) chan;
+    if (c->n_dst == CS_CHAN_LIMIT - 1) {
         return -1;
     } else {
         c->dests[c->n_dst++] = dst;
@@ -489,7 +501,7 @@ int cs_ect_add_trigdst(cs_channel_t chan, cs_trigdst_t dst)
 int cs_ect_diag(cs_channel_t chan)
 {
     int i;
-    struct cs_channel const *c = (struct cs_channel const *)chan;
+    struct cs_channel const *c = (struct cs_channel const *) chan;
 
     diagf("Channel request:\n");
     diagf("  Trigger sources:\n");
@@ -512,7 +524,7 @@ int cs_ect_configure(cs_channel_t chandesc)
     unsigned int i;
     unsigned int channo;
     int is_local;
-    struct cs_channel *c = (struct cs_channel *)chandesc;
+    struct cs_channel *c = (struct cs_channel *) chandesc;
 
     assert(c != NULL);
 
@@ -543,7 +555,7 @@ int cs_ect_configure(cs_channel_t chandesc)
         /* Find the lowest-numbered channel not used by this CTI.  Use elsewhere
            in the cross-trigger fabric doesn't matter as we will gate the channel
            off at this CTI. */
-        channo = chans & (0U-chans);
+        channo = chans & (0U - chans);
         /* Gate off the channel, to make it local to this CTI */
         _cs_clear(cti, CS_CTIGATE, channo);
     } else {
@@ -570,25 +582,29 @@ int cs_ect_configure(cs_channel_t chandesc)
             chans &= cs_cti_unused_channels(DEVDESC(c->ctis[i]));
         }
         if (chans == 0) {
-            return cs_report_error("all channels are in use by these CTIs");
+            return
+                cs_report_error("all channels are in use by these CTIs");
         }
         /* Scan all CTIs in the system */
         for (d = G.device_top; d != NULL; d = d->next) {
-            if (d->type != DEV_CTI) continue;
+            if (d->type != DEV_CTI)
+                continue;
             chans &= ~cs_cti_used_global_channels(DEVDESC(d));
         }
         if (chans == 0) {
             return cs_report_error("no channels available");
         }
-        channo = chans & (0U-chans);
+        channo = chans & (0U - chans);
     }
 
     /* Program the requested sources and destinations */
     for (i = 0; i < c->n_src; ++i) {
-        _cs_set(DEV(c->sources[i].cti), CS_CTIINEN(c->sources[i].ctiport), channo);
+        _cs_set(DEV(c->sources[i].cti), CS_CTIINEN(c->sources[i].ctiport),
+                channo);
     }
     for (i = 0; i < c->n_dst; ++i) {
-        _cs_set(DEV(c->dests[i].cti), CS_CTIOUTEN(c->dests[i].ctiport), channo);
+        _cs_set(DEV(c->dests[i].cti), CS_CTIOUTEN(c->dests[i].ctiport),
+                channo);
     }
     for (i = 0; i < c->n_cti; ++i) {
         cs_cti_enable(DEVDESC(c->ctis[i]));
@@ -601,7 +617,8 @@ int cs_ect_reset(void)
     int rc = 0;
     struct cs_device *d;
     for (d = G.device_top; d != NULL; d = d->next) {
-        if (d->type != DEV_CTI) continue;
+        if (d->type != DEV_CTI)
+            continue;
         rc = cs_cti_reset(DEVDESC(d));
         if (rc != 0)
             break;
