@@ -1,0 +1,24 @@
+CoreSight Access Library make
+-----------------------------
+
+Targets:-
+    all         : build library and demos.
+    lib         : build library.
+    demos       : build demos.
+    docs        : build doxygen documentation.
+    experimental: try to build experimental code.
+    clean       : clean library and demos.
+    <target>_clean: clean individual target.
+
+Environment Variables:-
+     ARCH - target architecture (arm, arm64)
+     CROSS_COMPILE - build on x86 platform. Arm gcc compiler prefix - assumes on path and correct target arch o/p
+
+Make Command Line Variables:-
+     DEBUG=1      : build debug version.
+     NOLPAE=1     : No LPAE on arm64 build.
+     LPAE=1       : LPAE on arm build.
+     BAREMETAL=1  : None-linux bare metal build.
+     NO_DIAG=1    : disable diagnostic printing.
+     NO_CHECK=1   : disable checks.
+     DBG_HALT=1   : create library with v7 halting debug operations.

@@ -2,13 +2,13 @@ Using the Library in Python      {#python}
 ===========================
 
 The `./python` directory in the CoreSight Access Library distribution contains source code and 
-a Makefile to build a python add-in module for the library, enabling the use of the library 
+a makefile to build a python add-in module for the library, enabling the use of the library 
 within python scripts on platforms that support python.
 
 Supplied Files
 --------------
 
-- `Makefile` : this will make the python module, either using the python-dev module within python
+- `makefile` : this will make the python module, either using the python-dev module within python
    or building a module standalone. This file will require modification for the target system.
 - `setup.py` : Python script that sets up the `_csaccess` module using python.
 - `csaccess.i` : Interface source file used to create the python module. Library includes are 
@@ -25,13 +25,13 @@ The target system must have the following modules installed, in addition to a 2.
  - `python-dev`: a python module used to build the add-in module.
 
 
-Modifying the `Makefile`
+Modifying the `makefile`
 ------------------------
 
-The supplied `Makefile` will require modification to match the `python` installation on the 
+The supplied `makefile` will require modification to match the `python` installation on the 
 target system. As supplied it is set up to test the build on a linux test platform.
 
-The following lines from `Makefile` may need changing:-
+The following lines from `makefile` may need changing:-
 
     # gcc flags - these match those used by python 2.6 build utilities.
     #           - tune according to your python

@@ -23,6 +23,8 @@ import os
 
 def fn_is_source(fn):
     base, ext = os.path.splitext(fn)
+    if "makefile" in base:
+        return base
     return ext in [".c", ".cpp", ".h", ".py"]
 
 

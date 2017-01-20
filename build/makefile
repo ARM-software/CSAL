@@ -1,8 +1,25 @@
-# CoreSight Access Library
+#############################################################################
+#  CoreSight Access Library
+#
+#  Copyright (C) ARM Limited, 2017. All rights reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at#
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#
+#############################################################################
 # 
 # This makefile builds the CS-Access library for both static and dynamic linked versions. 
 #
-# Default builds the standard release versions, linux application space
+# Default builds the standard release versions, linux application space, arm 32 arch
 #
 # to build debug add DEBUG=1 to the make command line
 # to build in the v7 debug halt extensions add DBG_HALT=1 to the make command line
@@ -12,24 +29,27 @@
 # make DEBUG=1 
 #  
 
-# default settings
-CC=gcc
+# setup architecture & x-compile
+include ../makefile-arch.inc
+
+# default settings - allow for cross compile of library 
+CC=$(CROSS_COMPILE)gcc
 CFLAGS=-Wall -Wno-switch
 
-LIB_DIR = ../lib/rel
-LIB_DIR_BM=../lib/rel_bm
+LIB_DIR = ../lib/$(ARCH)/rel
+LIB_DIR_BM=../lib/$(ARCH)/rel_bm
 LIB_NAME=csaccess
 LIB_NAME_UTIL=csacc_util
-BUILD_DIR=./rel
-BUILD_DIR_BM=./rel_bm
+BUILD_DIR=./rel-$(ARCH)
+BUILD_DIR_BM=./rel_bm-$(ARCH)
 
 # build options
 ifeq ($(DEBUG),1)
 CFLAGS+= -O0 -DDEBUG -g
-LIB_DIR = ../lib/dbg
-LIB_DIR_BM = ../lib/dbg_bm
-BUILD_DIR=./dbg
-BUILD_DIR_BM=./dbg_bm
+LIB_DIR = ../lib/$(ARCH)/dbg
+LIB_DIR_BM = ../lib/$(ARCH)/dbg_bm
+BUILD_DIR=./dbg-$(ARCH)
+BUILD_DIR_BM=./dbg_bm-$(ARCH)
 else
 CFLAGS+= -O2 -DNDEBUG
 endif
@@ -47,14 +67,19 @@ CFLAGS+= -DUSING_V7_DBG_HALT
 CSSRC_HALT=cs_debug_halt.c
 endif
 
-# LPAE options
+# check if building on/for aarch64
+ifeq ($(ARCH),arm64)
+CFLAGS+= -DCS_VA64BIT
+ifneq ($(NOLPAE),1)
+CFLAGS+= -DLPAE
+endif
+
+else
+# arm 32 - might want lpae
 ifeq ($(LPAE),1)
 CFLAGS+= -DLPAE
 endif
 
-# 64 bit VAs
-ifeq ($(VA64),1)
-CFLAGS+= -DCS_VA64BIT
 endif
 
 #disable diagnostic printing
@@ -113,7 +138,14 @@ SO_OBJS_UTIL=$(addprefix $(BUILD_DIR)/so/,$(CSUTILSRC:%.c=%.o))
 
 # build both lib types
 .PHONY: all
-all: lib_a lib_so 
+all: start lib_a lib_so 
+
+# start msg
+start:
+	@echo "CSAL libraries: Building ARCH=$(ARCH), CROSS_COMPILE=$(CROSS_COMPILE)"
+	@echo "MAKEFLAGS = $(MAKEFLAGS)"
+	@echo ""
+
 
 # create the lib output and build dirs
 .PHONY: lib_dir
@@ -157,26 +189,4 @@ clean_objs:
 	rm -fr $(SO_OBJS)
 	rm -fr $(SO_OBJS_UTIL)
 
-###### library maintenance operaions ##################################
-
-# CS Lib API Documentation
-docs: ../doxygen-cfg.txt 
-	cd ../. && doxygen doxygen-cfg.txt 
-
-
-# create a distribution file.
-libsources = ../source ../include ../build/Makefile ../build/readme_build.md
-demosources = ../demos/*.c ../demos/*.h ../demos/Makefile ../demos/readme_demos.md
-pythonsources = ../python/*.py ../python/Makefile ../python/csaccess_py.c ../python/csaccess.i 
-sources = $(libsources) $(demosources) $(pythonsources)
-distfile = csaccess.tar.gz
-
-.PHONY: dist
-dist: $(distfile)
-
-# readme.html
-
-$(distfile): $(sources) ../doxygen-cfg.txt ../README.md ../LICENCE
-	tar -czf $@ $^
-	tar -tzf $@
 

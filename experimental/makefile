@@ -1,4 +1,22 @@
-# CoreSight Access Library - Demonstration and example builds
+#############################################################################
+#  CoreSight Access Library
+#
+#  Copyright (C) ARM Limited, 2017. All rights reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at#
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#
+#############################################################################
+#  Demonstration and example builds
 # 
 # This makefile builds the demos for the CS Access Library 
 #
@@ -60,9 +78,9 @@ LIB_NAME=csaccess
 LIB_INCL=-L $(CS_LIB_DIR)
 LIB_NAME_UTIL=csacc_util
 
-# build all demos
+# build all experimental programs
 .PHONY: all
-all: csls tracedemo trace_cti_stop etmdemo 
+all: topogen csprofile
 
 # (csprofile will not build on snowball demo target so removed from all)
 
@@ -77,42 +95,18 @@ bin_dir:
 $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a:
 	@$(MAKE) -C ../build
 
-# **** build the CSLS demo
-CSLS_SRC=csls.c
-
-CSLS_OBJS=$(addprefix $(BUILD_DIR)/,$(CSLS_SRC:%.c=%.o))
-
-csls: bin_dir $(CSLS_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(BIN_DIR)/Makefile
-	$(CC) -o $(BIN_DIR)/$@ $(CSLS_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a 
-
-#  **** build the tracedemo program
-CSTD_SRC=   tracedemo.c \
-			cs_demo_known_boards.c
-
-CSTD_OBJS=$(addprefix $(BUILD_DIR)/,$(CSTD_SRC:%.c=%.o))
-
-tracedemo: bin_dir $(CSTD_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/Makefile
-	$(CC) -o $(BIN_DIR)/$@ $(CSTD_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a 
-
+# **** the known boards source
+CSBOARDS_SRC=../demo/cs_demo_known_boards.c
 
 #  **** build the topology generator utility
-TOPOGEN_SRC=topogen.c cs_demo_known_boards.c cs_topology_detect.c cs_topology_print.c
+TOPOGEN_SRC=topogen.c $(CSBOARDS_SRC) cs_topology_detect.c cs_topology_print.c
 
 topogen: $(TOPOGEN_SRC) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/Makefile
 	$(CC) $(CFLAGS) $(INCS) -o $@ $(TOPOGEN_SRC) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a
 
-#  **** build the trace_cti_stop program
-CSTDCTI_SRC=tracedemo_cti_stop.c \
-			cs_demo_known_boards.c
-
-CSTDCTI_OBJS=$(addprefix $(BUILD_DIR)/,$(CSTDCTI_SRC:%.c=%.o))
-
-trace_cti_stop: bin_dir $(CSTDCTI_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/Makefile
-	$(CC) -o $(BIN_DIR)/$@ $(CSTDCTI_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a 
-
 #  **** build the traceprofile program
 CSTP_SRC=   csprofile.c tns.c \
-			cs_demo_known_boards.c
+			 $(CSBOARDS_SRC)
 
 CSTP_OBJS=$(addprefix $(BUILD_DIR)/,$(CSTP_SRC:%.c=%.o))
 
@@ -129,33 +123,12 @@ csprofile: CFLAGS_EX=$(PROF_CFLAGS) -UNDEBUG
 csprofile: bin_dir $(CSTP_OBJS) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/Makefile
 	$(CC) -o $(BIN_DIR)/$@ $(CSTP_OBJS) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a -lrt -lpthread
 
-#  **** build the ETM/PTM config print demo
-CSETM_SRC=  cs_etm_config_demo.c \
-			cs_demo_known_boards.c
-
-CSETM_OBJS=$(addprefix $(BUILD_DIR)/,$(CSETM_SRC:%.c=%.o))
-
-etmdemo: bin_dir $(CSETM_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/Makefile
-	$(CC) -o $(BIN_DIR)/$@ $(CSETM_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a
-
-
-# copy the snapshot makefile
-$(BIN_DIR)/Makefile:
-	cp Makefile.snapshot $(BIN_DIR)/Makefile
-
 # clean all object files and libraries
 .PHONY: clean
 clean: clean_objs
-	rm -fr $(BIN_DIR)/etmdemo
-	rm -fr $(BIN_DIR)/csls
-	rm -fr $(BIN_DIR)/tracedemo
 	rm -fr $(BIN_DIR)/csprofile
 
 .PHONY: clean_objs
 clean_objs:
-	rm -fr $(CSLS_OBJS)
-	rm -fr $(CSTD_OBJS)
 	rm -fr $(CSTP_OBJS)
-	rm -fr $(CSETM_OBJS)
-	rm -fr $(CSTDCTI_OBJS)
 

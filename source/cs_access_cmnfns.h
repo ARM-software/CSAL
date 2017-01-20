@@ -61,7 +61,7 @@
 
 
 #define CS_LIB_VERSION_MAJ 0x02
-#define CS_LIB_VERSION_MIN 0x02
+#define CS_LIB_VERSION_MIN 0x03
 
 /*
   DIAG defines whether this build is capable of writing diagnostic messages.

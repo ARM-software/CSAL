@@ -17,9 +17,28 @@
 #
 #############################################################################
 #
-# Makefile to collect all files for a snapshot archive into DS-5
-# Copied from ./demos/Makefile.snapshot to ./bin/.../Makefile when demos built
+# Architecture and cross compile tests for makefiles
+#
 
-# create a snapshot file 
-cstrace.tar: snapshot.ini cstrace.bin kernel_dump.bin trace.ini
-	tar cvf $@ $^ cpu_*.ini device_*.ini
+# figure platform arch
+ifndef PLAT_ARCH
+PLAT_ARCH := $(shell uname -m 2>/dev/null || echo not)
+endif
+
+ifeq ($(PLAT_ARCH),$(filter $(PLAT_ARCH), x86 x86_64 ))
+ifeq ($(CROSS_COMPILE), )
+$(error no CROSS_COMPILE set on x86 platform)
+endif
+ifeq ($(ARCH), )
+$(error no arm target ARCH set on x86 platform)
+endif
+endif
+
+# set build arch - default to arm
+ifndef ARCH
+ifeq ($(PLAT_ARCH),$(filter $(PLAT_ARCH), aarch64 arm64 ))
+ARCH=arm64
+else
+ARCH=arm
+endif
+endif

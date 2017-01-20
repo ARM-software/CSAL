@@ -46,11 +46,16 @@ Library supplied as a git repository on github - git@github.com:ARM-software/CSA
 
 `./build`  : The main library build `Makefile`. Change to this directory to build the library.
 
-`./python` : Build and source files to make a python module to interface to the library.
+`./python` : Build and source files to make a python module to interface to the library. (unmaintained)
+
+`./experimental` : Unmaintained and unsupported additional demos.
 
 `./doxygen-cfg.txt` : File to generate API documentation using __doxygen__.
 
 `./README.md` : This readme text file - which is also processed by __doxygen__.
+
+`./makefile`  : master makefile - `make help` for list of targets.
+
 
 Documentation
 -------------
@@ -145,10 +150,11 @@ Updates to APIs:-
 - Updated topology detection to recognise an Embedded Logic Analyser type component.
 - Updated documentation for running Juno examples an shipping scripts to set up the platform.
 
-Version 3.0.0
+Version 2.3
 -------------
 - Transfer to github project
-- Versioning change
+- makefile updates for x-compile and master makefile in project root dir.
+- moved some code to 'experimental' directory - demos that are not maintained / supported. 
 
 ------------------------------------
 
