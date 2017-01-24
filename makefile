@@ -77,6 +77,9 @@ experimental_clean:
 python_clean:
 	cd ./python && make clean
 
+#### rebuild
+.PHONY: rebuild
+rebuild: clean all
 
 ###### library maintenance operaions ##################################
 # CS Lib API Documentation

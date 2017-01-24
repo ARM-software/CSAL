@@ -55,16 +55,20 @@ else
 CFLAGS+= -O2 -g
 endif
 
-# LPAE options
+# check if building on/for aarch64
+ifeq ($(ARCH),arm64)
+CFLAGS+= -DCS_VA64BIT
+ifneq ($(NOLPAE),1)
+CFLAGS+= -DLPAE
+endif
+
+else
+# arm 32 - might want lpae
 ifeq ($(LPAE),1)
 CFLAGS+= -DLPAE
 endif
 
-# 64 bit VAs
-ifeq ($(VA64),1)
-CFLAGS+= -DCS_VA64BIT
 endif
-
 
 # set the include paths - for the CS Access library API
 INCS=   -I. \
@@ -73,7 +77,8 @@ INCS=   -I. \
 
 # build rules for the executables
 $(BUILD_DIR)/%.o: %.c
-	$(CC) $(CFLAGS) $(CFLAGS_EX) $(INCS) -c $< -o $@
+	$(CC) $(CFLAGS) $(CFLAGS_EX) $(INCS) -c -MMD -MP  $< -o $@
+
 
 # library dependencies
 LIB_NAME=csaccess
@@ -101,6 +106,7 @@ $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a:
 CSLS_SRC=csls.c
 
 CSLS_OBJS=$(addprefix $(BUILD_DIR)/,$(CSLS_SRC:%.c=%.o))
+CSLS_DEPS=$(CSLS_OBJS:.o=.d)
 
 csls: bin_dir $(CSLS_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(BIN_DIR)/makefile
 	$(CC) -o $(BIN_DIR)/$@ $(CSLS_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a 
@@ -110,6 +116,7 @@ CSTD_SRC=   tracedemo.c \
 			cs_demo_known_boards.c
 
 CSTD_OBJS=$(addprefix $(BUILD_DIR)/,$(CSTD_SRC:%.c=%.o))
+CSTD_DEPS=$(CSTD_OBJS:.o=.d)
 
 tracedemo: bin_dir $(CSTD_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/makefile
 	$(CC) -o $(BIN_DIR)/$@ $(CSTD_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a 
@@ -119,6 +126,7 @@ CSTDCTI_SRC=tracedemo_cti_stop.c \
 			cs_demo_known_boards.c
 
 CSTDCTI_OBJS=$(addprefix $(BUILD_DIR)/,$(CSTDCTI_SRC:%.c=%.o))
+CSTDCTI_DEPS=$(CSTDCTI_OBJS:.o=.d)
 
 trace_cti_stop: bin_dir $(CSTDCTI_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/makefile
 	$(CC) -o $(BIN_DIR)/$@ $(CSTDCTI_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a 
@@ -128,10 +136,18 @@ CSETM_SRC=  cs_etm_config_demo.c \
 			cs_demo_known_boards.c
 
 CSETM_OBJS=$(addprefix $(BUILD_DIR)/,$(CSETM_SRC:%.c=%.o))
+CSETM_DEPS=$(CSETM_OBJS:.o=.d)
+
 
 etmdemo: bin_dir $(CSETM_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/makefile
 	$(CC) -o $(BIN_DIR)/$@ $(CSETM_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a
 
+
+# include dependencies
+-include $(CSLS_DEPS)
+-include $(CSTD_DEPS)
+-include $(CSTDCTI_DEPS)
+-include $(CSETM_DEPS)
 
 # copy the snapshot makefile
 $(BIN_DIR)/makefile:
@@ -148,8 +164,8 @@ clean: clean_objs
 
 .PHONY: clean_objs
 clean_objs:
-	rm -fr $(CSLS_OBJS)
-	rm -fr $(CSTD_OBJS)
-	rm -fr $(CSETM_OBJS)
-	rm -fr $(CSTDCTI_OBJS)
+	rm -fr $(CSLS_OBJS) $(CSLS_DEPS)
+	rm -fr $(CSTD_OBJS) $(CSTD_DEPS)
+	rm -fr $(CSETM_OBJS) $(CSTDCTI_DEPS)
+	rm -fr $(CSTDCTI_OBJS) $(CSETM_DEPS)
 

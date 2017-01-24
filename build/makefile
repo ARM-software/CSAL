@@ -126,15 +126,19 @@ INCS=   -I. \
 
 # build rules for the .a lib
 $(BUILD_DIR)/a/%.o: %.c
-	$(CC) $(CFLAGS) $(INCS) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCS) -MMD -MP -c $< -o $@
 A_OBJS=$(addprefix $(BUILD_DIR)/a/,$(CSSRC:%.c=%.o))	
 A_OBJS_UTIL=$(addprefix $(BUILD_DIR)/a/,$(CSUTILSRC:%.c=%.o))
+A_DEPS=$(A_OBJS:.o=.d)
+A_DEPS_UTIL=$(A_OBJS_UTIL:.o=.d)
 
 # build rules for the .so lib
 $(BUILD_DIR)/so/%.o: %.c
-	$(CC) $(CFLAGS) -fPIC $(INCS) -c $< -o $@	
+	$(CC) $(CFLAGS) -fPIC $(INCS) -MMD -MP -c $< -o $@	
 SO_OBJS=$(addprefix $(BUILD_DIR)/so/,$(CSSRC:%.c=%.o))	
 SO_OBJS_UTIL=$(addprefix $(BUILD_DIR)/so/,$(CSUTILSRC:%.c=%.o))
+SO_DEPS=$(SO_OBJS:.o=.d)
+SO_DEPS_UTIL=$(SO_OBJS_UTIL:.o=.d)
 
 # build both lib types
 .PHONY: all
@@ -175,6 +179,12 @@ lib$(LIB_NAME).so: $(SO_OBJS)
 lib$(LIB_NAME_UTIL).so: $(SO_OBJS_UTIL)
 	$(CC) -shared -o $(LIB_DIR)/lib$(LIB_NAME_UTIL).so $(SO_OBJS_UTIL)
 
+# include generated dependency files
+-include $(A_DEPS)
+-include $(A_DEPS_UTIL)
+-include $(SO_DEPS)
+-include $(SO_DEPS_UTIL)
+
 
 # clean all object files and libraries
 .PHONY: clean
@@ -184,9 +194,9 @@ clean: clean_objs
 
 .PHONY: clean_objs
 clean_objs:
-	rm -fr $(A_OBJS)
-	rm -fr $(A_OBJS_UTIL)
-	rm -fr $(SO_OBJS)
-	rm -fr $(SO_OBJS_UTIL)
+	rm -fr $(A_OBJS) $(A_DEPS)
+	rm -fr $(A_OBJS_UTIL) $(A_DEPS_UTIL)
+	rm -fr $(SO_OBJS) $(SO_DEPS)
+	rm -fr $(SO_OBJS_UTIL) $(SO_DEPS_UTIL)
 
 
