@@ -659,15 +659,11 @@ static void _cs_link_affinity(struct cs_device *dbg,
     }
 }
 
-
+/* Used in asserts only */
+#ifdef DEBUG
 static int cs_device_has_atb_out(struct cs_device *d)
 {
     return (d->devclass & (CS_DEVCLASS_SOURCE | CS_DEVCLASS_LINK)) != 0;
-}
-
-static int cs_device_outport_is_valid(struct cs_device *d, unsigned int p)
-{
-    return cs_device_has_atb_out(d) && p < d->n_out_ports;
 }
 
 static int cs_device_has_atb_in(struct cs_device *d)
@@ -675,11 +671,16 @@ static int cs_device_has_atb_in(struct cs_device *d)
     return (d->devclass & (CS_DEVCLASS_LINK | CS_DEVCLASS_SINK)) != 0;
 }
 
+static int cs_device_outport_is_valid(struct cs_device *d, unsigned int p)
+{
+    return cs_device_has_atb_out(d) && p < d->n_out_ports;
+}
+
 static int cs_device_inport_is_valid(struct cs_device *d, unsigned int p)
 {
     return cs_device_has_atb_in(d) && p < d->n_in_ports;
 }
-
+#endif
 /* ========== API functions ================ */
 
 /* ========= registration group =========== */

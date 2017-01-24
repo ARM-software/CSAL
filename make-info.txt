@@ -8,6 +8,7 @@ Targets:-
     docs        : build doxygen documentation.
     experimental: try to build experimental code.
     clean       : clean library and demos.
+    rebuild     : clean and build all.
     <target>_clean: clean individual target.
 
 Environment Variables:-
