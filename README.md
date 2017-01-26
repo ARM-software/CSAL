@@ -71,20 +71,22 @@ the `readme*.md` files as part of the documentation.
 Usage
 -----
 
-__Building the Library__:
-Change into the `./build` directory and run `make` to build the standard version of the library. 
-This will create and deliver the library into the `./lib/rel` directory. To use the library 
-in a program include the file `csaccess.h` from the `./include` directory and link to the built library. 
+__Building the Library and Demos__:
 
-See [`./build/readme_buildlib.md`](@ref buildlib) for further information.
+Run `make` from the root of the installation. This will build the standard version of the library,
+and deliver the library into the `./lib/<arch>/rel` directory. The demonstration programs will be
+built and linked to the library, delivered into the `./bin/<arch>/rel` directory. 
 
-__Building and Running the Demos__: 
-Change into the `./demos` directory. Run `make` to build all the demo programs. 
-These will link to the built library in `./lib/rel`.  
+To use the library in a program include the file `csaccess.h` from the `./include` directory and
+link to the built library. 
 
-See [`./build/readme_demos.md`](@ref demos) for further information on running the demos.
+See [`./build/readme_buildlib.md`](@ref buildlib) for further information on building the library.
+
+See [`./demos/readme_demos.md`](@ref demos) for further information on running the demos.
 
 __Using the Library in Python__:
+
+This experimental code is not built by default.
 The ./python directory contains source and makefiles to generate a python module to allow
 use of the library. 
 

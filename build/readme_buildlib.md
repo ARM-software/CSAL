@@ -6,8 +6,15 @@ Default Build
 
 The library and demos can be built from the root of the CSAL installation using the master
 `makefile`. The default build will build a release version of the library and demos based
-on the platform architecture (arm or arm64). Platform architecture is detected using the
-linux `uname` command.
+on the platform architecture set in the ARCH environment variable.
+
+`ARCH` values:-
+- `arm`  : default for 32 bit arm / aarch32 platforms - virtual and physical address sizes 32 bit.
+- `arm64`: build for 64 bit / aarch64 platforms - virtual and physical address sizes 64 bit.
+
+If the ARCH environment is not set, then the platform architecture is detected using the linux
+`uname` command and an appropriate value used. If the platform is not ARM and no cross compile
+is indicated, then the build will fail.
 
 The default version will be a linux user application release build, built into the `./lib/<arch>/rel` 
 sub-directory off the main CoreSight Access Library directory. This version will not have any 
@@ -19,7 +26,7 @@ dynamic link library `libcsaccess.so`.
 The utility library will be built at the same time using the same parameters. This will
 appear as `libcsacc_util.a` and `libcsacc_util.so`.
 
-`make help` lists possible targets.
+`make help` lists possible build targets.
 
 Cross Compilation
 -----------------
@@ -39,13 +46,10 @@ The following options can be added the make command line:-
   in embedded applications not running under Linux. Default architecture is `arm`. Set the `ARCH` environment
   variable to use `arm64`, or cross compile.
 
-- `LPAE=1`      : This will create a version of the library with long physical address types - suitable for
-                  use on cores using the LPAE extensions. This defines the `LPAE` macro at compile time to 
-                  enable large physical addresses.
 
-- `VA64=1`      : This will create a version of the library using 64 bit virtual address types. Suitable for 
-                  V8 architecture cores. This defines the `CS_VA64BIT` macro at compile time to enable 64 bit 
-                  virtual addresses.
+- `NOLPAE=1`    : This will create a version of the library without long physical address types on an `ARCH=arm64` platform. Not used on `arm` platforms.
+
+- `LPAE=1`      :  This will create a version of the library with long physical address types on an `ARCH=arm` platform. LPAE is default on used on `arm64` platforms.
 
 - `NO_DIAG=1`   : This will disable the diagnostic `printf()` messages. May be required for Baremetal version if
                   external printing unsupported.
@@ -64,3 +68,13 @@ e.g.
     make DEBUG=1 BAREMETAL=1
 
 will create a debug version of the Baremetal library, delivered into the `./lib/<arch>/dbg_bm` directory.
+
+Build Targets
+-------------
+
+all     : build library and demos.
+lib     : build library only.
+demos   : build the demos.
+docs    : build doxygen documentation.
+clean   : clean library and demos.
+rebuild : clean and build all.
