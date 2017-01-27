@@ -26,6 +26,8 @@
 
 static struct cs_devices_t devices;
 static bool init_etm = false;
+#define BOARD_NAME_LEN 256
+static char board_name[BOARD_NAME_LEN];
 
 static int print_ptm_config(const struct board *board, int ptm_no)
 {
@@ -113,7 +115,7 @@ int main(int argc, char **argv)
 {
     int ptm_no = -1;
     bool dump = false;
-
+    board_name[0] = 0;    
 
     if (argc >= 2) {
         int i = 1;
@@ -129,6 +131,17 @@ int main(int argc, char **argv)
             } else if (strncmp(argv[i], "-i", 2) == 0) {
                 init_etm = true;
                 printf("CS_ETM_DEMO: Initialise ETMs before printing.\n");
+            } else if (strcmp(argv[i], "-board-name") == 0) {
+                if (i + 1 >= argc) {
+                    printf("Missing value after -board-name option\n");
+                    return EXIT_FAILURE;
+                }
+                ++i;
+                strncpy(board_name, argv[i], BOARD_NAME_LEN - 1);
+                board_name[BOARD_NAME_LEN - 1] = 0;
+            } else {
+                printf("Unknown option %s.\n", argv[i]);
+                return EXIT_FAILURE;
             }
         }
     } else {
@@ -139,8 +152,16 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
 
     printf("CoreSight Demonstration - Print ETM/PTM config\n");
-    if (setup_known_board(&board, &devices) < 0) {
-        return EXIT_FAILURE;
+
+    if (strlen(board_name) > 0) {
+        if (setup_known_board_by_name(board_name, &board, &devices) < 0) {
+            printf("Failed to setup board named %s.\n",board_name);
+            return EXIT_FAILURE;
+        }
+    } else {
+        if (setup_known_board(&board, &devices) < 0) {
+            return EXIT_FAILURE;
+        }
     }
 
     printf("Board: %s\n", board->hardware);
