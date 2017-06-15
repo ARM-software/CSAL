@@ -87,7 +87,7 @@ LIB_NAME_UTIL=csacc_util
 
 # build all demos
 .PHONY: all
-all: csls tracedemo trace_cti_stop etmdemo 
+all: csls tracedemo trace_cti_stop etmdemo snapshot_scripts
 
 # (csprofile will not build on snowball demo target so removed from all)
 
@@ -152,6 +152,12 @@ etmdemo: bin_dir $(CSETM_OBJS) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$
 # copy the snapshot makefile
 $(BIN_DIR)/makefile:
 	cp makefile.snapshot $(BIN_DIR)/makefile
+
+.PHONY: snapshot_scripts
+snapshot_scripts:
+	cp save-snapshot.bash $(BIN_DIR)/.
+	cp clean-snapshot.bash $(BIN_DIR)/.
+
 
 # clean all object files and libraries
 .PHONY: clean

@@ -77,6 +77,8 @@ static char board_name[BOARD_NAME_LEN];
 static bool etb_stop_on_flush;
 static unsigned int etb_post_trig_words;
 
+static bool return_stack;
+
 #define INVALID_ADDRESS 1	/* never a valid address */
 static unsigned long o_trace_start_address = INVALID_ADDRESS;
 static unsigned long o_trace_end_address = INVALID_ADDRESS;
@@ -270,10 +272,14 @@ static int do_config_etmv3_ptm(int n_core)
     tconfig.sequencer.transition_event[CS_ETMSQOFF(2, 1)] = CS_ETME_NEVER;
     tconfig.sequencer.transition_event[CS_ETMSQOFF(3, 1)] = CS_ETME_NEVER;
     tconfig.sequencer.transition_event[CS_ETMSQOFF(3, 2)] = CS_ETME_NEVER;
-
+    
     if (trace_timestamps) {
         tconfig.flags |= CS_ETMC_TS_EVENT;
         tconfig.timestamp_event = CS_ETMER_CZERO(0);
+    }
+
+    if (return_stack) {
+        tconfig.cr.raw.c.ret_stack = 1;
     }
 
     cs_etm_config_print(&tconfig);
@@ -308,6 +314,9 @@ static int do_config_etmv4(int n_core)
     if (tconfig.scv4->idr2.bits.cidsize > 0)
         tconfig.configr.bits.cid = 1;	/* context ID trace enable. */
 
+    if (return_stack)
+        tconfig.configr.bits.rs = 1; /* set the return stack */
+    
     if (!full) {
         /*  set up an address range filter - use comparator pair and the view-inst registers */
 
@@ -578,6 +587,7 @@ int main(int argc, char **argv)
     verbose = false;
     trace_timestamps = false;
     trace_cycle_accurate = false;
+    return_stack = false;
     board_name[0] = 0;
 
     pause_mode = 0;
@@ -631,6 +641,9 @@ int main(int argc, char **argv)
                 } else if (strncmp(opt, "fon-stop", 8) == 0) {
                     printf("Enabling ETB Stop on Flush\n");
                     etb_stop_on_flush = true;
+                } else if (strncmp(opt, "return-stack", 12) == 0) {
+                    printf("Enabling ETM return stack\n");
+                    return_stack = true;
                 } else if (strncmp(opt, "etb-words", 9) == 0) {
                     if (i + 1 < argc) {
                         etb_post_trig_words =

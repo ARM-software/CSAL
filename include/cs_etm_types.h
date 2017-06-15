@@ -112,7 +112,8 @@ typedef union etm_v3_ccer {
         unsigned int tssb_use_EICE:1;
         unsigned int etmeibcr:1;
         unsigned int timestamping:1;
-        unsigned int _reserved:3;
+        unsigned int return_stack:1;  /* PTM only */
+        unsigned int _reserved:2;
         unsigned int virt_ext:1;
         unsigned int reduced_counter:1;
         unsigned int timestamp_enc:1;
