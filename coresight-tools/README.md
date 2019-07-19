@@ -1,7 +1,9 @@
-Miscellaneous tools for CoreSight, mostly self-hosted under Linux.
+CoreSight discovery tools.
 
- - CoreSight topology discovery
- - format conversion (DS-5 SDF, device tree etc.)
- - CoreSight trace decode
+This package provides
 
-Some of this might eventually be open-sourced in ARM-software/CSAL.
+ - a kernel module (csinfo) to report the CoreSight ROM table base address
+
+ - a discovery script (csscan.py) to report the CoreSight configuration
+
+

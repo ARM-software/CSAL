@@ -6,6 +6,22 @@ Read /proc/self/pagemap to get the VA-to-PA mapping.
 Since 4.2 this requires CAP_SYS_ADMIN. Users without this capability
 may see the PTE as zeroes.
 
+Copyright (C) ARM Ltd. 2019.  All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
+
+"""
 Note that the "PA" is the physical address as seen by the OS.
 If running under virtualization it might be an IPA.
 So this is not suitable (in general) for getting physical addresses
@@ -15,6 +31,7 @@ Further information about the physical page can be found in
   /proc/kpageflags
 which is an array of 64-bit flags words indexed by PFN.
 """
+
 
 from __future__ import print_function
 
