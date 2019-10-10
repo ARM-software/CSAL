@@ -114,7 +114,8 @@ class Device:
         self.platform = platform
         self.is_hidden = is_hidden
         assert (not is_hidden) or (device_type in [CS_DEVTYPE_FUNNEL, CS_DEVTYPE_REPLICATOR])
-        self.name = name
+        if name is not None:
+            self.set_name(name)
         self.type_name = type_name
         self.part_vendor = None
         self.part_number = None     # e.g. 0x906
@@ -131,6 +132,8 @@ class Device:
             self.etm_architecture = None
         self.mem_address = None     # Ideally, memory address as seen by the core (DAP-relative address may differ)
         self.dap_name = DAP_CORE    # By default
+        # Input and output links can be of various types: ATB, CTI etc.
+        # The device may also have configured ports that do not have links.
         self.outlinks = []
         self.inlinks = []
         platform.devices.append(self)
@@ -196,6 +199,12 @@ class Device:
         assert pid <= 0xfff, "expected 3 hex digit part number: 0x%x" % pid
         self.part_vendor = 'A'
         self.part_number = pid
+
+    def set_name(self, name):
+        self.name = name
+        if name in self.platform.devices_by_name:
+            assert False, "%s: duplicate device name '%s'" % (self.platform, name)
+        self.platform.devices_by_name[name] = self
 
     def set_mem_address(self, maddr):
         self.mem_address = maddr
@@ -376,6 +385,7 @@ class Platform:
         self.auto_split = auto_split
         self.devices = []
         self.devices_by_address = {}
+        self.devices_by_name = {}
         self.links = []              # all links
         self.source_file = None
 
@@ -389,8 +399,18 @@ class Platform:
         else:
             return None
 
+    def device_by_name(self, name):
+        """
+        Look up a device by the name that we have given it.
+        """
+        if name in self.devices_by_name:
+            return self.devices_by_name[name]
+        else:
+            return None
+
     def create_device(self, type, **kwargs):
-        return Device(self, type, **kwargs)
+        d = Device(self, type, **kwargs)
+        return d
 
     def add_unmapped_topology(self):
         """
@@ -435,6 +455,7 @@ class Platform:
                 assert ln.master == d
             if d.mem_address is not None:
                 assert d.address() in self.devices_by_address
+        return self
 
     def show(self):
         """
