@@ -773,7 +773,7 @@ class CSROM:
             print(" TPIU", end="")
         elif d.is_arm_part_number(0x907):
             # CoreSight ETB
-            print(" ETB size:%u" % d.read32(0x000), end="")            
+            print(" ETB size:%u" % (d.read32(0x004)*4), end="")
         elif d.is_arm_part_number(0x961):
             # CoreSight TMC (SoC400 generation)
             configtype = (devid >> 6) & 3
