@@ -63,23 +63,42 @@ jedec_designers = {
 
 
 # Device architectures defined by Arm (i.e. vaild when Arm is the architect)
-# Source: CoreSight Architecture Specification 3.0 Table B2-8
+# Sources:
+#   IHI0029E CoreSight Architecture Specification 3.0, Table B2-8
+#   other product information
+#
+# The CoreSight architecture defines
+#   DEVARCH[15:0]:ARCHID  DEVARCH[19:16]:revision
+# Conventionally Arm uses
+#   DEVARCH[11:0]:architecture  DEVARCH[15:12]:major-rev  DEVARCH[19:16]:minor-rev
+
 arm_archids = {
     0x0a00:"RAS",
     0x1a01:"ITM",
+    0x1a02:"DWT",
     0x2a04:"v8-M",
     0x6a05:"v8-R",
+    0x0a11:"ETR",
     0x4a13:"ETMv4",      # REVISION indicates the ETMv4 minor version
     0x1a14:"CTI",
     0x6a15:"v8.0-A",
     0x7a15:"v8.1-A",
     0x8a15:"v8.2-A",
-    0x2a16:"PMU",
+    0x2a16:"PMUv3",
     0x0a17:"MEM-AP",
-    0x0a37:"pwr-rq",
+    0x0a34:"pwr-rq",     # not 0x0a37 as stated in Issue E
+    0x0a41:"CATU",
+    0x0a50:"HSSTP",
     0x0a63:"STM",
     0x0a75:"ELA",
     0x0af7:"ROM"
+}
+
+# match [11:0] if the major-rev doesn't match (Arm-defined architecture only)
+arm_archparts = {
+    0xa13:"cpu-trace",
+    0xa15:"v8A-debug",
+    0xa16:"PMU"
 }
 
 
@@ -321,7 +340,7 @@ class Device:
         return None
 
     def architect(self):
-        # CoreSight devices have a DEVARCH register which specifies the architect and architecture.
+        # CoreSight devices have a DEVARCH register which specifies the architect and architecture as a JEDEC code.
         assert self.is_coresight()
         if self.devarch is None:
             return None
@@ -598,13 +617,17 @@ class CSROM:
         if d.architecture() is None:
             archdesc = "" 
         elif d.is_arm_architecture():
-            archid = d.architecture()        
+            archid = d.architecture()
+            archpart = archid & 0xfff
+            archrev = (d.devarch >> 16) & 15
             if archid in arm_archids:
-                archdesc = "Arm %s rev%u" % (arm_archids[archid], (d.devarch >> 16)&15)
+                archdesc = "Arm %s rev%u" % (arm_archids[archid], archrev)
+            elif archpart in arm_archparts:
+                archdesc = "?Arm %s rev%u.%u" % (arm_archparts[archpart], (archid >> 12), archrev)
             else:
-                archdesc = "?Arm:0x%04x" % archid
+                archdesc = "?Arm:0x%04x rev %u" % (archid, archrev)
         else:
-            archdesc = "?ARCH:0x%x" % d.devarch 
+            archdesc = "?ARCH:0x%x:0x%x" % (d.architect(), d.architecture())
 
         # architected regs with imp def values
         affinity = d.affinity_id()
@@ -612,17 +635,28 @@ class CSROM:
 
         authstatus = d.read32(0xFB8)
         if o_show_authstatus:
+            # Authorization status works in three dimensions:
+            #   functionality: invasive debug / non-invasive debug
+            #   accessor: nonsecure, secure, hypervisor
+            #   status: unsupported, supported and disabled, supported and enabled
+            print("", end=" ")
             #print("auth=%04x" % authstatus, end=" ")
-            # NonSecure, Secure, Hypervisor
-            for (dix, dom) in enumerate(["NS","S","HN"]):
-                # Invasive, NonInvasive
-                for (iix, inv) in enumerate(["I","NI"]):
+            # Invasive, NonInvasive are considered independent functionality
+            for (iix, inv) in enumerate(["I","NI"]):
+                # NonSecure, Secure, HypervisorNonSecure: only some combinations make sense?
+                # SID implies NSID etc. But we might have SID supported but disabled, NSID enabled
+                for (dix, dom) in zip([1,2,0],["S","HN","NS"]):
                     stat = bits(authstatus, dix*4+iix*2, 2)
                     dtype = "%s%sD" % (dom, inv)
                     if stat != 0:
-                        print("%1s%-5s" % (["-","?","!",""][stat], dtype), end=" ")
+                        if stat == 2:
+                            # functionality disabled
+                            dtype = dtype.lower()
+                        print("%-5s" % (dtype), end=" ")
                     else:
-                        print("      ", end=" ")
+                        print("     ", end=" ")
+            print("", end=" ")
+
         print("%-14s %-16s" % (desc, archdesc), end="")
         if o_verbose:
             print(" devid=0x%x" % devid, end="")
@@ -665,7 +699,8 @@ class CSROM:
             if not core_powered_off:
                 dfr = d.read32x2(0xD2C,0xD28)
                 if o_verbose:
-                    print(" dfr=0x%x bkpt:%u wpt:%u" % (dfr, bits(dfr,12,4)+1, bits(dfr,20,4)+1), end="")
+                    print(" dfr=0x%x" % (dfr), end="")
+                print(" bkpt:%u wpt:%u" % (bits(dfr,12,4)+1, bits(dfr,20,4)+1), end="")
         elif d.is_arm_architecture(0x2a16):
             # Arm architecture: PMU
             # PMU doesn't have a register of its own to indicate power state - you have to
