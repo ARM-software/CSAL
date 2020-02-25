@@ -166,11 +166,26 @@ class Device:
                     yield ln
 
     def link(self, type, end, port=0):
+        """
+        Get the other end of an existing link
+        """
         assert type in link_types, "unexpected link type: %s" % type
         assert end in [CS_LINK_SLAVE, CS_LINK_MASTER], "unexpected link end: %s (expected CS_LINK_SLAVE or CS_LINK_MASTER)" % end
         for ln in self.links(type, end):
             if ln.port(end) == port:
                 return ln
+        return None
+
+    def get_path_to(self, td, type=CS_LINK_ATB):
+        """
+        Get a path (a list of links) to another device, or None if no path.
+        """
+        if td == self:
+            return Path() 
+        for ln in self.outlinks:
+            p = ln.slave.get_path_to(td, type=type)
+            if p is not None:
+                return p.prepend(ln)
         return None
 
     def is_affine_to_cpu(self):
@@ -191,6 +206,8 @@ class Device:
             
     def set_cpu_number(self, n):
         self.cpu_number = n
+        if n > self.platform.max_cpu_number:
+            self.platform.max_cpu_number = n
         if type == CS_DEVTYPE_CORE:
             for d in self.affine_devices:
                 d.cpu_number = n
@@ -328,9 +345,10 @@ class Link:
         s = str(self.master)
         if self.master_port is not None:
             s += ".%u" % self.master_port
-        s += " --(%s)--> %s" % (link_type_str[self.linktype], str(self.slave))
+        s += " --(%s)--> " % link_type_str[self.linktype]
         if self.slave_port is not None:
-            s += ".%u" % self.slave_port
+            s += "%u." % self.slave_port
+        s += str(self.slave)
         return s
 
     def device(self, end):
@@ -374,6 +392,41 @@ class Link:
         return od
 
 
+class Path:
+    """
+    A collection of links. Usually of the same type.
+    """
+    def __init__(self):
+        self.links = []
+
+    def len(self):
+        return len(self.links)
+
+    def append(self, ln):
+        assert (not self.links) or self.links[-1].slave == ln.master
+        self.links.append(ln)
+        return self
+
+    def prepend(self, ln):
+        assert (not self.links) or ln.slave == self.links[0].master
+        self.links.insert(0, ln)
+        return self
+
+    def __str__(self):
+        if not self.links:
+            return "[]"
+        ln0 = self.links[0]
+        s = str(ln0.master)
+        for ln in self.links:
+            if ln.master_port is not None:
+                s += ".%u" % ln.master_port
+            s += " --(%s)--> " % link_type_str[ln.linktype]
+            if ln.slave_port is not None:
+                s += "%u." % ln.slave_port
+            s += str(ln.slave)
+        return s
+
+
 class Platform:
     """
     A collection of linked CoreSight devices.
@@ -388,6 +441,7 @@ class Platform:
         self.devices_by_name = {}
         self.links = []              # all links
         self.source_file = None
+        self.max_cpu_number = 0
 
     def device_by_address(self, addr):
         """
@@ -407,6 +461,15 @@ class Platform:
             return self.devices_by_name[name]
         else:
             return None
+
+    def device_by_cpu(self, cpu, type=CS_DEVTYPE_CORE):
+        """
+        Look up a device (of a given type) by affine CPU number.
+        """
+        for d in self.devices:
+            if d.cpu_number == cpu and d.type == type:
+                return d
+        return None
 
     def create_device(self, type, **kwargs):
         d = Device(self, type, **kwargs)
@@ -478,15 +541,29 @@ class Platform:
             if d.address() is not None:
                 print(" %20s " % d.address_str(), end="")
             if d.is_affine_to_cpu():
-                print(" cpu=%s" % str(d.affine_cpu), end="")
+                if d.affine_cpu is not None:
+                    print(" cpu=%s" % str(d.affine_cpu), end="")
+                else:
+                    print(" cpu=%u" % d.cpu_number, end="")
             if d.is_hidden:
                 print(" hidden", end="")
             print()
             if False:
                 for cfk in d.config:
                     print("    %s: %s" % (cfk, d.config[cfk]))
+        print("Links:")
         for ln in self.links:
             print("  %s" % str(ln))
+        print("CPUs:")
+        for c in range(0, self.max_cpu_number+1):
+            cd = self.device_by_cpu(c, type=CS_DEVTYPE_TRACE_CORE)
+            if cd is None:
+                continue
+            print("  CPU #%u:" % c)
+            for sink in self.devices:
+                if sink.type in [CS_DEVTYPE_PORT, CS_DEVTYPE_FIFO, CS_DEVTYPE_BUFFER, CS_DEVTYPE_ROUTER]:
+                    p = cd.get_path_to(sink)
+                    print("    %s: %s" % (sink, p))
 
 
 def load(fn):
