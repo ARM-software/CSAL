@@ -66,8 +66,12 @@ def get_cs_from_sysfs(p=None):
             pass
         rp = os.path.realpath(dp)
         path_to_d[rp] = d
+        of_node = os.path.join(os.path.dirname(rp), "of_node")
+        if os.path.exists(of_node):
+            d.of_node = os.path.realpath(of_node)      # /sys/firmware/devicetree
+    # Populate the ATB links from the 'out:' and 'in:' entries if available
     for sd in os.listdir(cs):
-        dp = os.path.realpath(os.path.join(cs, sd))
+        dp = os.path.realpath(os.path.join(cs, sd))    # somewhere in /sys/devices/platform
         d = path_to_d[dp]
         # Scan the device's outputs.
         for opn in range(0, 2):
@@ -203,6 +207,11 @@ def get_cs_from_device_tree(p=None):
         p = Platform()
     phandle_node = {}
     node_device = {}
+    for d in p:
+        try:
+            node_device[d.of_node] = d
+        except:
+            pass
     for (dp, phandle, dcompat) in device_tree_nodes():
         phandle_node[phandle] = dp
         cs = compat_is_coresight(dcompat)
@@ -225,7 +234,11 @@ def get_cs_from_device_tree(p=None):
                 elif os.path.isfile(os.path.join(dp, "arm,scatter-gather")):
                     # not all ETR nodes have this, but if it does, it's definitely ETR
                     devtype = CS_DEVTYPE_ROUTER
-            d = Device(p, devtype, name=os.path.basename(dp), mem_address=phys_addr)
+            drp = os.path.realpath(dp)
+            if drp in node_device:
+                d = node_device[drp]
+            else:
+                d = Device(p, devtype, name=os.path.basename(dp), mem_address=phys_addr)
             if cs == "etm4x":
                 d.etm_architecture = 4
             elif cs == "stm":
@@ -307,16 +320,9 @@ def get_cs_from_device_tree(p=None):
 
 
 if __name__ == "__main__":
-    p = get_cs_from_device_tree()
-    if p is not None:
-        print()
-        print("CoreSight device discovery from /proc/device-tree:")
-        p.show()
-        p.check()
     p = get_cs_from_sysfs()
+    if p is None or not p.links:
+        p = get_cs_from_device_tree(p)
     if p is not None:
-        print()
-        print("CoreSight device discovery from sysfs:")
         p.show()
         p.check()
-
