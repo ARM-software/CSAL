@@ -43,13 +43,16 @@ The ROM Table base address(es) can be found from any one of:
 
   * the manufacturer's datasheet, if it has this information
   * a DS-5 SDF file for the system (addresses are from an external debugger's point of view and may need to be adjusted)
-  * building and loading the csinfo kernel module supplied with CSAL (TBD) to print the contents of the core's ROM Table base address register: the ROM Table base address is shown in dmesg output. For this you will need to set up for building kernel modules.
+  * reading ROM Table Base Address register (MDRAR / DBGRAR) from any of the cores. For this you can build and load the csinfo kernel module supplied with CSAL: the ROM Table base address is shown in dmesg output. For this you will need to set up for building kernel modules (see below).
 
 In a multi-socket system, each socket might have its own separate top-level ROM Table, mapped (along with other peripherals) at different areas of the common physical memory space seen by cores on both sockets. Each core's ROM Table base address register should point to whichever top-level ROM Table directly or indirectly has an entry for that core.
-Getting access to physical memory
+
+Note: the ARM architecture specification states that use of MDRAR/DBGRAR is deprecated. In general, software should rely on the firmware providing descriptor tables like ACPI or Device Tree. But we are describing a situation where these tables do not exist and MDRAR/DBGRAR may be the only option. It will work on most systems, but you should be prepared for the value of MDRAR/DBGRAR to be incorrect - the value is hardwired during core integration and some SoCs may not have done this correctly.
+
+### Getting access to physical memory
 
   * /dev/mem, if the kernel was built with CONFIG_DEVMEM
-  * building and loading the cskern kernel module supplied with CSAL (TBD). For this you will need to set up for building kernel modules.
+  * building and loading the cskern kernel module supplied with CSAL. For this you will need to set up for building kernel modules.
 
 ### Getting a DS-5 SDF or RVC file
 
