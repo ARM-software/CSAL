@@ -876,6 +876,15 @@ class CSROM:
                         if (not inv and bit(bs,i)) or (inv and not bit(bs,i)):
                             bl.append(pfx+"%u" % i)
                     return bl
+                # Ideally, we only print ETM configuration elements that are used,
+                # but discovering which are used is in general recursive.
+                # E.g. a counter decrement condition may depend on a resource,
+                # which in turn depends on a counter reaching zero.
+                # Currently we show all resources and all their dependents.
+                ac_used = 0
+                pec_used = 0
+                ssc_used = 0
+                ctr_used = 0
                 # show stability
                 status = d.read32(0x00C)
                 if not bit(status,1):
@@ -895,7 +904,10 @@ class CSROM:
                 if bit(config,3):
                     # show which ACs are used to include/exclude branch-broadcast
                     bbctl = d.read32(0x03C)
-                    print(" branch-broadcast:0x%x" % (bbctl), end="")  
+                    print(" branch-broadcast:0x%x" % (bbctl), end="")
+                    for i in range(0, 8):
+                        if bit(bbctl,i):
+                            ac_used |= (3 << (i*2))
                 if bit(config,4):
                     print(" cycle-count:%u" % (d.read32(0x038)), end="")
                 if bit(config,11):
@@ -917,15 +929,6 @@ class CSROM:
                         print("  start/stop logic is started")
                     else:
                         print("  start/stop logic is stopped")
-                # Ideally, we only print ETM configuration elements that are used,
-                # but discovering which are used is in general recursive.
-                # E.g. a counter decrement condition may depend on a resource,
-                # which in turn depends on a counter reaching zero.
-                # Currently we show all resources and all their dependents.
-                ac_used = 0
-                pec_used = 0
-                ssc_used = 0
-                ctr_used = 0
                 if n_address_comparator_pairs > 0:
                     # TRCVIIECTLR: ViewInst Include-Exclude Control Register
                     vie = d.read32(0x084)
