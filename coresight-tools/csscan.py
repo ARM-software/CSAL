@@ -42,6 +42,7 @@ o_verbose = 0
 o_show_programming = False
 o_show_integration = False
 o_show_authstatus = False
+o_show_sample = False        # Destructive sampling
 o_exclusions = []
 
 
@@ -128,12 +129,12 @@ class Device:
     """
 
     def __init__(self, cs, addr):
+        self.we_unlocked = False
+        self.m = None
         self.cs = cs
         assert (addr & 0xfff) == 0, "Device must be located on 4K boundary: 0x%x" % addr
         self.base_address = addr
-        self.we_unlocked = False
         self.affine_core = None
-        self.m = None
         self.map_is_write = False
         self.map()
         self.CIDR = (self.byte(0xFFC)<<24) | (self.byte(0xFF8)<<16) | (self.byte(0xFF4)<<8) | self.byte(0xFF0)
@@ -697,10 +698,31 @@ class CSROM:
             if (edprsr & 0x4) == 1:
                 print(" halted", end="")
             if not core_powered_off:
-                dfr = d.read32x2(0xD2C,0xD28)
-                if o_verbose:
+                pfr = d.read32x2(0xD24,0xD20)     # EDPFR: External Debug Processor Feature Register
+                if True or o_verbose:
+                    print(" pfr=0x%x" % (pfr), end="")
+                if bits(pfr,44,4):
+                    print(" AMU", end="")
+                dfr = d.read32x2(0xD2C,0xD28)     # EDDFR: External Debug Feature Register
+                if True or o_verbose:
                     print(" dfr=0x%x" % (dfr), end="")
+                pmuver = bits(dfr,8,4)
                 print(" bkpt:%u wpt:%u" % (bits(dfr,12,4)+1, bits(dfr,20,4)+1), end="")
+                pmuvers = {
+                    0x1: "PMUv3",
+                    0x4: "PMUv3-v8.1",
+                    0x5: "PMUv3-v8.4",
+                    0x6: "PMUv3-v8.5",
+                    0xf: "PMU-impdef"
+                }
+                if pmuver in pmuvers:
+                    print(" %s" % pmuvers[pmuver], end="")
+                if bits(dfr,40,4):
+                    print(" self-hosted-trace", end="")
+                if bits(devid,0,4):
+                    print(" pc-sampling:%u" % bits(devid,0,4), end="")
+                if bits(devid,4,4):
+                    print(" DoPD", end="")
         elif d.is_arm_architecture(0x2a16):
             # Arm architecture: PMU
             # PMU doesn't have a register of its own to indicate power state - you have to
@@ -716,10 +738,18 @@ class CSROM:
                 if o_verbose:
                     print(" config:0x%08x" % (config), end="")
                 print(" counters:%u" % (n_counters), end="")
-                if (config & 0x10000):
-                    print(" exported", end="")
+                if bit(config,15):
+                    print(" prescale", end="")
+                if bit(config,16):
+                    print(" exportable", end="")
                 else:
-                    print(" not-exported", end="")
+                    print(" not-exportable", end="")
+                if bit(config,19):
+                    print(" user-enable", end="")
+                pmmir = d.read32(0xE40)
+                n_slots = bits(pmmir,0,8)
+                if n_slots:
+                    print(" slots:%u" % (n_slots), end="")
         elif d.is_arm_architecture(0x4a13):
             # Arm architecture: ETM
             # Test if the registers are invalid/unreadable, either because the core power domain
@@ -846,7 +876,32 @@ class CSROM:
 
         integration_regs = []
 
-        if d.is_arm_architecture(0x4a13):
+        if d.is_arm_architecture_core():
+            # Core debug interface
+            pass
+        elif d.is_arm_architecture(0x2a16):
+            # PMU
+            pmcr = d.read32(0xE04)
+            print("  pmcr: 0x%08x" % pmcr)
+            ovs = d.read32(0xC80)
+            cen = d.read32(0xC00)
+            ccntr = d.read64(0x0F8)
+            print("  ccntr: 0x%016x" % ccntr, end="")
+            if bit(cen,31):
+                print(" enabled", end="")
+            if bit(ovs,31):
+                print(" overflowed", end="")
+            print()
+            for i in range(0,n_counters):
+                evcnt = d.read64(0x000+i*8)
+                evtyp = d.read32(0x400+i*4)
+                print("  #%u: 0x%08x 0x%016x" % (i, evtyp, evcnt), end="")
+                if bit(cen,i):
+                    print(" enabled", end="")
+                if bit(ovs,i):
+                    print(" overflowed", end="")
+                print()
+        elif d.is_arm_architecture(0x4a13):
             # ETM
             if emajor >= 4:
                 def res_str(rn):
@@ -1125,6 +1180,32 @@ class CSROM:
             # unknown device
             pass
 
+        if o_show_sample:
+            pc = 0
+            cxid = None
+            cxid_el2 = None
+            vmid = None
+            if d.is_arm_architecture_core():
+                # Core debug interface
+                if bits(devid,0,4):
+                    pc = d.read32x2(0x0AC,0x0A0)       # EDPCSR: not consecutive
+                    cxid = d.read32(0x0A4) 
+                    vmid = d.read32(0x0A8)
+            elif d.is_arm_architecture(0x2a16):
+                # PMU
+                if bits(devid,0,4):
+                    pc = d.read32x2(0x204,0x200)       # PMPCSR
+                    cxid = d.read32(0x208)             # PMCID1SR
+                    cxid_el2 = d.read32(0x22C)         # PMCID2SR
+                    vmid = d.read32(0x20C)             # PMVIDSR
+            if pc:
+                print("  PC: 0x%x EL%u %sS" % (bits(pc,0,56), bits(pc,61,2), "N"[0:bit(pc,63)]))
+                print("  CXID_EL1: 0x%08x" % cxid)
+            if cxid_el2 is not None:
+                print("  CXID_EL2: 0x%08x" % cxid_el2)
+            if vmid is not None:
+                print("  VMID: 0x%08x" % vmid)
+
         if o_show_integration:
             for r in integration_regs:
                 print("  r%X = 0x%x" % (r, d.read32(r)))
@@ -1401,6 +1482,7 @@ if __name__ == "__main__":
             o_exclusions.append(eaddr)
         elif arg == "--status":
             o_show_programming = True
+            o_show_sample = True
         elif arg == "--integration":
             o_show_integration = True
         elif arg == "--topology":
