@@ -2,8 +2,12 @@
 
 """
 Scan the ROM table and report on CoreSight devices.
+Also do ATB topology detection.
 
-Does not do topology (connection) discovery.
+We report three levels of status:
+  - the "hard wired" configuration selected at SoC design time
+  - the "programming" configuration, e.g. address comparator settings
+  - the actual status, e.g. busy/ready bits, values of counters etc.
 
 To do:
   - CPU affinity and debug/PMU/ETM/CTI grouping
@@ -40,6 +44,7 @@ o_max_devices = 9999999
 o_top_only = False
 o_verbose = 0
 o_show_programming = False
+o_show_all_status = False
 o_show_integration = False
 o_show_authstatus = False
 o_show_sample = False        # Destructive sampling
@@ -926,9 +931,20 @@ class CSROM:
                         if (not inv and bit(bs,i)) or (inv and not bit(bs,i)):
                             bl.append(pfx+"%u" % i)
                     return bl
+                # Ideally, we only print ETM configuration elements that are used,
+                # but discovering which are used is in general recursive.
+                # E.g. a counter decrement condition may depend on a resource,
+                # which in turn depends on a counter reaching zero.
+                # Currently we show all resources and all their dependents.
+                ac_used = 0
+                pec_used = 0
+                ssc_used = 0
+                ctr_used = 0
                 # show stability
                 status = d.read32(0x00C)
                 if not bit(status,1):
+                    # NOT "The programmer's model is stable. When polled, the trace unit
+                    #      registers return stable data."
                     print("  unstable")
                 if bit(status,0):
                     print("  idle")
@@ -943,7 +959,10 @@ class CSROM:
                 if bit(config,3):
                     # show which ACs are used to include/exclude branch-broadcast
                     bbctl = d.read32(0x03C)
-                    print(" branch-broadcast:0x%x" % (bbctl), end="")  
+                    print(" branch-broadcast:0x%x" % (bbctl), end="")
+                    for i in range(0, 8):
+                        if bit(bbctl,i):
+                            ac_used |= (3 << (i*2))
                 if bit(config,4):
                     print(" cycle-count:%u" % (d.read32(0x038)), end="")
                 if bit(config,11):
@@ -956,15 +975,49 @@ class CSROM:
                 if bit(config,7):
                     print(" vmid", end="")
                 print()
-                # show trace condition (ViewInst control)
-                vi = d.read32(0x080)
-                event = bits(vi,0,8)
-                print("  trace-enable: 0x%08x %s %s" % (vi, esel_str(event), '|'.join(blist("EL",bits(vi,20,3),n=3,inv=True))))
+                # TRCVICTLR: ViewInst Control. Controls instruction trace filtering.
+                vic = d.read32(0x080)
+                event = bits(vic,0,8)
+                print("  instruction trace-enable: 0x%08x %s %s" % (vic, esel_str(event), '|'.join(blist("EL",bits(vic,20,3),n=3,inv=True))))
                 if n_address_comparator_pairs > 0 or n_pe_comparators > 0:
-                    if bit(vi,9):
-                        print("  started")
+                    if bit(vic,9):
+                        print("  start/stop logic is started")
                     else:
-                        print("  stopped")
+                        print("  start/stop logic is stopped")
+                if n_address_comparator_pairs > 0:
+                    # TRCVIIECTLR: ViewInst Include-Exclude Control Register
+                    vie = d.read32(0x084)
+                    print("  instruction include/exclude: 0x%08x" % vie, end="")
+                    for i in range(0, n_address_comparator_pairs):
+                        if bit(vie,i):
+                            ac_used |= (3 << (i*2))
+                            print(" include AC%u..AC%u" % (i*2,i*2+1), end="")
+                        if bit(vie,i+16):
+                            ac_used |= (3 << (i*2))
+                            print(" exclude AC%u..AC%u" % (i*2,i*2+1), end="")
+                    print()
+                    # TRCVISSCTLR: ViewInst Start/Stop Control
+                    viss = d.read32(0x088)
+                    print("  instruction start/stop: 0x%08x" % viss, end="")
+                    for i in range(0, n_address_comparator_pairs*2):
+                        if bit(viss,i):
+                            ac_used |= (1 << i)
+                            print(" start AC%u" % (i), end="")
+                        if bit(viss,i+16):
+                            ac_used |= (1 << i)
+                            print(" stop AC%u" % (i), end="")
+                    print()
+                if n_pe_comparators:
+                    vissp = d.read32(0x08C)
+                    print("  instruction PE comparator control: 0x%08x" % vissp, end="")
+                    for i in range(0, n_pe_comparators):
+                        if bit(vissp,i):
+                            pec_used |= (1 << i)
+                            print(" start PEC%u" % (i), end="")
+                        if bit(vissp,i+16):
+                            pec_used |= (1 << i)
+                            print(" stop PEC%u" % (i), end="")
+                    print()
                 # show resources
                 for rn in range(2,n_resource_selectors):
                     rs = d.read32(0x200+4*rn)
@@ -983,14 +1036,21 @@ class CSROM:
                         bl = blist("EXTSEL",sel)
                     elif group == 1:
                         bl = blist("PECOMP",sel)
+                        pec_used |= sel
                     elif group == 2:
                         bl = blist("SEQ==",sel>>4) + blist("ZERO:C",sel&15)
+                        ctr_used |= (sel & 15)
                     elif group == 3:
                         bl = blist("SSC",sel)
+                        ssc_used |= sel
                     elif group == 4:
                         bl = blist("SAC",sel)
+                        ac_used |= sel
                     elif group == 5:
                         bl = blist("AR",sel)
+                        for i in range(0,8):
+                            if bit(sel, i):
+                                ac_used |= (3 << (i*2))
                     elif group == 6:
                         bl = blist("CXID",sel)
                     elif group == 7:
@@ -1015,19 +1075,30 @@ class CSROM:
                         if en == 0 and bit(ectl1,11):
                             print(" trigger", end="")
                         print()
+                # show single-shot control
+                for n in range(0,n_single_shot):
+                    ssctrl = d.read32(0x280+n*4)
+                    ssstat = d.read32(0x2A0+n*4)
+                    print("  single-shot #%u: ctrl=0x%08x status=0x%08x" % (n, ssctrl, ssstat), end="")
+                    for i in range(0,n_address_comparator_pairs*2):
+                        if bit(ssctrl,i):
+                            ac_used |= (1 << i)
+                            print(" AC%u" % i, end="")
+                    for i in range(0,n_address_comparator_pairs):
+                        if bit(ssctrl,i+16):
+                            ac_used |= (3 << (i*2))
+                            print(" AC%u..AC%u" % (i*2, i*2+1), end="")
+                    print()
                 # show address range comparators
                 for n in range(0,n_address_comparator_pairs*2):
+                    if not o_show_all_status and not bit(ac_used,n):
+                        continue
                     aval = d.read64(0x400+n*8)
                     atyp = d.read64(0x480+n*8)
                     print("  address comparator #%u: value=0x%016x type=0x%08x" % (n, aval, atyp), end="")
                     print(" %s" % ('|'.join(blist("EL",bits(atyp,12,3),n=3,inv=True))), end="")
                     print(" %s" % ["inst", "load", "store", "load/store"][bits(atyp,0,2)], end="")
                     print()
-                # show single-shot control
-                for n in range(0,n_single_shot):
-                    ssctrl = d.read32(0x280+n*4)
-                    ssstat = d.read32(0x2A0+n*4)
-                    print("  single-shot #%u: ctrl=0x%08x status=0x%08x" % (n, ssctrl, ssstat))
                 # show counters                
                 for n in range(0,n_counters):
                     reload_value = d.read32(0x140+n*4)
@@ -1483,6 +1554,10 @@ if __name__ == "__main__":
         elif arg == "--status":
             o_show_programming = True
             o_show_sample = True
+        elif arg == "--all-status":
+            o_show_programming = True
+            o_show_sample = True
+            o_show_all_status = True
         elif arg == "--integration":
             o_show_integration = True
         elif arg == "--topology":

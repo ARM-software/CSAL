@@ -35,7 +35,7 @@ The list of CoreSight devices, their physical addresses, and their types and har
 
   * the manufacturer's datasheet, if it has this information
   *  a DS-5 SDF or RVC file for the system (device addresses may need to be adjusted - see ROM Table advice below)
-  * scanning the ROM table to find the device addresses, and reading the device identifier registers to identify the device types, using the cslist tool supplied with CSAL, or the csscan.py script. For this you will need the CoreSight top-level ROM Table base address and access to physical memory. Note that some devices may not make the CoreSight memory area accessible. You can do a quick check using "sudo busybox devmem <romaddr> 32".
+  * scanning the ROM table to find the device addresses, and reading the device identifier registers to identify the device types, using the cslist tool supplied with CSAL, or the csscan.py script. For this you will need the CoreSight top-level ROM Table base address and access to physical memory. Note that some devices may not make the CoreSight memory area accessible. You can do a quick check using "sudo busybox devmem \<romaddr> 32".
 
 ### Finding the CoreSight top-level ROM Table base address(es)
 
