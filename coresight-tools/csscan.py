@@ -78,6 +78,13 @@ jedec_designers = {
 # Conventionally Arm uses
 #   DEVARCH[11:0]:architecture  DEVARCH[15:12]:major-rev  DEVARCH[19:16]:minor-rev
 
+ARM_ARCHID_ETM      = 0x4a13
+ARM_ARCHID_CTI      = 0x1a14
+ARM_ARCHID_PMU      = 0x2a16
+ARM_ARCHID_STM      = 0x0a63
+ARM_ARCHID_ELA      = 0x0a75
+ARM_ARCHID_ROM      = 0x0af7
+
 arm_archids = {
     0x0a00:"RAS",
     0x1a01:"ITM",
@@ -106,6 +113,16 @@ arm_archparts = {
     0xa15:"v8A-debug",
     0xa16:"PMU"
 }
+
+
+# Source: CoreSight Architecture Specification 3.0 Table B2-9
+cs_majors = {1:"sink", 2:"link", 3:"source", 4:"control", 5:"logic", 6:"PMU"}
+cs_types = {(1,1):"port", (1,2):"buffer", (1,3):"router",
+            (2,1):"funnel", (2,2):"replicator", (2,3):"fifo",
+            (3,1):"ETM", (3,4):"HTM", (3,6):"STM",
+            (4,1):"CTI", (4,2):"auth", (4,3):"power",
+            (5,1):"core-debug", (5,7):"ELA",
+            (6,1):"PMU (core)", (6,5):"PMU (SMMU)"}
 
 
 def binstr(n,w=None):
@@ -139,7 +156,7 @@ class Device:
         self.cs = cs
         assert (addr & 0xfff) == 0, "Device must be located on 4K boundary: 0x%x" % addr
         self.base_address = addr
-        self.affine_core = None
+        self.affine_core = None      # Link to the Device object for the core debug block
         self.map_is_write = False
         self.map()
         self.CIDR = (self.byte(0xFFC)<<24) | (self.byte(0xFF8)<<16) | (self.byte(0xFF4)<<8) | self.byte(0xFF0)
@@ -178,6 +195,12 @@ class Device:
             self.unmap()
             self.map(write=True)
             self.map_is_write = True
+
+    def __str__(self):
+        s = "%s @0x%x" % (self.cs_device_type_name(), self.base_address)
+        if self.is_affine_to_core():
+            s += " (core)"
+        return s
 
     def __del__(self):
         if self.we_unlocked and self.cs.restore_locks:
@@ -295,7 +318,7 @@ class Device:
         return self.device_class() == 0xF and self.is_arm_part_number(0x101)
 
     def is_rom_table(self):
-        return self.device_class() == 1 or (self.is_coresight() and self.is_arm_architecture(0x0af7))
+        return self.device_class() == 1 or (self.is_coresight() and self.is_arm_architecture(ARM_ARCHID_ROM))
 
     def coresight_device_type(self):
         assert self.is_coresight()
@@ -319,6 +342,20 @@ class Device:
 
     def is_replicator(self):
         return self.is_coresight_device_type(2,2)
+
+    def is_cti(self):
+        return self.is_arm_architecture(ARM_ARCHID_CTI) or self.is_arm_part_number(0x906) or self.is_arm_part_number(0x9ED)
+
+    def cs_device_type_name(self):
+        devtype = self.coresight_device_type()
+        (major, minor) = devtype
+        if devtype in cs_types:
+            desc = cs_types[devtype]
+        elif major in cs_majors:
+            desc = "UNKNOWN %s" % cs_majors[major]
+        else:
+            desc = "UNKNOWN (devtype = %s)" % (devtype)
+        return desc
 
     def atb_in_ports(self):
         if self.is_funnel():
@@ -344,6 +381,9 @@ class Device:
             if aff != 0:
                 return aff
         return None
+
+    def is_affine_to_core(self):
+        return self.affine_core is not None
 
     def architect(self):
         # CoreSight devices have a DEVARCH register which specifies the architect and architecture as a JEDEC code.
@@ -377,6 +417,12 @@ class Device:
     def lock(self):
         if self.is_unlocked():
             self.write32(0xFB0, 0x00000000, check=False)
+
+    def set_integration_mode(self, flag):
+        if flag:
+            self.set32(0xF00, 0x00000001, check=True)
+        else:
+            self.clr32(0xF00, 0x00000001, check=True)
 
 
 class ROMTableEntry:
@@ -603,22 +649,7 @@ class CSROM:
 
         # Registers architected by CoreSight, with architected values
         devtype = d.coresight_device_type()
-        (major, minor) = devtype
-
-        # Source: CoreSight Architecture Specification 3.0 Table B2-9
-        majors = {1:"sink", 2:"link", 3:"source", 4:"control", 5:"logic", 6:"PMU"}
-        types = {(1,1):"port", (1,2):"buffer", (1,3):"router",
-                 (2,1):"funnel", (2,2):"replicator", (2,3):"fifo",
-                 (3,1):"ETM", (3,4):"HTM", (3,6):"STM",
-                 (4,1):"CTI", (4,2):"auth", (4,3):"power",
-                 (5,1):"core-debug", (5,7):"ELA",
-                 (6,1):"PMU (core)", (6,5):"PMU (SMMU)"}
-        if devtype in types:
-            desc = types[devtype]
-        elif major in majors:
-            desc = "UNKNOWN %s" % majors[major]
-        else:
-            desc = "UNKNOWN (devtype = %s)" % (devtype)
+        desc = d.cs_device_type_name()
 
         if d.architecture() is None:
             archdesc = "" 
@@ -668,7 +699,7 @@ class CSROM:
             print(" devid=0x%x" % devid, end="")
         if affinity is not None:
             print(" aff=0x%x" % affinity, end="")
-        if False and d.affine_core is not None:
+        if False and d.is_affine_to_core():
             print(" affine_core=@0x%x" % d.affine_core.base_address, end="")
             
         # Now extract additional device-specific information. In general, we can establish
@@ -728,11 +759,10 @@ class CSROM:
                     print(" pc-sampling:%u" % bits(devid,0,4), end="")
                 if bits(devid,4,4):
                     print(" DoPD", end="")
-        elif d.is_arm_architecture(0x2a16):
-            # Arm architecture: PMU
+        elif d.is_arm_architecture(ARM_ARCHID_PMU):
             # PMU doesn't have a register of its own to indicate power state - you have to
             # find the affine core.
-            if d.affine_core is None:
+            if not d.is_affine_to_core():
                 core_powered_off = True
             else:
                 edprsr = d.affine_core.read32(0x314)
@@ -755,8 +785,10 @@ class CSROM:
                 n_slots = bits(pmmir,0,8)
                 if n_slots:
                     print(" slots:%u" % (n_slots), end="")
-        elif d.is_arm_architecture(0x4a13):
-            # Arm architecture: ETM
+                if bits(devid,0,4):
+                    # ARMv8.2 moves PC sampling from core debug into PMU
+                    print(" pc-sampling:%u" % bits(devid,0,4), end="")
+        elif d.is_arm_architecture(ARM_ARCHID_ETM):
             # Test if the registers are invalid/unreadable, either because the core power domain
             # is powered off or because the ETM hasn't been initialized since reset.
             #   TRCPDSR.STICKYPD[1]  indicates that trace register power has been removed
@@ -816,14 +848,14 @@ class CSROM:
                 print(" events:%u resources:%u addrcomp:%u ssc:%u pecomp:%u counters:%u seqstates:%u extin:%u extinsel:%u" % (n_events, n_resource_selectors, n_address_comparator_pairs, n_single_shot, n_pe_comparators, n_counters, n_seqstates, n_extin, n_extinsel), end="")
                 if bit(etmid5,31):
                     print(" reduced-function-counter", end="")
-        elif d.is_arm_architecture(0x0a63):
+        elif d.is_arm_architecture(ARM_ARCHID_STM):
             # CoreSight STM
             n_ports = devid & 0x1ffff
             print(" ports:%u" % n_ports, end="")
-        elif d.is_arm_architecture(0x0a75):
+        elif d.is_arm_architecture(ARM_ARCHID_ELA):
             print(" devid:0x%08x" % devid, end="")
-        elif d.is_arm_part_number(0x906) or d.is_arm_part_number(0x9ED):
-            # CoreSight CTI (SoC400) or CoreSight CTI (SoC600)
+        elif d.is_cti():
+            # CoreSight CTI (SoC400) or CoreSight CTI (SoC600) or core CTI
             # n.b. SoC600 CTI is fixed at 4 channels
             print(" channels:%u triggers:%u" % (((devid>>16)&0xf), ((devid>>8)&0xff)), end="")
         elif d.is_arm_part_number(0x908):
@@ -884,8 +916,7 @@ class CSROM:
         if d.is_arm_architecture_core():
             # Core debug interface
             pass
-        elif d.is_arm_architecture(0x2a16):
-            # PMU
+        elif d.is_arm_architecture(ARM_ARCHID_PMU):
             pmcr = d.read32(0xE04)
             print("  pmcr: 0x%08x" % pmcr)
             ovs = d.read32(0xC80)
@@ -906,8 +937,7 @@ class CSROM:
                 if bit(ovs,i):
                     print(" overflowed", end="")
                 print()
-        elif d.is_arm_architecture(0x4a13):
-            # ETM
+        elif d.is_arm_architecture(ARM_ARCHID_ETM):
             if emajor >= 4:
                 def res_str(rn):
                     # ETMv4 4.4.2
@@ -1222,8 +1252,8 @@ class CSROM:
             integration_regs = [0xEF0, 0xEF4, 0xEF8]
             if is_ETF:
                 integration_regs = [0xED0, 0xED4, 0xED8, 0xEDC] + integration_regs
-        elif d.is_arm_part_number(0x906):
-            # CoreSight CTI
+        elif d.is_cti():
+            # CoreSight CTI or core CTI
             n_trigs = (devid>>8) & 0xff
             n_channels = (devid>>16) & 0xf
             print("  trigger inputs:  %s" % (binstr(d.read32(0x130),n_trigs)))
@@ -1262,8 +1292,7 @@ class CSROM:
                     pc = d.read32x2(0x0AC,0x0A0)       # EDPCSR: not consecutive
                     cxid = d.read32(0x0A4) 
                     vmid = d.read32(0x0A8)
-            elif d.is_arm_architecture(0x2a16):
-                # PMU
+            elif d.is_arm_architecture(ARM_ARCHID_PMU):
                 if bits(devid,0,4):
                     pc = d.read32x2(0x204,0x200)       # PMPCSR
                     cxid = d.read32(0x208)             # PMCID1SR
@@ -1329,7 +1358,7 @@ class CSROM:
             print("class:%u" % (d.device_class()))
 
 
-def topology_detection(atb_devices, topo):
+def topology_detection_atb(atb_devices, topo):
     """
     Run the CoreSight topology detection procedure as described in
     [CoreSight Architecture 2.0] D6.4, Detection Algorithm.
@@ -1393,12 +1422,12 @@ def topology_detection(atb_devices, topo):
         return (d.read32(0xEF8) & mask) != 0
     for d in atb_devices:
         d.unlock()
-        d.set32(0xF00, 0x00000001, check=True)
+        d.set_integration_mode(True)
         def clear_integration_regs(d):
             d.write32(0xEF0, 0, check=False)
             d.write32(0xEF8, 0, check=False)
             d.write32(0xEFC, 0, check=False)
-            if d.is_coresight_device_type(2,3):
+            if d.is_coresight_device_type(2,3):  # ETF
                 d.write32(0xEDC, 0, check=False)
         if d.is_funnel():
             for i in range(0, d.atb_in_ports()):
@@ -1437,14 +1466,135 @@ def topology_detection(atb_devices, topo):
             set_ATVALIDM(dm, mp, 0)
     # Finally, put the devices back into production mode.
     for d in atb_devices:
-        d.clr32(0xF00, 0x00000001, check=True)
+        d.set_integration_mode(False)
         d.lock()
     # At this point, the system isn't guaranteed to be in a usable
     # (mission-mode) state. In practice, it often works.
     print("ATB topology detection complete.")
 
 
-def scan_rom(c, table_addr, recurse=True, detect_topology=False, enable_timestamps=False):
+def topology_detection_cti(devices, topo):
+    """
+    CTI topology detection.
+    For each device, assert its outputs and search other devices for corresponding inputs.
+
+    With DynamIQ it appears the relationship between a core and its CTI is not discoverable
+    via topology detection. Instead the relationship is fixed and documented in the DSU TRM:
+
+    DSU per-core CTI inputs:
+      0: cross-halt
+      1: PMU overflow
+      2: profile sampl
+      4-7: ETM trace output
+      8-9: ELA trigger output
+    DSU per-core CTI outputs:
+      0: debug request
+      1: restart
+      2: GIC generic CTI interrupt
+      4-7: ETM external input
+      8-9: ELA trigger input
+    """
+    def pin_out(d):
+        if d.is_arm_part_number(0x907) or d.is_arm_part_number(0x961):
+            yield ("ACQCOMP", 0xEE0, 0)
+            yield ("FULL", 0xEE0, 1)
+        elif d.is_coresight_device_type(3,1):
+            for i in range(0, 4):
+                yield ("ETMEXTOUT%u" % i, 0xEDC, i+8)
+        elif d.is_arm_architecture(ARM_ARCHID_STM):
+            yield ("TRIGOUTSPTE", 0xEE8, 0)
+            yield ("TRIGOUTSW", 0xEE8, 1)
+            yield ("TRIGOUTHETE", 0xEE8, 2)
+            yield ("ASYNCOUT", 0xEE8, 3)
+        elif d.is_cti() and not d.is_affine_to_core():
+            # Testing core-affine CTIs currently disabled to avoid halting our own core
+            n_triggers = ((d.read32(0xFC8)>>8)&0xff)
+            for i in range(0, n_triggers):
+                yield ("TRIGOUT%u" % i, 0xEE8, i)
+        else:
+            pass
+    def pin_in(d):
+        # Yield the input sensing register and bit, and also the input acknowledge register if present
+        # We assume bit position in sense register and ack register is the same.
+        if d.is_arm_part_number(0x907) or d.is_arm_part_number(0x961) or d.is_arm_part_number(0x912):
+            yield ("TRIGIN", 0xEE8, 0, 0xEE4)
+            yield ("FLUSHIN", 0xEE8, 1, 0xEE4)
+        elif d.is_coresight_device_type(3,1):
+            # ETM - integration registers not architected, may be specific to core, this is a guess
+            #etmid5 = d.read32(0x1F4)
+            #n_extin = bits(etmid5,0,9)
+            n_extin = 4        # ignore all the PMU inputs
+            for i in range(0, n_extin):
+                yield ("ETMEXTIN%u" % i, 0xEE0, i, None)
+        elif d.is_cti():
+            n_triggers = ((d.read32(0xFC8)>>8)&0xff)
+            for i in range(0, n_triggers):
+                yield ("TRIGIN%u" % i, 0xEF8, i, 0xEE0)
+        else:
+            pass
+    def has_triggers(d):
+        return d.is_cti() or len(list(pin_out(d))) > 0 or len(list(pin_in(d))) > 0
+    print("\nCTI topology detection")
+    devices = [d for d in devices if has_triggers(d)]
+    # Put all devices into integration mode, and do the master preamble
+    for d in devices:
+        c.show_device(d)
+        d.unlock()
+        d.set_integration_mode(True)
+        for (name, reg, b) in pin_out(d):
+            d.clr32(reg, 1<<b)
+    # Slave preamble, and check if any input pins are already asserted...
+    for ds in devices:
+        for (sname, sreg, sb, inack) in pin_in(ds):
+            if inack is not None:
+                d.clr32(inack, 1<<sb)
+            if bit(ds.read32(sreg), sb):
+                print("%s %s already asserted" % (ds, sname))
+    out_map = {}
+    in_map = {}
+    print("CTI outputs:")
+    for dm in devices:
+        if len(list(pin_out(dm))):
+            print("  %s" % dm)
+        for (mname, mreg, mb) in pin_out(dm):
+            dm.set32(mreg, 1<<mb)
+            mkey = (dm, mname)
+            for ds in devices:
+                for (sname, sreg, sb, inack) in pin_in(ds):
+                    if bit(ds.read32(sreg), sb):
+                        print("    %s -> %s %s" % (mname, ds, sname))
+                        skey = (ds, sname)
+                        if mkey in out_map:
+                            print("       multiple outputs!")
+                        if skey in in_map:
+                            (da, aname) = in_map[skey]
+                            print("       multiple inputs: already connected to %s %s" % (da, aname))
+                        out_map[mkey] = skey
+                        in_map[skey] = mkey
+                        if inack is not None:
+                            ds.set32(inack, 1<<sb)
+                            ds.clr32(inack, 1<<sb)
+            dm.clr32(mreg, 1<<mb)
+            if mkey not in out_map:
+                print("    %s not connected" % (mname))
+    print("CTI inputs:")
+    for ds in devices:
+        if len(list(pin_in(ds))):
+            print("  %s" % ds)
+        for (sname, sreg, sb, inack) in pin_in(ds):
+            skey = (ds, sname)
+            if skey in in_map:
+                (dm, mname) = in_map[skey]
+                print("    %s <- %s %s" % (sname, dm, mname))
+            else:
+                print("    %s not connected" % (sname))
+    for d in devices:
+        d.set_integration_mode(False)
+        d.lock()
+    print("CTI topology detection complete.")
+
+
+def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology_cti=False, enable_timestamps=False):
     """
     Scan a ROM Table recursively, showing devices as we go.
     We can also use this to list a single device.
@@ -1492,18 +1642,20 @@ def scan_rom(c, table_addr, recurse=True, detect_topology=False, enable_timestam
             # A CPU trace source of some kind. Not necessarily an ARM-architecture ETM.
             def get_etm_architecture(d):
                 etm_version = None
-                if d.is_arm_architecture(0x4a13):
+                if d.is_arm_architecture(ARM_ARCHID_ETM):
                     etm_version = bits(d.read32(0x1E4),8,4)
                 return etm_version
             etm_version = get_etm_architecture(d)
             if etm_version is not None:
                 dd["architecture"] = ["ETM", etm_version]
-        elif d.is_arm_architecture(0x0a63):
+        elif d.is_arm_architecture(ARM_ARCHID_STM):
             # STM: we should add the memory-mapped stimulus base address and size.
             pass
         topo["devices"].append(dd)
     if detect_topology:
-        topology_detection(atb_devices, topo)
+        topology_detection_atb(atb_devices, topo)
+    if detect_topology_cti:
+        topology_detection_cti(devices, topo)
     if enable_timestamps:
         n_found = 0
         print("Enabling global timestamps:")
@@ -1540,6 +1692,7 @@ if __name__ == "__main__":
     c = None
     done = False
     o_detect_topology = False
+    o_detect_topology_cti = False
     o_enable_timestamps = False
     for arg in sys.argv[1:]:
         if arg == "-v" or arg == "--verbose":
@@ -1562,6 +1715,8 @@ if __name__ == "__main__":
             o_show_integration = True
         elif arg == "--topology":
             o_detect_topology = True
+        elif arg == "--topology-cti":
+            o_detect_topology_cti = True
         elif arg == "--enable-timestamps":
             o_enable_timestamps = True
         elif arg == "--authstatus":
@@ -1581,7 +1736,7 @@ if __name__ == "__main__":
                     else:
                         print("** failed to access CoreSight devices even as superuser")
                     sys.exit(1)
-            scan_rom(c, table_addr, recurse=(not o_top_only), detect_topology=o_detect_topology, enable_timestamps=o_enable_timestamps)
+            scan_rom(c, table_addr, recurse=(not o_top_only), detect_topology=o_detect_topology, detect_topology_cti=o_detect_topology_cti, enable_timestamps=o_enable_timestamps)
             done = True
     if not done:
         help()
