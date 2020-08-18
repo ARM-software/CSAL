@@ -2,7 +2,7 @@
 
 """
 Scan the ROM table and report on CoreSight devices.
-Also do ATB topology detection.
+Also do ATB and CTI topology detection.
 
 We report three levels of status:
   - the "hard wired" configuration selected at SoC design time
@@ -10,13 +10,12 @@ We report three levels of status:
   - the actual status, e.g. busy/ready bits, values of counters etc.
 
 To do:
-  - CPU affinity and debug/PMU/ETM/CTI grouping
   - latest CoreSight architecture (mostly done)
   - ETMv3.x/PTF
   - SoC600: TMC, CATU
   - power requestors
 
-Copyright (C) ARM Ltd. 2018.  All rights reserved.
+Copyright (C) ARM Ltd. 2018-2020.  All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -157,6 +156,7 @@ class Device:
         assert (addr & 0xfff) == 0, "Device must be located on 4K boundary: 0x%x" % addr
         self.base_address = addr
         self.affine_core = None      # Link to the Device object for the core debug block
+        self.affinity_group = None   # AffinityGroup containing related devices
         self.map_is_write = False
         self.map()
         self.CIDR = (self.byte(0xFFC)<<24) | (self.byte(0xFF8)<<16) | (self.byte(0xFF4)<<8) | self.byte(0xFF0)
@@ -385,6 +385,12 @@ class Device:
     def is_affine_to_core(self):
         return self.affine_core is not None
 
+    def affine_device(self, typ):
+        if self.is_affine_to_core:
+            return self.affinity_group.affine_device(typ)
+        else:
+            return None
+
     def architect(self):
         # CoreSight devices have a DEVARCH register which specifies the architect and architecture as a JEDEC code.
         assert self.is_coresight()
@@ -462,6 +468,37 @@ class ROMTableEntry:
         return self.table.base_address + self.device_offset()
 
 
+class AffinityGroup:
+    """
+    An affinity group groups related components together, e.g.
+    a core debug, PMU, ETM and CTI.
+    The grouping may be by DEVAFF or by proximity in the ROM table.
+    """
+    def __init__(self, id=None):
+        self.id = id
+        self.devices = {}     # indexed by type
+
+    def set_affine_device(self, d, typ):
+        assert typ not in self.devices, "attempt to put two devices of type '%s' in group %s" % (typ, self)
+        self.devices[typ] = d
+        # As well as its affinity group, each device has a direct link to its core
+        # We fix this up regardless of the order in which we add the devices to the affinity group
+        if typ == "core":
+            for od in self.devices.values():
+                od.affine_core = d
+        elif "core" in self.devices:
+            d.affine_core = self.devices["core"]
+
+    def affine_device(self, typ):
+        if typ in self.devices:
+            return self.devices[typ]
+        else:
+            return None
+
+    def __str__(self):
+        return "AffinityGroup(0x%016x)" % self.id
+
+
 class CSROM:
     """
     Container for the overall ROM table scan.
@@ -484,6 +521,7 @@ class CSROM:
                 raise
         self.fno = self.fd.fileno()
         self.device_by_base_address = {}
+        self.affinity_group_map = {}
         self.n_mappings = 0
         self.restore_locks = True 
 
@@ -532,6 +570,11 @@ class CSROM:
         d.rom_table_entry = rom_table_entry
         self.device_by_base_address[addr] = d
         return d
+
+    def affinity_group(self, id):
+        if id not in self.affinity_group_map:
+            self.affinity_group_map[id] = AffinityGroup(id)
+        return self.affinity_group_map[id]
 
     def list_table(self, td, include_empty=False, recurse=True):
         """
@@ -598,32 +641,33 @@ class CSROM:
                 e.device = d
                 # Fix up device affinity - in the absence of anywhere better.
                 # We could either do this using DEVAFF or heuristically.
-                if d.is_core_debug():
-                    d.affine_core = d      # affine to itself
-                    d.affine_devices = {}
-                    cpus_in_this_table.append(d)
-                elif d.is_coresight_device_type(6,1):
-                    # PMU: allocate to the first CPU that hasn't yet got a PMU
-                    for c in cpus_in_this_table:
-                        if "PMU" not in c.affine_devices:
-                            d.affine_core = c
-                            c.affine_devices["PMU"] = d
-                            break
+                id = d.affinity_id()
+                if id:
+                    d.affinity_group = self.affinity_group(id)
+                adtype = None
+                if d.is_coresight_device_type(6,1):
+                    adtype = "PMU"
                 elif d.is_coresight_device_type(3,1):
-                    # ETM: allocate to the first CPU that hasn't yet got an ETM
-                    for c in cpus_in_this_table:
-                        if "ETM" not in c.affine_devices:
-                            d.affine_core = c
-                            c.affine_devices["ETM"] = d
-                            break
+                    adtype = "ETM"
                 elif d.is_coresight_device_type(4,1):
-                    # CTI: allocate to the first CPU that hasn't yet got a CTI
-                    # If not using DEVAFF, it should be at -64K offset from the CTI
-                    for c in cpus_in_this_table:
-                        if "CTI" not in c.affine_devices and c.base_address == (d.base_address - 0x10000):
-                            d.affine_core = c
-                            c.affine_devices["CTI"] = d
-                            break
+                    adtype = "CTI"
+                if d.is_core_debug():
+                    if not id:
+                        d.affinity_group = AffinityGroup()    # anonymous group
+                    d.affinity_group.set_affine_device(d, "core")
+                    cpus_in_this_table.append(d)
+                elif adtype is not None:
+                    if id:
+                        d.affinity_group.set_affine_device(d, adtype)
+                    else:
+                        # Allocate to the first CPU that hasn't yet got an affine device of this type 
+                        for c in cpus_in_this_table:
+                            if c.affine_device(adtype) is None:
+                                # If not using DEVAFF, core should be at -64K offset from the CTI
+                                if adtype == "CTI" and c.base_address != (d.base_address - 0x10000):
+                                    continue
+                                c.affinity_group.set_affine_device(d, adtype)
+                                break
                 yield e
                 if recurse and d.is_rom_table():
                     for se in self.list_table(d, include_empty=include_empty, recurse=True):
@@ -770,9 +814,11 @@ class CSROM:
             if not core_powered_off:
                 config = d.read32(0xE00)
                 n_counters = config & 0xff
+                csize = bits(config,8,6)+1
                 if o_verbose:
                     print(" config:0x%08x" % (config), end="")
                 print(" counters:%u" % (n_counters), end="")
+                print(" %u-bit" % (csize), end="")
                 if bit(config,15):
                     print(" prescale", end="")
                 if bit(config,16):
@@ -853,11 +899,16 @@ class CSROM:
             n_ports = devid & 0x1ffff
             print(" ports:%u" % n_ports, end="")
         elif d.is_arm_architecture(ARM_ARCHID_ELA):
-            print(" devid:0x%08x" % devid, end="")
+            rwidth = bits(devid,8,8)
+            print(" devid:0x%08x entries:%u" % (devid, (1<<rwidth)), end="")
+            if bits(devid,0,4):
+                print(" ATB", end="")
         elif d.is_cti():
             # CoreSight CTI (SoC400) or CoreSight CTI (SoC600) or core CTI
             # n.b. SoC600 CTI is fixed at 4 channels
             print(" channels:%u triggers:%u" % (((devid>>16)&0xf), ((devid>>8)&0xff)), end="")
+            if bits(devid,24,2):
+                print(" gate", end="")
         elif d.is_arm_part_number(0x908):
             # CoreSight trace funnel (SoC400)
             in_ports = devid & 15
@@ -1473,46 +1524,70 @@ def topology_detection_atb(atb_devices, topo):
     print("ATB topology detection complete.")
 
 
-def topology_detection_cti(devices, topo):
+class TopologyDetectionCTI:
     """
     CTI topology detection.
     For each device, assert its outputs and search other devices for corresponding inputs.
 
-    With DynamIQ it appears the relationship between a core and its CTI is not discoverable
-    via topology detection. Instead the relationship is fixed and documented in the DSU TRM:
+    For core-affine CTIs (indicated with DEVAFF) the relationship between a core and its CTI is not discoverable
+    via topology detection. Instead the relationship is fixed and documented in the architecture spec
+    (for v8 this is H5.4), or the CPU or SU TRM:
 
-    DSU per-core CTI inputs:
+    Core CTI inputs:
       0: cross-halt
       1: PMU overflow
-      2: profile sampl
+      2: SPE sample trigger event (n.b. there is no way externally to detect if SPE is present)
+      3: reserved
       4-7: ETM trace output
-      8-9: ELA trigger output
-    DSU per-core CTI outputs:
+      8-9: ELA trigger output (imp def)
+    Core CTI outputs:
       0: debug request
       1: restart
       2: GIC generic CTI interrupt
+      3: reserved
       4-7: ETM external input
-      8-9: ELA trigger input
+      8-9: ELA trigger input (imp def)
     """
+    def __init__(self, devices, topo):
+        self.devices = [d for d in devices if self.has_triggers(d)]
+        self.out_map = {}
+        self.in_map = {}
+
+    @staticmethod
     def pin_out(d):
+        # Yield the ouptut triggers: output assert register and bit.
         if d.is_arm_part_number(0x907) or d.is_arm_part_number(0x961):
             yield ("ACQCOMP", 0xEE0, 0)
             yield ("FULL", 0xEE0, 1)
         elif d.is_coresight_device_type(3,1):
+            # ETM
             for i in range(0, 4):
                 yield ("ETMEXTOUT%u" % i, 0xEDC, i+8)
+        elif d.is_core_debug():
+            yield ("DBGCROSS", None, None)
+        elif d.is_coresight_device_type(6,1):
+            yield ("OVERFLOW", None, None)
         elif d.is_arm_architecture(ARM_ARCHID_STM):
             yield ("TRIGOUTSPTE", 0xEE8, 0)
             yield ("TRIGOUTSW", 0xEE8, 1)
             yield ("TRIGOUTHETE", 0xEE8, 2)
             yield ("ASYNCOUT", 0xEE8, 3)
-        elif d.is_cti() and not d.is_affine_to_core():
-            # Testing core-affine CTIs currently disabled to avoid halting our own core
+        elif d.is_arm_architecture(ARM_ARCHID_ELA):
+            yield ("CTTRIGOUT0", 0xEE8, 0)
+            yield ("CTTRIGOUT1", 0xEE8, 1)
+        elif d.is_cti():
             n_triggers = ((d.read32(0xFC8)>>8)&0xff)
+            # Testing core-affine CTIs currently disabled to avoid halting our own core
+            if d.is_affine_to_core():
+                ireg = None
+            else:
+                ireg = 0xEE8 
             for i in range(0, n_triggers):
-                yield ("TRIGOUT%u" % i, 0xEE8, i)
+                yield ("TRIGOUT%u" % i, ireg, i)
         else:
             pass
+
+    @staticmethod
     def pin_in(d):
         # Yield the input sensing register and bit, and also the input acknowledge register if present
         # We assume bit position in sense register and ack register is the same.
@@ -1526,72 +1601,127 @@ def topology_detection_cti(devices, topo):
             n_extin = 4        # ignore all the PMU inputs
             for i in range(0, n_extin):
                 yield ("ETMEXTIN%u" % i, 0xEE0, i, None)
+        elif d.is_core_debug():
+            yield ("DBGREQ", None, None, None)
+            yield ("DBGRST", None, None, None)
+        elif d.is_arm_architecture(ARM_ARCHID_ELA):
+            yield ("CTTRIGIN0", 0xEF8, 0, None)
+            yield ("CTTRIGIN1", 0xEF8, 1, None)
         elif d.is_cti():
             n_triggers = ((d.read32(0xFC8)>>8)&0xff)
+            if d.is_affine_to_core():
+                ireg = None
+            else:
+                ireg = 0xEF8
             for i in range(0, n_triggers):
-                yield ("TRIGIN%u" % i, 0xEF8, i, 0xEE0)
+                yield ("TRIGIN%u" % i, ireg, i, 0xEE0)
         else:
             pass
-    def has_triggers(d):
-        return d.is_cti() or len(list(pin_out(d))) > 0 or len(list(pin_in(d))) > 0
-    print("\nCTI topology detection")
-    devices = [d for d in devices if has_triggers(d)]
-    # Put all devices into integration mode, and do the master preamble
-    for d in devices:
-        c.show_device(d)
-        d.unlock()
-        d.set_integration_mode(True)
-        for (name, reg, b) in pin_out(d):
-            d.clr32(reg, 1<<b)
-    # Slave preamble, and check if any input pins are already asserted...
-    for ds in devices:
-        for (sname, sreg, sb, inack) in pin_in(ds):
-            if inack is not None:
-                d.clr32(inack, 1<<sb)
-            if bit(ds.read32(sreg), sb):
-                print("%s %s already asserted" % (ds, sname))
-    out_map = {}
-    in_map = {}
-    print("CTI outputs:")
-    for dm in devices:
-        if len(list(pin_out(dm))):
-            print("  %s" % dm)
-        for (mname, mreg, mb) in pin_out(dm):
-            dm.set32(mreg, 1<<mb)
+
+    def has_triggers(self, d):
+        return d.is_cti() or len(list(self.pin_out(d))) > 0 or len(list(self.pin_in(d))) > 0
+
+    def preamble(self):
+        # Put all devices into integration mode, and do the master preamble
+        for d in self.devices:
+            c.show_device(d)
+            d.unlock()
+            d.set_integration_mode(True)
+            for (name, reg, b) in self.pin_out(d):
+                if reg is not None:
+                    d.clr32(reg, 1<<b)
+        # Slave preamble, and check if any input pins are already asserted...
+        for ds in self.devices:
+            for (sname, sreg, sb, inack) in self.pin_in(ds):
+                if sreg is None:
+                    continue
+                if inack is not None:
+                    d.clr32(inack, 1<<sb)
+                if bit(ds.read32(sreg), sb):
+                    print("%s %s already asserted" % (ds, sname))
+
+    def detect(self):
+        print("\nCTI topology detection")
+        self.preamble()
+        print("CTI outputs:")
+        for dm in self.devices:
+            if len(list(self.pin_out(dm))):
+                self.detect_master(dm)
+        self.postamble()
+        self.show_inputs()
+        print("CTI topology detection complete.")
+
+    def add(self, dm, mname, ds, sname):
+        print("    %s -> %s %s" % (mname, ds, sname))
+        mkey = (dm, mname)
+        skey = (ds, sname)
+        if mkey in self.out_map:
+            print("       multiple outputs!")
+        if skey in self.in_map:
+            (da, aname) = self.in_map[skey]
+            print("       multiple inputs: already connected to %s %s" % (da, aname))
+        self.out_map[mkey] = skey
+        self.in_map[skey] = mkey
+
+    def detect_master(self, dm):
+        print("  %s" % dm)
+        if dm.is_affine_to_core():
+            if dm.is_cti():
+                # Add the trigger connections defined in the architecture (non discoverable)
+                self.add(dm, "TRIGOUT0", dm.affine_core, "DBGREQ")
+                self.add(dm, "TRIGOUT1", dm.affine_core, "DBGRST")
+                etm = dm.affine_device("ETM")
+                for i in range(0, 4):
+                    self.add(dm, "TRIGOUT" + str(i+4), etm, "ETMEXTIN" + str(i))
+            elif dm.is_core_debug():
+                self.add(dm, "DBGCROSS", dm.affine_device("CTI"), "TRIGIN0")
+                # TRIGIN2 is the SPE sample event - but there's no non-invasive way to detect SPE
+            elif dm.is_coresight_device_type(6,1):
+                self.add(dm, "OVERFLOW", dm.affine_device("CTI"), "TRIGIN1")
+            elif dm.is_coresight_device_type(3,1):
+                for i in range(0, 4):
+                    self.add(dm, "EXTMEXTOUT" + str(i), dm.affine_device("CTI"), "TRIGIN" + str(i+4))
+            return
+        for (mname, mreg, mb) in self.pin_out(dm):
+            if mreg is None:
+                continue
             mkey = (dm, mname)
-            for ds in devices:
-                for (sname, sreg, sb, inack) in pin_in(ds):
+            dm.set32(mreg, 1<<mb)
+            for ds in self.devices:
+                for (sname, sreg, sb, inack) in self.pin_in(ds):
+                    if sreg is None:
+                        continue
                     if bit(ds.read32(sreg), sb):
-                        print("    %s -> %s %s" % (mname, ds, sname))
-                        skey = (ds, sname)
-                        if mkey in out_map:
-                            print("       multiple outputs!")
-                        if skey in in_map:
-                            (da, aname) = in_map[skey]
-                            print("       multiple inputs: already connected to %s %s" % (da, aname))
-                        out_map[mkey] = skey
-                        in_map[skey] = mkey
                         if inack is not None:
                             ds.set32(inack, 1<<sb)
                             ds.clr32(inack, 1<<sb)
+                        self.add(dm, mname, ds, sname)
             dm.clr32(mreg, 1<<mb)
-            if mkey not in out_map:
+            if mkey not in self.out_map:
                 print("    %s not connected" % (mname))
-    print("CTI inputs:")
-    for ds in devices:
-        if len(list(pin_in(ds))):
-            print("  %s" % ds)
-        for (sname, sreg, sb, inack) in pin_in(ds):
-            skey = (ds, sname)
-            if skey in in_map:
-                (dm, mname) = in_map[skey]
-                print("    %s <- %s %s" % (sname, dm, mname))
-            else:
-                print("    %s not connected" % (sname))
-    for d in devices:
-        d.set_integration_mode(False)
-        d.lock()
-    print("CTI topology detection complete.")
+
+    def show_inputs(self):
+        print("CTI inputs:")
+        for ds in self.devices:
+            if len(list(self.pin_in(ds))):
+                print("  %s" % ds)
+            for (sname, sreg, sb, inack) in self.pin_in(ds):
+                skey = (ds, sname)
+                if skey in self.in_map:
+                    (dm, mname) = self.in_map[skey]
+                    print("    %s <- %s %s" % (sname, dm, mname))
+                else:
+                    print("    %s not connected" % (sname))
+
+    def postamble(self):
+        for d in self.devices:
+            d.set_integration_mode(False)
+            d.lock()
+
+
+def topology_detection_cti(devices, topo):
+    d = TopologyDetectionCTI(devices, topo)
+    d.detect()
 
 
 def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology_cti=False, enable_timestamps=False):
@@ -1623,6 +1753,12 @@ def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology
             print("... further devices not shown.")
         else:
             pass
+    if False:
+        print("Affinity groups:")
+        for ag in sorted(c.affinity_group_map.values()):
+            print("  %s" % ag)
+            for (typ, d) in ag.devices.items():
+                print("    %-5s %s" % (typ, d))
     # Prepare to generate a topology JSON file, that can be used to create
     # a Linux device tree.
     atb_devices = []
