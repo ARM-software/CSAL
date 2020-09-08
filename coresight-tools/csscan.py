@@ -80,6 +80,7 @@ jedec_designers = {
 ARM_ARCHID_ETM      = 0x4a13
 ARM_ARCHID_CTI      = 0x1a14
 ARM_ARCHID_PMU      = 0x2a16
+ARM_ARCHID_MEMAP    = 0x0a17
 ARM_ARCHID_STM      = 0x0a63
 ARM_ARCHID_ELA      = 0x0a75
 ARM_ARCHID_ROM      = 0x0af7
@@ -144,6 +145,54 @@ def bits_set(w,m):
 assert bits_set(0x011,{0:"x",2:"y",4:"z"}) == "x z"
 
 
+class DevicePhy:
+    """
+    Access a memory-mapped device
+    """
+    def __init__(self, devmem, base_address, write=False):
+        self.devmem = devmem
+        self.memap = None
+        self.mmap_offset = base_address % devmem.page_size
+        mmap_address = base_address - self.mmap_offset
+        self.m = devmem.map(mmap_address, write=write)
+
+    def __del__(self):
+        self.devmem.unmap(self.m)
+
+    def read32(self, off):
+        off += self.mmap_offset
+        raw = self.m[off:off+4]
+        x = struct.unpack("I", raw)[0]
+        return x
+
+    def write32(self, off, value):
+        s = struct.pack("I", value)
+        off += self.mmap_offset
+        self.m[off:off+4] = s
+
+    def write64(self, off, value):
+        s = struct.pack("Q", value)
+        off += self.mmap_offset
+        self.m[off:off+8] = s
+
+
+class DeviceMemAP:
+    """
+    Access a MEM-AP indirected device
+    """
+    def __init__(self, memap, base_address, write=False):
+        assert isinstance(memap, Device)
+        assert memap.is_arm_architecture(ARM_ARCHID_MEMAP), "%s: expected MEM-AP" % memap
+        self.memap = memap
+        self.offset = base_address      # Device base offset within MEM-AP's target space
+
+    def read32(self, off):
+        off += self.offset
+        self.memap.write32(0xD04, off)  # write Transfer Address Register
+        return self.memap.read32(0xD0C) # read Data Response Register
+        #return self.memap.read32(off & 0x3FF)         # read xfer register 0..255
+
+
 class Device:
     """
     A single CoreSight device mapped by a ROM table (including ROM tables themselves).    
@@ -151,16 +200,16 @@ class Device:
 
     def __init__(self, cs, addr):
         self.we_unlocked = False
-        self.m = None
-        self.cs = cs
+        self.phy = None
+        self.cs = cs                 # Device address space
         assert (addr & 0xfff) == 0, "Device must be located on 4K boundary: 0x%x" % addr
-        self.base_address = addr
+        self.base_address = addr     # Device base address within its address space
         self.affine_core = None      # Link to the Device object for the core debug block
         self.affinity_group = None   # AffinityGroup containing related devices
         self.map_is_write = False
         self.map()
-        self.CIDR = (self.byte(0xFFC)<<24) | (self.byte(0xFF8)<<16) | (self.byte(0xFF4)<<8) | self.byte(0xFF0)
-        self.PIDR = (self.byte(0xFD0) << 32) | (self.byte(0xFEC) << 24) | (self.byte(0xFE8) << 16) | (self.byte(0xFE4) << 8) | self.byte(0xFE0)
+        self.CIDR = self.idbytes([0xFFC, 0xFF8, 0xFF4, 0xFF0])
+        self.PIDR = self.idbytes([0xFD0, 0xFEC, 0xFE8, 0xFE4, 0xFE0])
         self.jedec_designer = (((self.PIDR>>32)&15) << 7) | ((self.PIDR >> 12) & 0x3f)
         # The part number is selected by the component designer.
         self.part_number = self.PIDR & 0xfff
@@ -180,24 +229,32 @@ class Device:
         # So we need to adjust the mmap address and size to page granularity.
         # This might mean we end up mapping the same page-sized range several
         # times for different 4K devices located within it.
-        if self.m is None:
-            self.mmap_offset = self.base_address % self.cs.page_size
-            mmap_address = self.base_address - self.mmap_offset
-            self.m = self.cs.map(mmap_address, write=write)
+        if self.phy is None:
+            if self.cs.devmem is not None:
+                self.phy = DevicePhy(self.cs.devmem, self.base_address, write=write)
+            else:
+                self.phy = DeviceMemAP(self.cs.memap, self.base_address, write=write)
 
     def unmap(self):
-        if self.m is not None:
-            self.cs.unmap(self.m)
-            self.m = None
+        if self.phy is not None:
+            self.phy = None
 
     def write_enable(self):
         if not self.map_is_write:
+            if o_verbose:
+                print("%s: enabling for write" % str(self))
             self.unmap()
             self.map(write=True)
             self.map_is_write = True
 
+    def address_string(self):
+        s = "@0x%x" % self.base_address
+        if self.phy.memap is not None:
+            s = self.phy.memap.address_string() + "." + s
+        return s
+
     def __str__(self):
-        s = "%s @0x%x" % (self.cs_device_type_name(), self.base_address)
+        s = "%s %s" % (self.cs_device_type_name(), self.address_string())
         if self.is_affine_to_core():
             s += " (core)"
         return s
@@ -215,9 +272,9 @@ class Device:
         self.map()
         if o_verbose >= 2:
             print("  0x%x[%03x] R4" % (self.base_address, off), end="")
-        off += self.mmap_offset
-        raw = self.m[off:off+4]
-        x = struct.unpack("I", raw)[0]
+            if o_verbose >= 3:
+                time.sleep(0.1)
+        x = self.phy.read32(off)
         if o_verbose >= 2:
             print("  = 0x%08x" % x)
         return x
@@ -237,9 +294,9 @@ class Device:
             value = (ovalue & ~mask) | value
         if o_verbose >= 2:
             print("  0x%x[%03x] W4 := 0x%08x" % (self.base_address, off, value))
-        s = struct.pack("I", value)
-        off += self.mmap_offset
-        self.m[off:off+4] = s
+            if o_verbose >= 3:
+                time.sleep(0.1)
+        self.phy.write32(off, value)
         if self.do_check(check):
             readback = self.read32(off)
             if readback != value:
@@ -257,11 +314,10 @@ class Device:
             return (self.read32(off) & value) == 0
 
     def write64(self, off, value):
+        # Write an aligned 64-bit value, atomically. Cannot do with MEM-AP?
         if o_verbose >= 2:
             print("  0x%x[%03x] W8 := 0x%016x" % (self.base_address, off, value))
-        s = struct.pack("Q", value)
-        off += self.mmap_offset
-        self.m[off:off+8] = s
+        self.phy.write64(off, value)
 
     def read32x2(self, hi, lo):
         # CoreSight (APB-connected) devices are generally 32-bit wide,
@@ -287,15 +343,11 @@ class Device:
             vhia = vhib
         return (vhib << 32) | vlo
 
-    def byte(self, off):
-        self.map()
-        if o_verbose >= 3:
-            print("  0x%x[%03x] R1" % (self.base_address, off))
-        off += self.mmap_offset
-        x = ord(self.m[off:off+1])
-        if o_verbose >= 3:
-            print("  = 0x%02x" % x)
-        return x
+    def idbytes(self, x):
+        id = 0
+        for wa in x:
+            id = (id << 8) | (self.read32(wa) & 0xff)
+        return id
 
     def is_arm_part_number(self, n=None):
         return self.jedec_designer == JEDEC_ARM and (n is None or self.part_number == n)
@@ -354,7 +406,7 @@ class Device:
         elif major in cs_majors:
             desc = "UNKNOWN %s" % cs_majors[major]
         else:
-            desc = "UNKNOWN (devtype = %s)" % (devtype)
+            desc = "UNKNOWN (devtype = %s)" % str(devtype)
         return desc
 
     def atb_in_ports(self):
@@ -417,6 +469,8 @@ class Device:
     def unlock(self):
         self.write_enable()
         if not self.is_unlocked():
+            if o_verbose >= 2:
+                print("%s: unlocking" % self)
             self.write32(0xFB0, 0xC5ACCE55, check=False)
             self.we_unlocked = True
 
@@ -499,16 +553,13 @@ class AffinityGroup:
         return "AffinityGroup(0x%016x)" % self.id
 
 
-class CSROM:
+class DevMem:
     """
-    Container for the overall ROM table scan.
-    Owns the mechanism by which we access physical memory - e.g. a
-    mapping on to /dev/mem. Individual device mappings are owned by the
-    device objects.
+    Access physical memory via /dev/mem. This object creates mappings into
+    page-aligned regions of physical address space.
     """
 
     def __init__(self):
-        self.fd = None
         self.page_size = os.sysconf("SC_PAGE_SIZE")
         try:
             # This may fail because not present or access-restricted.
@@ -520,10 +571,7 @@ class CSROM:
                 #print("Can't access /dev/mem or /dev/csmem - are you running as superuser?")
                 raise
         self.fno = self.fd.fileno()
-        self.device_by_base_address = {}
-        self.affinity_group_map = {}
         self.n_mappings = 0
-        self.restore_locks = True 
 
     def __del__(self):
         if self.fd is not None:
@@ -557,6 +605,38 @@ class CSROM:
         m.close()
         self.n_mappings -= 1
 
+
+class CSROM:
+    """
+    Container for the overall ROM table scan.
+    Owns the mechanism by which we access physical memory - e.g. a
+    mapping on to /dev/mem. Individual device mappings are owned by the
+    device objects.
+    """
+
+    def __init__(self, memap=None):
+        self.fd = None
+        self.memap = memap
+        if memap is None:
+            self.devmem = DevMem()
+        else:
+            self.devmem = None
+        self.device_by_base_address = {}
+        self.affinity_group_map = {}
+        self.restore_locks = True
+
+    def map(self, addr, write=False):
+        if self.devmem is not None:
+            return self.devmem.map(addr, write)
+        else:
+            return None
+
+    def unmap(self, addr):
+        if self.devmem is not None:
+            return self.devmem.unmap(addr)
+        else:
+            return None
+
     def device_at(self, addr, unlock=True):
         assert addr in self.device_by_base_address, "missing device at 0x%x" % addr
         d = self.device_by_base_address[addr]
@@ -564,11 +644,13 @@ class CSROM:
             d.unlock()
         return d
 
-    def create_device_at(self, addr, rom_table_entry=None):
+    def create_device_at(self, addr, rom_table_entry=None, write=False):
         assert not addr in self.device_by_base_address, "device at 0x%x already collected" % addr
         d = Device(self, addr)
         d.rom_table_entry = rom_table_entry
         self.device_by_base_address[addr] = d
+        if write:
+            d.write_enable()
         return d
 
     def affinity_group(self, id):
@@ -898,6 +980,20 @@ class CSROM:
             # CoreSight STM
             n_ports = devid & 0x1ffff
             print(" ports:%u" % n_ports, end="")
+        elif d.is_arm_architecture(ARM_ARCHID_MEMAP):
+            idr = d.read32(0xDFC)
+            print(" idr:0x%08x" % idr, end="")
+            aptype = bits(idr,0,4)
+            aptypes = { 6: "APB4", 7: "AXI5", 8: "AHB5+HPROT" }
+            if aptype in aptypes:
+                saptype = aptypes[aptype]
+            else:
+                saptype = str(aptype)
+            print(" type:%s" % saptype, end="")
+            cfg = d.read32(0xDF4)
+            print(" cfg:0x%08x" % cfg, end="")
+            rombase = d.read32(0xDF8)
+            print(" rom:%#x" % rombase, end="")
         elif d.is_arm_architecture(ARM_ARCHID_ELA):
             rwidth = bits(devid,8,8)
             print(" devid:0x%08x entries:%u" % (devid, (1<<rwidth)), end="")
@@ -1220,6 +1316,12 @@ class CSROM:
             else:
                 # TBD show older ETMs
                 pass
+        elif d.is_arm_architecture(ARM_ARCHID_MEMAP):
+            csw = d.read32(0xD00)
+            print("  CSW: 0x%08x (%s)" % (csw, ["disabled","enabled"][bit(csw,6)]))
+            if bit(csw,7):
+                print("  Transfer in progress")
+            print("  TAR: 0x%08x" % (d.read32(0xD04)))
         elif d.is_arm_part_number(0x907) or d.is_arm_part_number(0x961):
             # CoreSight SoC400 ETB or TMC trace buffer.
             # Trace buffer management is complicated by the variety of design-time
@@ -1368,7 +1470,7 @@ class CSROM:
         """
         rev = (d.PIDR >> 20) & 15       # PIDR2.REVISION
         patch = (d.PIDR >> 28) & 15     # PIDR3.REVAND
-        print("@0x%x " % (d.base_address), end=" ")
+        print("%s " % (d.address_string()), end=" ")
         # Note that Arm CoreSight SoC uses PIDR2.REVISION to count successive
         # major/minor releases of each block. The overall release of CoreSight SoC
         # can only be deduced from the combination of block releases seen.
@@ -1814,6 +1916,10 @@ def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology
     f.close()
 
 
+def disable_stdout_buffering():
+    sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
+
+
 if __name__ == "__main__":
     # we don't use argparse because it's not available on Python 2.6
     def help():
@@ -1822,6 +1928,7 @@ if __name__ == "__main__":
         print("  --status             show device status as well as configuration")
         print("  --limit=<n>          stop scan after n devices")
         print("  --topology           detect ATB topology")
+        print("  --topology-cti       detect CTI topology")
         print("  --enable-timestamps  enable global CoreSight timestamps")
         print("  -v/--verbose         increase verbosity level")
         sys.exit(1)
@@ -1830,6 +1937,7 @@ if __name__ == "__main__":
     o_detect_topology = False
     o_detect_topology_cti = False
     o_enable_timestamps = False
+    d_memap = None
     for arg in sys.argv[1:]:
         if arg == "-v" or arg == "--verbose":
             o_verbose += 1
@@ -1859,13 +1967,20 @@ if __name__ == "__main__":
             o_show_authstatus = True
         elif arg.startswith("--limit="):
             o_max_devices = int(arg[8:])
+        elif arg.startswith("--memap="):
+            # CoreSight devices are accessed via a MEM-AP gateway in the main address space
+            maddr = int(arg[8:], 16)
+            ctop = CSROM()                                       # The main physical address space
+            d_memap = ctop.create_device_at(maddr, write=True)   # The gateway device
         elif arg == "--top-only":
             o_top_only = True
         else:
+            if o_verbose >= 2:
+                disable_stdout_buffering()
             table_addr = int(arg, 16)
             if c is None:
                 try:
-                    c = CSROM()
+                    c = CSROM(memap=d_memap)
                 except:
                     if os.geteuid() != 0:
                         print("** failed to access CoreSight devices - try running as superuser")
