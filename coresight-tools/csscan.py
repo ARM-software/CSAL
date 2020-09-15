@@ -961,7 +961,7 @@ class CSROM:
                     print(" stall", end="")
                 if bit(etmid3,25):
                     print(" fixed-sync", end="")
-                n_resource_selectors = bits(etmid4,16,4)*2
+                n_resource_selectors = bits(etmid4,16,4)*2 + 2
                 n_address_comparator_pairs = bits(etmid4,0,4)
                 n_pe_comparators = bits(etmid4,12,4)
                 n_single_shot = bits(etmid4,20,4)
@@ -970,8 +970,9 @@ class CSROM:
                 n_seqstates = bits(etmid5,25,3)
                 n_extin = bits(etmid5,0,9)
                 n_extinsel = bits(etmid5,9,3)
-                if eminor >= 3:
+                if emajor > 4 or eminor >= 3:
                     if bits(etmid4,16,4) == 0:
+                        n_resource_selectors = 0
                         n_events = 0       
                 print(" events:%u resources:%u addrcomp:%u ssc:%u pecomp:%u counters:%u seqstates:%u extin:%u extinsel:%u" % (n_events, n_resource_selectors, n_address_comparator_pairs, n_single_shot, n_pe_comparators, n_counters, n_seqstates, n_extin, n_extinsel), end="")
                 if bit(etmid5,31):
