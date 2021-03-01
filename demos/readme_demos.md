@@ -185,7 +185,7 @@ This can be run each time the system is booted. Alternatively, the following ste
 
     cat /sys/devices/system/cpu/cpu3/cpuidle/state1/disable
 
-See [FAQ: Why am I having problems connecting a debugger to the Juno in DS-5?] (http://community.arm.com/docs/DOC-9320)
+See [FAQ: Why am I having problems connecting a debugger to the Juno in DS-5?](http://community.arm.com/docs/DOC-9320)
 
 
 __Ensuring Debug Hardware Correctly Powered__
@@ -308,7 +308,7 @@ You will see output like (for Snowball):
       ETMSCR = 00000000
       ETMIDR = 411CF301
     ETM dynamic configuration:
-      ETMCR = 00000000
+      ETMCR = 00000000arm-linux-gnueabihf-
       Trace enable event: true
       Trace enable control: CR1=00000001 CR2=00000000
       Trace start comparators: 0000
@@ -527,7 +527,7 @@ You will see output like (for Snowball):
         #4: address=989EAE80 type=00000801 (execute) (size=1) (S:all) (NS:none)
         #5: address=45FB31E5 type=00000F01 (execute) (size=1) (S:none) (NS:none)
         #6: address=E5F180E4 type=00000C01 (execute) (size=1) (S:none) (NS:none)
-        #7: address=B6FD1362 type=00000301 (execute) (size=1) (S:all) (NS:all)
+        #7: address=B6FD1362 type=00000301 (execute) (size=1)arm-linux-gnueabihf- (S:all) (NS:all)
       Data comparators: 0
       Sequencer present: 1
       Sequencer:
