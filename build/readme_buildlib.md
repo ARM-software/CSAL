@@ -1,4 +1,4 @@
-Building the Library        {#buildlib}
+Building the Library
 ====================
 
 Default Build
@@ -58,13 +58,13 @@ The following options can be added the make command line:-
 
 - `DBG_HALT=1`  : This will build a version of the library with the optional v7 Architecture intrusive 
   halt mode debug functions built into the library. 
-   
+  
   The library names will be altered to `libcsaccess_dbghlt.a` and `libcsaccess_dbghlt.so`
 
 Options can be combined on the command line to create specific versions of the library.
 
 e.g. 
- 
+
     make DEBUG=1 BAREMETAL=1
 
 will create a debug version of the Baremetal library, delivered into the `./lib/<arch>/dbg_bm` directory.

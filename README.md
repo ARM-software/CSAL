@@ -1,4 +1,4 @@
-CoreSight Access Library        {#mainpage}
+CoreSight Access Library
 ========================
 
 The __CoreSight Access Library__ provides an API which enables user code to interact directly with CoreSight trace devices on your target.  
@@ -6,8 +6,8 @@ This allows, for example, program execution trace to be captured in a production
 have an external debugger connected.  The saved trace can be retrieved later and loaded into DS-5 debugger for analysis.  
 
 The library supports a number of different CoreSight components on several target boards as described in the 
-[demos `readme`](@ref demos) file described below. 
-  
+[demos `readme`](./demos/readme_demos.md) file described below. 
+
 You can modify the library and demos to support other CoreSight components and/or boards.  An example Linux application 
 (`tracedemo`) that exercises the library is provided.  As it runs, `tracedemo` creates several files on the target, 
 including the captured trace. Ready-made example capture files are provided that can be loaded into DS-5 debugger.
@@ -36,7 +36,7 @@ Optional support is provided for intrusive halting mode debug support of v7 Arch
 Installation
 ------------
 
-Library supplied as a git repository on github - git@github.com:ARM-software/CSAL.git
+Library supplied as a git repository on Github:
 
 `./source` : Contains all the library source .c files.
 
@@ -80,9 +80,9 @@ built and linked to the library, delivered into the `./bin/<arch>/rel` directory
 To use the library in a program include the file `csaccess.h` from the `./include` directory and
 link to the built library. 
 
-See [`./build/readme_buildlib.md`](@ref buildlib) for further information on building the library.
+See [`./build/readme_buildlib.md`](./build/readme_buildlib.md) for further information on building the library.
 
-See [`./demos/readme_demos.md`](@ref demos) for further information on running the demos.
+See [`./demos/readme_demos.md`](./demos/readme_demos.md) for further information on running the demos.
 
 __Using the Library in Python__:
 
@@ -90,7 +90,7 @@ This experimental code is not built by default.
 The ./python directory contains source and makefiles to generate a python module to allow
 use of the library. 
 
-See [`./build/readme_python.md`](@ref python) for further information.
+See [`./python/readme_python.md`](./python/readme_python.md) for further information.
 
 ------------------------------------
 
@@ -120,6 +120,7 @@ Updates to APIs:-
 - Added in support for V8 Architecture debug sampling. 
 - _API change_: Function `cs_etm_static_config_init()` deprecated. Not useful in external API.
   
+
 General changes:-
 - Source file and directory re-structuring for improved maintenance.
 - Examples extended for additional board support. 
@@ -168,7 +169,7 @@ Licence Information
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at:
- 
+
 http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software

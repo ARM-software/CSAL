@@ -1,4 +1,4 @@
-Library Demonstration Programs      {#demos}
+Library Demonstration Programs
 ==============================
 
 The demonstration programs provide examples of the usage of the library for a set of
@@ -202,26 +202,26 @@ The following script can be used with a DSTREAM connection in the CSAT tool ship
 
     # Wake DAPS on a Juno system - allow CSAL to access CS debug hardware
     echo Powering Juno DAPs.
-
+    
     # set the scan chain.
     chain dev=ARMCS-DP,ARMCS-DP
-
+    
     # connect to first - will force power up
     dvo 0
-
+    
     # check DP register for power ACK bits
     drr dp.csw
-
+    
     dvc
-
+    
     # connect to second - will force power up
     dvo 1
-
+    
     # check DP register for power ACK bits
     drr dp.csw
-
+    
     dvc
-
+    
     echo Done
 
 To use:-

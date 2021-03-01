@@ -1,4 +1,4 @@
-Using the Library in Python      {#python}
+Using the Library in Python
 ===========================
 
 The `./python` directory in the CoreSight Access Library distribution contains source code and 
