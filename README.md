@@ -63,7 +63,9 @@ Documentation
 API Documentation is provided inline in the source header files, which use the __doxygen__ standard mark-up.
 Run `doxygen` on the `./doxygen-cfg.txt` file located in the library main directory.
 
-    doxygen ./doxygen-cfg.txt
+```bash
+doxygen ./doxygen-cfg.txt
+```
 
 This will produce the documentation in the `./doc/html` directory. The doxygen configuration also includes
 the `readme*.md` files as part of the documentation.
@@ -73,7 +75,16 @@ Usage
 
 __Building the Library and Demos__:
 
-Run `make` from the root of the installation. This will build the standard version of the library,
+Run `make` from the root of the installation. Please set two variables as well :
+
+- `CROSS_COMPILE`: prefix of your cross-compiler (for instance, `arm-linux-gnueabihf-`)
+- `ARCH`: target architecture (`arm` or `arm64`)
+
+```bash
+make CROSS_COMPILE=arm-linux-gnueabihf- ARCH=arm
+```
+
+This will build the standard version of the library,
 and deliver the library into the `./lib/<arch>/rel` directory. The demonstration programs will be
 built and linked to the library, delivered into the `./bin/<arch>/rel` directory. 
 
