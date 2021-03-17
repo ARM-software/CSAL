@@ -3,14 +3,14 @@ CoreSight Access Library        {#mainpage}
 
 The __CoreSight Access Library__ provides an API which enables user code to interact directly with CoreSight trace devices on your target.  
 This allows, for example, program execution trace to be captured in a production system without the need to 
-have an external debugger connected.  The saved trace can be retrieved later and loaded into DS-5 debugger for analysis.  
+have an external debugger connected.  The saved trace can be retrieved later and loaded into a debugger for analysis.  
 
 The library supports a number of different CoreSight components on several target boards as described in the 
 [demos `readme`](@ref demos) file described below. 
   
 You can modify the library and demos to support other CoreSight components and/or boards.  An example Linux application 
 (`tracedemo`) that exercises the library is provided.  As it runs, `tracedemo` creates several files on the target, 
-including the captured trace. Ready-made example capture files are provided that can be loaded into DS-5 debugger.
+including the captured trace. Ready-made example capture files are provided that can be loaded into a debugger.
 
 CoreSight Trace Component Support
 ---------------------------------
@@ -163,7 +163,7 @@ Version 2.3
 Licence Information
 ===================
 
-*Copyright (C) ARM Limited, 2014. All rights reserved.*
+*Copyright (C) ARM Limited, 2014-2021. All rights reserved.*
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
