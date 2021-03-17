@@ -9,9 +9,9 @@ Procedures that involve running software on the system, under Linux (or another 
 It might be helpful to start by asking some questions...
 
   * do you have a datasheet showing the memory map, and are the CoreSight devices shown? Or does the map show an area "reserved for debug" or labelled "CoreSight" or "CSSYS"?
-  * do you have physical JTAG access to the device and a JTAG debugger such as Arm DS-5 that can do platform discovery?
+  * do you have physical JTAG access to the device and a JTAG debugger that can do platform discovery?
   * do you have a datasheet showing the connections between the CoreSight devices?
-  * do you have a device configuration file for a debugger such as Arm DS-5?
+  * do you have a device configuration file for a JTAG debugger?
 
 Having established what information we've got, we can then select the easiest route to finding the full configuration. We don't want to rush into using exotic and invasive techniques if we can get the information from a datasheet!
 
@@ -26,7 +26,7 @@ The following steps start with the end goal (discovering the complete topology) 
 The trace bus (ATB) connections between the devices need to be discovered. These can be found from any one of:
 
   * the manufacturer's datasheet, if it has this information
-  *  a DS-5 SDF (not RVC) file for the system
+  * a DS-5 or ArmDS SDF (not RVC) file for the system
   * using the cstopology tool supplied with CSAL, or the --topology option of the csscan.py script. For topology detection you will need the CoreSight device addresses and access to physical memory. This tool puts the CoreSight devices into a special mode ("integration mode"). CoreSight architecture guidelines recommend to do a power-off reset after using this mode. In practice, this is often not necessary, but nevertheless it is recommended to do topology discovery only in a controlled environment and not as part of normal system startup.
 
 ### Finding the CoreSight device addresses
@@ -34,7 +34,7 @@ The trace bus (ATB) connections between the devices need to be discovered. These
 The list of CoreSight devices, their physical addresses, and their types and hardware configurations, can be found from any one of:
 
   * the manufacturer's datasheet, if it has this information
-  *  a DS-5 SDF or RVC file for the system (device addresses may need to be adjusted - see ROM Table advice below)
+  * a DS-5 or ArmDS SDF or RVC file for the system (device addresses may need to be adjusted - see ROM Table advice below)
   * scanning the ROM table to find the device addresses, and reading the device identifier registers to identify the device types, using the cslist tool supplied with CSAL, or the csscan.py script. For this you will need the CoreSight top-level ROM Table base address and access to physical memory. Note that some devices may not make the CoreSight memory area accessible. You can do a quick check using "sudo busybox devmem \<romaddr> 32".
 
 ### Finding the CoreSight top-level ROM Table base address(es)
@@ -42,7 +42,7 @@ The list of CoreSight devices, their physical addresses, and their types and har
 The ROM Table base address(es) can be found from any one of:
 
   * the manufacturer's datasheet, if it has this information
-  * a DS-5 SDF file for the system (addresses are from an external debugger's point of view and may need to be adjusted)
+  * a DS-5 or ArmDS SDF file for the system (addresses are from an external debugger's point of view and may need to be adjusted)
   * reading ROM Table Base Address register (MDRAR / DBGRAR) from any of the cores. For this you can build and load the csinfo kernel module supplied with CSAL: the ROM Table base address is shown in dmesg output. For this you will need to set up for building kernel modules (see below).
 
 In a multi-socket system, each socket might have its own separate top-level ROM Table, mapped (along with other peripherals) at different areas of the common physical memory space seen by cores on both sockets. Each core's ROM Table base address register should point to whichever top-level ROM Table directly or indirectly has an entry for that core.
@@ -54,10 +54,10 @@ Note: the ARM architecture specification states that use of MDRAR/DBGRAR is depr
   * /dev/mem, if the kernel was built with CONFIG_DEVMEM
   * building and loading the cskern kernel module supplied with CSAL. For this you will need to set up for building kernel modules.
 
-### Getting a DS-5 SDF or RVC file
+### Getting an ArmDS or DS-5 SDF or RVC file
 
-  * check to see if the file is supplied with DS-5
-  * attach DS-5 to the board with JTAG and use the DS-5 Platform Configuration Editor (PCE) to generate a file
+  * check to see if the file is supplied with your debugger
+  * attach the debugger to the board with JTAG, and use the Platform Configuration Editor (PCE) to generate a file
 
 ### Set up for building kernel modules
 
