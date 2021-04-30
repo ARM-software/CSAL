@@ -56,13 +56,35 @@ def read_binary_file(fn):
     return s
 
 
+class IOMem:
+    def __init__(self):
+        self.by_name = {}
+        f = open("/proc/iomem")
+        for ln in f:
+            ix = ln.index(" : ")
+            (lo, hi) = ln[:ix].split('-')
+            lo = int(lo.strip(), 16)
+            hi = int(hi, 16)
+            if not hi:
+                continue
+            name = ln[ix+3:-1]
+            if name not in self.by_name:
+                self.by_name[name] = []
+            self.by_name[name].append((lo, hi))
+
+
 def get_cs_from_sysfs(p=None):
+    """
+    Get CoreSight topology from /sys/bus/coresight/devices, populating a Platform object.
+    """
     cs = "/sys/bus/coresight/devices"
     if not os.path.isdir(cs):
+        # CoreSight devices are not exposed in sysfs
         return p
     if p is None:
         p = Platform()
     path_to_d = {}
+    iomem = None
     for sd in os.listdir(cs):
         dp = os.path.join(cs, sd)
         base = sd
@@ -70,6 +92,7 @@ def get_cs_from_sysfs(p=None):
             base = base[:-1]
         devtype = devtypes[base]
         d = Device(p, devtype, name=sd)
+        d.sysfs_path = dp
         try:
             cn = int(read_file(os.path.join(dp, "cpu")))
             d.set_cpu_number(cn)
@@ -81,9 +104,31 @@ def get_cs_from_sysfs(p=None):
             pass
         rp = os.path.realpath(dp)
         path_to_d[rp] = d
+        # Add the device-tree node if available
         of_node = os.path.join(os.path.dirname(rp), "of_node")
         if os.path.exists(of_node):
             d.of_node = os.path.realpath(of_node)      # /sys/firmware/devicetree
+            d.set_mem_address(device_tree_node_address(d.of_node))
+        firmware_node = os.path.join(os.path.dirname(rp), "firmware_node")
+        if os.path.exists(firmware_node):
+            firmware_node = os.path.realpath(firmware_node)
+            node_name = os.path.basename(firmware_node)
+            if iomem is None:
+                iomem = IOMem()
+                if not iomem.by_name:
+                    print("cannot get device addresses from /proc/iomem - run as root", file=sys.stderr)
+            found = False
+            if node_name in iomem.by_name:
+                # Some devices e.g. STM may have multiple physical ranges - pick the 4K range
+                for (lo, hi) in iomem.by_name[node_name]:
+                    if (hi+1-lo) == 0x1000:
+                        d.set_mem_address(lo)
+                        found = True
+                    elif devtype == CS_DEVTYPE_TRACE_SW:
+                        d.stimulus_base_address = lo
+                        d.stimulus_size = (hi+1-lo)
+            if not found and iomem.by_name:
+                print("%s node name %s not found" % (rp, node_name), file=sys.stderr)
     # Populate the ATB links from the 'out:' and 'in:' entries if available
     for sd in os.listdir(cs):
         dp = os.path.realpath(os.path.join(cs, sd))    # somewhere in /sys/devices/platform
@@ -104,7 +149,6 @@ def get_cs_from_sysfs(p=None):
                 if ln is None:
                     print("** failed to find link for %s -> %s" % (outp, tp), file=sys.stderr)
     return p
-
 
 
 def device_tree_node_compatibility(dtn):

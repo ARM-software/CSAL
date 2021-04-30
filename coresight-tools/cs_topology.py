@@ -142,6 +142,7 @@ class Device:
         if platform.trace_creation:
             print("  created %s%s" % (str(self), [""," (hidden)"][is_hidden]))
             platform.check()
+        self.sysfs_path = None      # Device path in Linux sysfs or equivalent
 
     def __str__(self):
         s = ""
@@ -246,11 +247,16 @@ class Device:
         return self.address() is not None
 
     def address_str(self):
-        (dapname, addr) = self.address()
-        if addr is not None:
-            return "%s:0x%x" % (dapname, addr)
+        if self.address() is not None:
+            (dapname, addr) = self.address()
+            if dapname:
+                return "%s:0x%x" % (dapname, addr)
+            else:
+                return "0x%x" % (addr)
+        elif self.dap_name:
+            return "%s:<no address>" % (self.dap_name)
         else:
-            return "%s:<no address>" % (dapname)
+            return "<no address>"
 
 
 class Link:
@@ -527,26 +533,30 @@ class Platform:
         print("%s: %u devices, %u links" % (self.name, len(self.devices_by_address), len(self.links)))
         #return
         print("Platform: %s" % self.name)
+        # List devices
         for d in self:
             if d.name is not None:
                 name = d.name
             else:
                 name = None
+            print("%20s  " % d.address_str(), end="")
             print("  %20s" % name, end="")
             if d.type in devtype_str:
                 tstr = devtype_str[d.type]
             else:
                 tstr = str(d.type)            
             print("  %12s" % (tstr), end="")
-            if d.address() is not None:
-                print(" %20s " % d.address_str(), end="")
             if d.is_affine_to_cpu():
                 if d.affine_cpu is not None:
-                    print(" cpu=%s" % str(d.affine_cpu), end="")
+                    print("%5s" % str(d.affine_cpu), end="")
                 else:
-                    print(" cpu=%u" % d.cpu_number, end="")
+                    print("%5u" % d.cpu_number, end="")
+            else:
+                print("     ", end="")
             if d.is_hidden:
                 print(" hidden", end="")
+            if d.sysfs_path is not None:
+                print("  %s" % d.sysfs_path, end="")
             print()
             if False:
                 for cfk in d.config:

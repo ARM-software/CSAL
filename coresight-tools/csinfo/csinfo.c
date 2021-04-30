@@ -30,6 +30,7 @@ limitations under the License.
 MODULE_AUTHOR("Arm Ltd");
 MODULE_DESCRIPTION("CoreSight: report basic info, then unload");
 MODULE_VERSION("0.1");
+MODULE_LICENSE("Proprietary");
 
 
 static char const *const dbgarch_str[] = {
