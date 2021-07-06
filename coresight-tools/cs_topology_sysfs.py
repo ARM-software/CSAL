@@ -380,7 +380,7 @@ def get_cs_from_device_tree(p=None):
 
 if __name__ == "__main__":
     p = get_cs_from_sysfs()
-    if p is None or not p.links:
+    if True or p is None or not p.links:
         p = get_cs_from_device_tree(p)
     if p is not None:
         p.show()

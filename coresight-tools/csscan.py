@@ -10,12 +10,10 @@ We report three levels of status:
   - the actual status, e.g. busy/ready bits, values of counters etc.
 
 To do:
-  - latest CoreSight architecture (mostly done)
   - ETMv3.x/PTF
-  - SoC600: TMC, CATU
   - power requestors
 
-Copyright (C) ARM Ltd. 2018-2020.  All rights reserved.
+Copyright (C) ARM Ltd. 2018-2021.  All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +36,9 @@ import os, sys, struct, time, json
 # more control over access to volatile registers.
 import iommap as mmap
 
+# We support accessing a remote device via our simple 'devmemd' daemon
+import devmemd
+
 
 o_max_devices = 9999999
 o_top_only = False
@@ -48,6 +49,8 @@ o_show_integration = False
 o_show_authstatus = False
 o_show_sample = False        # Destructive sampling
 o_exclusions = []
+
+g_devmem = None              # Physical memory provider
 
 
 def bit(x, pos):
@@ -85,6 +88,10 @@ ARM_ARCHID_STM      = 0x0a63
 ARM_ARCHID_ELA      = 0x0a75
 ARM_ARCHID_ROM      = 0x0af7
 
+#
+# Architecture identifiers indicate the programming interface which a device conforms to.
+# Multiple parts may have the same architecture identifier.
+#
 arm_archids = {
     0x0a00:"RAS",
     0x1a01:"ITM",
@@ -123,6 +130,27 @@ cs_types = {(1,1):"port", (1,2):"buffer", (1,3):"router",
             (4,1):"CTI", (4,2):"auth", (4,3):"power",
             (5,1):"core-debug", (5,7):"ELA",
             (6,1):"PMU (core)", (6,5):"PMU (SMMU)"}
+
+
+#
+# Read the 3-digit hex part numbers from part-numbers.json.
+# Where DEVARCH is not set, the part numbers can be used to find the
+# programmer's model for the part.
+#
+# For older CPUs, there will be separate part numbers for
+# the CPU's separate interfaces: debug, ETM, PMU, CTI, ELA etc.
+#
+# More recent CPUs have the same part number for all these,
+# relying on the combination of that common part number,
+# DEVTYPE and DEVARCH to indicate the programming model.
+#
+arm_part_numbers = {}
+with open("part-numbers.json") as f:
+    pj = json.load(f)
+    for p in pj["parts"]:
+        pn = int(p["part"],16)
+        assert pn not in arm_part_numbers, "duplicate part number: 0x%03x" % part_no
+        arm_part_numbers[pn] = p["name"]
 
 
 def binstr(n,w=None):
@@ -176,21 +204,80 @@ class DevicePhy:
         self.m[off:off+8] = s
 
 
-class DeviceMemAP:
+class MemAP:
     """
-    Access a MEM-AP indirected device
+    MEM-AP device, with some optimization e.g. use of Direct Access registers
+    and local cacheing of the current value of TAR.
+
+    For more details of MEM-AP operation, see
+    "Arm Debug Interface (ADI) Architecture Specification".
     """
-    def __init__(self, memap, base_address, write=False):
+    def __init__(self, memap):
         assert isinstance(memap, Device)
         assert memap.is_arm_architecture(ARM_ARCHID_MEMAP), "%s: expected MEM-AP" % memap
+        self.memap = memap
+        self.n_client_reads = 0
+        self.n_client_writes = 0
+        self.memap.claim()       # Claim for self-hosted use
+        self.current_TAR = None
+        # Using direct/banked access register banks minimizes address writes.
+        self.CFG = self.memap.read32(0xDF4)
+        self.use_DAR = (bits(self.CFG,4,4) == 0xA)
+        self.use_BDR = True    # only in effect if not using DAR
+
+    def __str__(self):
+        return "MEM-AP(%s)" % self.memap
+
+    def align(self, addr):
+        """
+        Align an address to the granule suitable for the transfer register(s).
+        """
+        if self.use_DAR:
+            return addr & ~0x3ff
+        elif self.use_BDR:
+            return addr & ~0xf
+        else:
+            return addr
+
+    def set_TAR(self, addr):
+        """
+        Prepare to transfer to/from an address. Set the TAR if necessary
+        and return the offset of a data transfer register (DAR, BDR or DRR).
+        """
+        eaddr = self.align(addr)
+        if self.current_TAR is None or eaddr != self.current_TAR:
+            self.memap.write32(0xD04, eaddr)  # write Transfer Address Register
+            self.current_TAR = eaddr
+        if self.use_DAR:
+            return 0x000 + (addr - eaddr)   # Direct Access Register 0..255
+        elif self.use_BDR:
+            return 0xD10 + (addr - eaddr)   # Banked Data Register 0..3
+        else:
+            return 0xD0C           # Data Read/Write Register
+
+    def read32(self, addr):
+        self.n_client_reads += 1
+        return self.memap.read32(self.set_TAR(addr))
+
+    def write32(self, addr, data):
+        self.n_client_writes += 1
+        self.memap.write32(self.set_TAR(addr), data)
+
+
+class DeviceViaMemAP:
+    """
+    Device accessed via a MEM-AP. This is not the MEM-AP device itself.
+    """
+    def __init__(self, memap, base_address, write=False):
+        assert isinstance(memap, MemAP)
         self.memap = memap
         self.offset = base_address      # Device base offset within MEM-AP's target space
 
     def read32(self, off):
-        off += self.offset
-        self.memap.write32(0xD04, off)  # write Transfer Address Register
-        return self.memap.read32(0xD0C) # read Data Response Register
-        #return self.memap.read32(off & 0x3FF)         # read xfer register 0..255
+        return self.memap.read32(off + self.offset)
+
+    def write32(self, off, data):
+        self.memap.write32(off + self.offset, data)
 
 
 class Device:
@@ -200,6 +287,9 @@ class Device:
 
     def __init__(self, cs, addr):
         self.we_unlocked = False
+        self.we_claimed = 0
+        self.n_reads = 0
+        self.n_writes = 0
         self.phy = None
         self.cs = cs                 # Device address space
         assert (addr & 0xfff) == 0, "Device must be located on 4K boundary: 0x%x" % addr
@@ -233,7 +323,7 @@ class Device:
             if self.cs.devmem is not None:
                 self.phy = DevicePhy(self.cs.devmem, self.base_address, write=write)
             else:
-                self.phy = DeviceMemAP(self.cs.memap, self.base_address, write=write)
+                self.phy = DeviceViaMemAP(self.cs.memap, self.base_address, write=write)
 
     def unmap(self):
         if self.phy is not None:
@@ -248,18 +338,31 @@ class Device:
             self.map_is_write = True
 
     def address_string(self):
+        """
+        A string describing how to locate this device.
+        """
         s = "@0x%x" % self.base_address
         if self.phy.memap is not None:
-            s = self.phy.memap.address_string() + "." + s
+            s = self.phy.memap.memap.address_string() + "." + s
         return s
 
     def __str__(self):
-        s = "%s %s" % (self.cs_device_type_name(), self.address_string())
+        s = self.cs_device_type_name()
+        if s == "UNKNOWN":
+            aname = self.architecture_name()
+            if aname is not None:
+                s = aname
+        s += " %s" % self.address_string()
         if self.is_affine_to_core():
             s += " (core)"
         return s
 
     def __del__(self):
+        self.close()
+
+    def close(self):
+        if self.we_claimed:
+            self.unclaim(self.we_claimed)
         if self.we_unlocked and self.cs.restore_locks:
             self.lock()
         self.unmap()
@@ -269,6 +372,7 @@ class Device:
         Read a device register. The register may be volatile, so we should take
         care to only read it once.
         """
+        self.n_reads += 1
         self.map()
         if o_verbose >= 2:
             print("  0x%x[%03x] R4" % (self.base_address, off), end="")
@@ -296,6 +400,7 @@ class Device:
             print("  0x%x[%03x] W4 := 0x%08x" % (self.base_address, off, value))
             if o_verbose >= 3:
                 time.sleep(0.1)
+        self.n_writes += 1
         self.phy.write32(off, value)
         if self.do_check(check):
             readback = self.read32(off)
@@ -349,11 +454,14 @@ class Device:
             id = (id << 8) | (self.read32(wa) & 0xff)
         return id
 
+    def is_arm_part(self):
+        return self.jedec_designer == JEDEC_ARM
+
     def is_arm_part_number(self, n=None):
-        return self.jedec_designer == JEDEC_ARM and (n is None or self.part_number == n)
+        return self.is_arm_part() and (n is None or self.part_number == n)
 
     def arm_part_number(self):
-        if self.jedec_designer == JEDEC_ARM:
+        if self.is_arm_part():
             return self.part_number
         else:
             return None
@@ -405,14 +513,34 @@ class Device:
             desc = cs_types[devtype]
         elif major in cs_majors:
             desc = "UNKNOWN %s" % cs_majors[major]
+        elif devtype != (0,0):
+            desc = "UNKNOWN %s" % str(devtype)
         else:
-            desc = "UNKNOWN (devtype = %s)" % str(devtype)
+            desc = "UNKNOWN"
         return desc
+
+    def architecture_name(self):
+        if self.architecture() is None:
+            return None
+        if self.is_arm_architecture():
+            archid = self.architecture()
+            archpart = archid & 0xfff
+            archrev = (self.devarch >> 16) & 15
+            if archid in arm_archids:
+                archdesc = "Arm %s rev%u" % (arm_archids[archid], archrev)
+            elif archpart in arm_archparts:
+                archdesc = "?Arm %s rev%u.%u" % (arm_archparts[archpart], (archid >> 12), archrev)
+            else:
+                archdesc = "?Arm:0x%04x rev %u" % (archid, archrev)
+        else:
+            archdesc = "?ARCH:0x%x:0x%x" % (self.architect(), self.architecture())
+        return archdesc
 
     def atb_in_ports(self):
         if self.is_funnel():
+            # TBD: strictly, device-type=funnel doesn't mean it has the CoreSight programming interface
             return self.read32(0xFC8) & 15    # read DEVID
-        elif self.coresight_device_type()[0] in [1,2]:
+        elif self.coresight_device_type()[0] in [1,2]:   # sink or link
             return 1
         else:
             return 0
@@ -464,7 +592,36 @@ class Device:
         return self.is_arm_architecture() and (self.architecture() & 0x0fff) == 0x0a15
 
     def is_unlocked(self):
+        """
+        Return True if the device is unlocked and writeable. This is only
+        valid for CoreSight devices.
+        """
         return (self.read32(0xFB4) & 0x02) == 0
+
+    def is_claimed(self, mask=0xffffffff):
+        """
+        Read CLAIMCLR and check if any of the mask bits (default all) are set
+        """
+        return self.read32(0xFA4) & mask
+
+    def claim(self, mask=0x01):
+        """
+        Write CLAIMSET to set claim tag(s).
+        """
+        assert mask != 0
+        self.write32(0xFA0, mask)
+        self.we_claimed |= mask
+
+    def unclaim(self, mask=0x01):
+        """
+        Write CLAIMCLR to release claim tag(s).
+        """
+        if mask:
+            self.write32(0xFA4, mask)
+            self.we_claimed &= ~mask
+
+    def is_in_integration_mode(self):
+        return (self.read32(0xF00) & 0x01) != 0
 
     def unlock(self):
         self.write_enable()
@@ -606,6 +763,24 @@ class DevMem:
         self.n_mappings -= 1
 
 
+class DevMemRemote:
+    """
+    Compatible with class DevMem, but accesses remote via devmemd.
+    """
+    def __init__(self, addr, port):
+        self.page_size = 4096
+        self.devmemd = devmemd.Devmem(addr, port)
+
+    def map(self, addr, write=False):
+        """
+        Return a mmap-compatible object that indirects via devmemd.
+        """
+        return self.devmemd.map(addr, self.page_size)
+
+    def unmap(self, m):
+        pass
+
+
 class CSROM:
     """
     Container for the overall ROM table scan.
@@ -613,17 +788,27 @@ class CSROM:
     mapping on to /dev/mem. Individual device mappings are owned by the
     device objects.
     """
-
     def __init__(self, memap=None):
         self.fd = None
         self.memap = memap
         if memap is None:
-            self.devmem = DevMem()
+            if g_devmem is not None:
+                self.devmem = g_devmem
+            else:
+                self.devmem = DevMem()
         else:
             self.devmem = None
         self.device_by_base_address = {}
         self.affinity_group_map = {}
         self.restore_locks = True
+
+    def close(self):
+        for d in self.device_by_base_address.values():
+            d.close()
+        self.device_by_base_address = {}
+
+    def __del__(self):
+        self.close()
 
     def map(self, addr, write=False):
         if self.devmem is not None:
@@ -776,21 +961,9 @@ class CSROM:
         # Registers architected by CoreSight, with architected values
         devtype = d.coresight_device_type()
         desc = d.cs_device_type_name()
-
-        if d.architecture() is None:
-            archdesc = "" 
-        elif d.is_arm_architecture():
-            archid = d.architecture()
-            archpart = archid & 0xfff
-            archrev = (d.devarch >> 16) & 15
-            if archid in arm_archids:
-                archdesc = "Arm %s rev%u" % (arm_archids[archid], archrev)
-            elif archpart in arm_archparts:
-                archdesc = "?Arm %s rev%u.%u" % (arm_archparts[archpart], (archid >> 12), archrev)
-            else:
-                archdesc = "?Arm:0x%04x rev %u" % (archid, archrev)
-        else:
-            archdesc = "?ARCH:0x%x:0x%x" % (d.architect(), d.architecture())
+        archdesc = d.architecture_name()
+        if archdesc is None:
+            archdesc = "<no arch>"
 
         # architected regs with imp def values
         affinity = d.affinity_id()
@@ -827,6 +1000,10 @@ class CSROM:
             print(" aff=0x%x" % affinity, end="")
         if False and d.is_affine_to_core():
             print(" affine_core=@0x%x" % d.affine_core.base_address, end="")
+        arm_part = d.arm_part_number()    # Will be None if not an ARM part
+        # don't print here, already printed in show_device() to cope with non-CoreSight devices
+        if False and arm_part is not None and arm_part in arm_part_numbers:
+            print(" %s" % arm_part_numbers[arm_part], end="")
             
         # Now extract additional device-specific information. In general, we can establish
         # the type of device, and our ability to determine further information, in two ways:
@@ -992,9 +1169,21 @@ class CSROM:
                 saptype = str(aptype)
             print(" type:%s" % saptype, end="")
             cfg = d.read32(0xDF4)
-            print(" cfg:0x%08x" % cfg, end="")
+            if bit(cfg,1):
+                print(" long-address", end="")
+            if bit(cfg,2):
+                print(" large-data", end="")
+            if bits(cfg,4,4):
+                print(" DAR:%u" % (1<<bits(cfg,4,4)), end="")
+            if bits(cfg,8,4):
+                print(" TRR", end="")
+            if bits(cfg,16,4):
+                print(" TARINC:%u" % (9+bits(cfg,16,4)), end="")
+            if cfg & 0xfff0fe09:
+                print(" CFG:0x%08x" % cfg, end="")
             rombase = d.read32(0xDF8)
-            print(" rom:%#x" % rombase, end="")
+            if rombase:
+                print(" ROM:%#x" % rombase, end="")
         elif d.is_arm_architecture(ARM_ARCHID_ELA):
             rwidth = bits(devid,8,8)
             print(" devid:0x%08x entries:%u" % (devid, (1<<rwidth)), end="")
@@ -1006,26 +1195,26 @@ class CSROM:
             print(" channels:%u triggers:%u" % (((devid>>16)&0xf), ((devid>>8)&0xff)), end="")
             if bits(devid,24,2):
                 print(" gate", end="")
-        elif d.is_arm_part_number(0x908):
-            # CoreSight trace funnel (SoC400)
+        elif d.is_arm_part_number(0x908) or d.is_arm_part_number(0x9eb):
+            # CoreSight trace funnel (SoC400 or SoC600)
             in_ports = devid & 15
             print(" in-ports:%u" % in_ports, end="")
             if (devid & 0xf0) == 3:
                 print(" priority-scheme")
-        elif d.is_arm_part_number(0x909):
-            # CoreSight trace replicator (SoC400)
+        elif d.is_arm_part_number(0x909) or d.is_arm_part_number(0x9ec):
+            # CoreSight trace replicator (SoC400 or SoC600)
             out_ports = devid & 15
             print(" out-ports:%u" % out_ports, end="")
             if (devid & 0xf0) == 3:
                 print(" priority-scheme")
-        elif d.is_arm_part_number(0x912):
+        elif d.is_arm_part_number(0x912) or d.is_arm_part_number(0x9e7):
             # CoreSight TPIU
             print(" TPIU", end="")
         elif d.is_arm_part_number(0x907):
             # CoreSight ETB
             print(" ETB size:%u" % (d.read32(0x004)*4), end="")
-        elif d.is_arm_part_number(0x961):
-            # CoreSight TMC (SoC400 generation)
+        elif d.arm_part_number() in [0x961, 0x9e8, 0x9e9, 0x9ea]:
+            # CoreSight TMC (SoC400 generation, or SoC600)
             configtype = (devid >> 6) & 3
             print(" TMC:%s" % ["ETB","ETR","ETF","?3"][configtype], end="")
             if configtype != 1:
@@ -1035,6 +1224,9 @@ class CSROM:
             if configtype == 1:
                 wbdepth = (devid >> 11) & 7
                 print(" wb:%u" % (1<<wbdepth), end="")
+        else:
+            # No more information for this part
+            print(" -", end="")
 
         # dynamic information, but generic for all CoreSight devices
         if d.is_unlocked():
@@ -1043,7 +1235,7 @@ class CSROM:
             claimed = d.read32(0xFA4)
             if claimed:
                 print(" claimed:0x%x" % claimed, end="")
-        if (d.read32(0xF00) & 1) != 0:
+        if d.is_in_integration_mode():
             print(" integration", end="")
         print()
 
@@ -1322,15 +1514,21 @@ class CSROM:
             print("  CSW: 0x%08x (%s)" % (csw, ["disabled","enabled"][bit(csw,6)]))
             if bit(csw,7):
                 print("  Transfer in progress")
+            if bit(csw,16):
+                print("  Errors are not passed upstream")
+            if bit(csw,17):
+                print("  Stop on error")
             print("  TAR: 0x%08x" % (d.read32(0xD04)))
-        elif d.is_arm_part_number(0x907) or d.is_arm_part_number(0x961):
-            # CoreSight SoC400 ETB or TMC trace buffer.
+            if (d.read32(0xD24) & 1) != 0:
+                print("  Error response logged")
+        elif d.arm_part_number() in [0x907, 0x961, 0x9e8, 0x9e9, 0x9ea]:
+            # CoreSight SoC400 ETB or TMC trace buffer or SoC600 TMC.
             # Trace buffer management is complicated by the variety of design-time
             # and programming-time configuration choices:
             #   1. Product: integration-time product selection, from e.g.
             #     - Arm CoreSight SoC-400 ETB (0x907)
             #     - Arm CoreSight TMC (0x961)
-            #     - Arm CoreSight SoC-600 TMC
+            #     - Arm CoreSight SoC-600 TMC (0x9e8, 0x9e9, 0x9ea)
             #   2. Configuration: integration-time choices
             #      for the old ETB, there wasn't much choice, but for a TMC, it can be
             #      configured as a trace router (ETR, with an AXI bus master interface)
@@ -1414,7 +1612,7 @@ class CSROM:
             print("  trigger outputs: %s" % (binstr(d.read32(0x134),n_trigs)))
             print("  channel inputs:  %s" % (binstr(d.read32(0x138),n_channels)))
             print("  channel outputs: %s" % (binstr(d.read32(0x13C),n_channels)))
-        elif d.is_arm_part_number(0x908):
+        elif d.arm_part_number() in [0x908, 0x9eb]:
             # CoreSight funnel
             ctrl = d.read32(0x000)
             print("  ports enabled: %s" % (binstr((ctrl & 0xff),in_ports)))
@@ -1422,7 +1620,7 @@ class CSROM:
             if bit(d.read32(0xEF0), 1):
                 print("  downstream requested flush")
             integration_regs = [0xEF0, 0xEF4, 0xEF8]
-        elif d.is_arm_part_number(0x909):
+        elif d.arm_part_number() in [0x909, 0x9ec]:
             # CoreSight replicator
             for rep_port in [0,1]:
                 rep_filter = d.read32(0x000 + rep_port*4)
@@ -1431,8 +1629,20 @@ class CSROM:
                     print(" (all IDs enabled)", end="")
                 print()
             integration_regs = [0xEF8]
+        elif d.is_arm_part_number(0x9ee):
+            catu_control = d.read(0x000)
+            catu_mode = d.read(0x004)
+            catu_status = d.read(0x100)
+            print("  %s" % ["disabled","enabled"][catu_control&1])
+            print("  %s" % ["pass-through","translate"][catu_mode&1])
+            if catu_status & 0x0001:
+                print("  address error")
+            if catu_status & 0x0010:
+                print("  AXI error")
+            if catu_status & 0x0100:
+                print("  ready")
         else:
-            # unknown device
+            # unknown device - can't show status
             pass
 
         if o_show_sample:
@@ -1480,6 +1690,13 @@ class CSROM:
         print("  0x%03x 0x%03x r%u.%u  " % (d.jedec_designer, d.part_number, rev, patch), end="")
         if (d.CIDR & 0xffff0fff) != 0xb105000d:
             print("unexpected CIDR: 0x%08x" % d.CIDR)
+        if d.is_arm_part() and d.part_number in arm_part_numbers:
+            part_string = arm_part_numbers[d.part_number]
+        elif d.is_rom_table():
+            part_string = ""      # ROM table part numbers tend not to mean much
+        else:
+            part_string = "<unknown part>"
+        print("%-22s" % part_string, end="")
         if d.is_rom_table():            
             print("ROM table")
         elif d.is_coresight_timestamp():
@@ -1500,7 +1717,8 @@ class CSROM:
         elif d.is_coresight():
             self.show_coresight_device(d)
         elif d.device_class() == 0xF:
-            # might be worth reading DEVARCH even though Class 0xF doesn't guarantee to have it (and it might not be readable)
+            # might be worth reading DEVARCH even though Class 0xF doesn't guarantee to have it (and it might not be readable
+            # could also look up part number
             print("generic PrimeCell peripheral: DEVARCH=0x%08x DEVAFF=0x%08x" % (d.read32(0xFBC), d.read32(0xFA8)))
             # might be Arm RAS architecture
             if False and d.read32(0xFBC) == 0x47700a00:
@@ -1531,9 +1749,16 @@ def topology_detection_atb(atb_devices, topo):
         assert n < d.atb_in_ports()
         d.write32(0x000, ((d.read32(0x000) & 0xFFFFFF00) | (1<<n)))
     def set_ATVALIDM(d, n, flag):
+        # Set ATVALID on a downstream ATB interface.
         reg = 0xEF8
         mask = 0x01
-        if d.is_replicator():
+        if d.is_arm_part_number(0x9eb):
+            # CSSoC-600 funnel is different from old one
+            (reg, mask) = (0xEFC, 0x01)
+        elif d.is_arm_part_number(0x9ec):
+            # CSSoC-600 replicator is different from old one
+            (reg, mask) = (0xEF8, (1 << (n*2)))
+        elif d.is_replicator():
             # A replicator has two ATB output ports, but controlled from the same register
             reg = 0xEFC
             mask = (1 << (n*2))
@@ -1556,29 +1781,39 @@ def topology_detection_atb(atb_devices, topo):
                     d.write32(0xEFC, flag*mask, check=False)
         else:
             reg = 0xEF8
+        if False and flag:
+            print("    set ATVALIDM: 0x%03x %08x" % (reg, mask))
         d.write32(reg, flag*mask, check=False)
     def set_ATREADYS(d, n, flag):
         if d.is_funnel():
             enable_funnel_input(d, n)
-        if d.is_replicator():
-            reg = 0xEFC
-            mask = 0x10
+        if d.is_arm_part_number(0x9eb):
+            (reg, mask) = (0xEF4, 0x01)
+        elif d.is_replicator():
+            (reg, mask) = (0xEFC, 0x10)
         else:
-            reg = 0xEF0
-            mask = 0x01
+            (reg, mask) = (0xEF0, 0x01)
         d.write32(reg, flag*mask, check=False)
     def get_ATVALIDS(d, n):
         if d.is_funnel():
             enable_funnel_input(d, n)
-        mask = 0x01
-        if d.is_replicator():
+        (reg, mask) = (0xEF8, 0x01)
+        if d.is_arm_part_number(0x9eb):
+            # CSSoC-600 funnel
+            (reg, mask) = (0xEFC, 0x01)
+        elif d.is_arm_part_number(0x9ec):
+            # CSSoC-600 replicator
+            (reg, mask) = (0xEFC, 0x08)
+        elif d.is_replicator():
             mask = 0x08
-        return (d.read32(0xEF8) & mask) != 0
+        return (d.read32(reg) & mask) != 0
     for d in atb_devices:
         d.unlock()
         d.set_integration_mode(True)
         def clear_integration_regs(d):
             d.write32(0xEF0, 0, check=False)
+            if d.is_arm_part_number(0x9eb):
+                d.write32(0xEF4, 0, check=False)
             d.write32(0xEF8, 0, check=False)
             d.write32(0xEFC, 0, check=False)
             if d.is_coresight_device_type(2,3):  # ETF
@@ -1597,20 +1832,34 @@ def topology_detection_atb(atb_devices, topo):
     # Where there is a non-programmable replicator in between, we might see
     # the ATVALIDM observed on several input ports.
     for dm in atb_devices:
-        c.show_device(dm)        
-        for mp in range(0, dm.atb_out_ports()):            
+        if dm.atb_out_ports():
+            print("ATB scan... ", end="")
+            c.show_device(dm)
+        for mp in range(0, dm.atb_out_ports()):
+            n_downstream = 0
             set_ATVALIDM(dm, mp, 1)
+            # Scan all other devices to see if they are downstream of this one
             for ds in atb_devices:
                 if ds == dm:
+                    continue    # No loopbacks in ATB, so no point checking
+                if not ds.atb_in_ports():
                     continue
+                if False:       # Debugging
+                    print("    ", end="")
+                    c.show_device(ds)
+                    print("    ", end="")
+                    for r in range(0xEF0, 0xF00, 4):
+                        print("  0x%03x: %08x " % (r, ds.read32(r)), end="")
+                    print()
                 for sp in range(0, ds.atb_in_ports()):
                     if get_ATVALIDS(ds, sp):
                         def jport(d, p):
                             return [("0x%x" % d.base_address), p]
                         ld = {"type": "ATB", "from": jport(dm, mp), "to": jport(ds, sp)}
                         topo["links"].append(ld)
+                        n_downstream += 1
                         print("  %u->%u  " % (mp, sp), end="")
-                        c.show_device(ds)
+                        c.show_device(ds)   # will be shown indented
                         set_ATREADYS(ds, sp, 1)
                         set_ATVALIDM(dm, mp, 0)
                         set_ATVALIDM(dm, mp, 1) # ready for next time
@@ -1618,6 +1867,8 @@ def topology_detection_atb(atb_devices, topo):
                 if ds.is_funnel():
                     d.clr32(0x000, 0xFF)
             set_ATVALIDM(dm, mp, 0)
+            if not n_downstream:
+                print("  %u: no downstream device found" % (mp))
     # Finally, put the devices back into production mode.
     for d in atb_devices:
         d.set_integration_mode(False)
@@ -1659,7 +1910,7 @@ class TopologyDetectionCTI:
     @staticmethod
     def pin_out(d):
         # Yield the ouptut triggers: output assert register and bit.
-        if d.is_arm_part_number(0x907) or d.is_arm_part_number(0x961):
+        if d.arm_part_number() in [0x907, 0x961, 0x9e8, 0x9e9, 0x9ea]:
             yield ("ACQCOMP", 0xEE0, 0)
             yield ("FULL", 0xEE0, 1)
         elif d.is_coresight_device_type(3,1):
@@ -1931,6 +2182,7 @@ if __name__ == "__main__":
         print("  --topology           detect ATB topology")
         print("  --topology-cti       detect CTI topology")
         print("  --enable-timestamps  enable global CoreSight timestamps")
+        print("  --remote=<net>       access remote device via devmemd")
         print("  -v/--verbose         increase verbosity level")
         sys.exit(1)
     c = None
@@ -1938,7 +2190,9 @@ if __name__ == "__main__":
     o_detect_topology = False
     o_detect_topology_cti = False
     o_enable_timestamps = False
+    o_force_memap = False
     d_memap = None
+    cssys = []
     for arg in sys.argv[1:]:
         if arg == "-v" or arg == "--verbose":
             o_verbose += 1
@@ -1964,6 +2218,8 @@ if __name__ == "__main__":
             o_detect_topology_cti = True
         elif arg == "--enable-timestamps":
             o_enable_timestamps = True
+        elif arg == "--force-memap":
+            o_force_memap = True
         elif arg == "--authstatus":
             o_show_authstatus = True
         elif arg.startswith("--limit="):
@@ -1971,8 +2227,18 @@ if __name__ == "__main__":
         elif arg.startswith("--memap="):
             # CoreSight devices are accessed via a MEM-AP gateway in the main address space
             maddr = int(arg[8:], 16)
-            ctop = CSROM()                                       # The main physical address space
-            d_memap = ctop.create_device_at(maddr, write=True)   # The gateway device
+            ctop = CSROM()                     # The main physical address space
+            cssys.append(ctop)
+            memap_device = ctop.create_device_at(maddr, write=True)
+            if memap_device.is_claimed(0x02):
+                print("MEM-AP at 0x%x is claimed for external debug" % (maddr), file=sys.stderr)
+                if not o_force_memap:
+                    sys.exit(1)
+            d_memap = MemAP(memap_device)      # The gateway device
+        elif arg.startswith("--remote="):
+            # Access physical memory on a network-connected target running devmemd
+            (addr, port) = arg[9:].split(':')
+            g_devmem = DevMemRemote(addr, int(port))
         elif arg == "--top-only":
             o_top_only = True
         else:
@@ -1982,6 +2248,7 @@ if __name__ == "__main__":
             if c is None:
                 try:
                     c = CSROM(memap=d_memap)
+                    cssys.append(c)
                 except:
                     if os.geteuid() != 0:
                         print("** failed to access CoreSight devices - try running as superuser")
@@ -1992,4 +2259,12 @@ if __name__ == "__main__":
             done = True
     if not done:
         help()
-
+    if d_memap is not None:
+        print("MEM-AP statistics for %s:" % d_memap)
+        print("  target reads: %7u" % d_memap.n_client_reads)
+        print("  target writes:%7u" % d_memap.n_client_writes)
+        print("  MEM-AP reads: %7u" % d_memap.memap.n_reads)
+        print("  MEM-AP writes:%7u" % d_memap.memap.n_writes)
+    # Clear up all devices, e.g. unclaim and relock
+    for cs in cssys:
+        cs.close()

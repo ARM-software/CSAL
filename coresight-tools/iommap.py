@@ -109,6 +109,7 @@ class mmap:
 
     def __setslice__(self, start, end, value):
         nbytes = end - start
+        assert len(value) == nbytes
         if nbytes == 1:
             x = ctypes.c_ubyte.from_address(self.addr + start)
             n = struct.unpack("B", value)[0]
@@ -126,6 +127,7 @@ class mmap:
 if __name__ == "__main__":
     print("SYS_mmap = %u" % SYS_mmap)
     print("SYS_munmap = %u" % SYS_munmap)
+    # Test by mapping this Python file, which starts "#!/usr/bin..."
     f = open(__file__, "rb")
     m = mmap(f.fileno(), os.sysconf("SC_PAGE_SIZE"), MAP_SHARED, PROT_READ, 0)
     s = m[4:8]
