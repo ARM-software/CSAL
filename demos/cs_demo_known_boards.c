@@ -499,7 +499,7 @@ static int do_registration_axx5500(struct cs_devices_t *devices)
     /* For the demo, use the ETB for cluster 0 */
     devices->etb = etb[0];
     devices->itm = cs_device_register(base + 0x7000);
-    cs_stm_config_master(devices->itm, 0, 0x2013000000);
+    cs_stm_config_master(devices->itm, 0, CS_PHYSADDR(0x2013000000));
     devices->itm_etb = cs_device_register(base + 0x8000);
 
     for (i = 0; i < N_CLUSTER * 4; ++i) {
@@ -510,6 +510,12 @@ static int do_registration_axx5500(struct cs_devices_t *devices)
 #endif
     }
     return 0;
+}
+
+static int do_registration_soc600fpga(struct cs_devices_t *devices)
+{
+    cs_register_romtable(0x208d0000);
+    return -1;
 }
 
 const struct board known_boards[] = {
@@ -537,6 +543,10 @@ const struct board known_boards[] = {
         .do_registration = do_registration_axx5500,
         .n_cpu = 16,
         .hardware = "LSI Axxia",
+    }, {
+        .do_registration = do_registration_soc600fpga,
+        .n_cpu = 2,
+        .hardware = "SoC-600 FPGA",
     },
     {}
 };

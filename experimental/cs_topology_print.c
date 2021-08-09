@@ -118,7 +118,7 @@ static int cs_print_topology_stdc(FILE *fd)
         fprintf(fd, " = ");
         if (!cs_device_is_non_mmio(d)) {
             cs_physaddr_t offset = cs_device_address(d) - base;
-            fprintf(fd, "cs_register_device(base + 0x%" CS_PHYSFMT ");\n", offset);
+            fprintf(fd, "cs_device_register(base + 0x%" CS_PHYSFMT ");\n", offset);
         } else {
             assert(cs_num_out_ports(d) > 1);
             fprintf(fd, "cs_atb_add_replicator(%u);\n", cs_num_out_ports(d));

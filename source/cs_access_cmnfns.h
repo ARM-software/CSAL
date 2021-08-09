@@ -27,6 +27,7 @@
 #include "cs_etmv4_types.h"
 #include "cs_stm_types.h"
 #include "cs_ts_gen.h"
+#include "cs_memap.h"
 
 #include "csregisters.h"
 
@@ -58,6 +59,10 @@
 #endif
 #include <stddef.h>
 #include <stdarg.h>
+
+#ifdef USE_DEVMEMD
+#include "cs_stub_devmemd.h"
+#endif /* USE_DEVMEMD */
 
 
 #define CS_LIB_VERSION_MAJ 0x02
@@ -112,8 +117,11 @@ struct cs_device {
     struct cs_device_ops ops;
 
     /* Generic properties of the device */
-    cs_physaddr_t phys_addr;
-    unsigned char volatile *local_addr;
+    cs_physaddr_t phys_addr;      /**< The physical address in the target memory space */
+    unsigned char volatile *local_addr;   /**< Address of the device page in our space */
+#ifdef CSAL_MEMAP
+    cs_device_t memap;            /**< MEM-AP, if device is being accessed indirectly */
+#endif
     unsigned char devtype_from_id;
     cs_devtype_t type;
     unsigned short part_number;	  /**< CoreSight part number, 3 hex digits */
@@ -207,6 +215,12 @@ struct cs_device {
         struct ts_gen_props {
             cs_ts_gen_config_t config;
         } ts;
+        struct memap_props {
+            int DAR_present:1;            /**< Direct Access Registers are available */
+            int TAR_valid:1;              /**< We have a cached copy of the TAR */
+            int memap_LPAE:1;             /**< Large Physical Addresses implemented */
+            unsigned long cached_TAR;     /**< Cached copy of the TAR */
+        } memap;
     } v;
 };
 
@@ -233,6 +247,9 @@ struct global {
 #ifdef UNIX_USERSPACE
     int mem_fd;			   /**< File handle for the memory mapped I/O */
 #endif				/* UNIX_USERSPACE */
+#ifdef CSAL_MEMAP
+    cs_device_t memap_default;     /**< MEM-AP parent for new devices, or NULL */
+#endif
     int init_called:1;
     int registration_open:1;
     int force_writes:1;
@@ -325,8 +342,6 @@ void diagf(char const *s, ...)
 #define is_4k_page_address(x) (((x) & 0xfff) == 0)
 
 /* Claim tag handling constants */
-#define CS_CLAIM_EXTERNAL      0x01
-#define CS_CLAIM_INTERNAL      0x02
 #define CS_CLAIM_PMU_EXTERNAL  0x04	/* PMU in use - in DBGCLAIM */
 #define CS_CLAIM_PMU_INTERNAL  0x08
 #define CS_CLAIM_CTI_EXTERNAL  0x10	/* CPU CTI in use - in DBGCLAIM */
@@ -350,54 +365,59 @@ extern int cs_report_error(char const *fmt, ...);
 extern int cs_report_device_error(struct cs_device *d, char const *fmt,
                                   ...);
 extern struct cs_device *cs_get_device_struct(cs_device_t dev);
+extern void cs_device_init(struct cs_device *d, cs_physaddr_t addr);
 extern struct cs_device *cs_device_new(cs_physaddr_t addr,
                                        void volatile *local_addr);
 
 extern unsigned int volatile *_cs_get_register_address(struct cs_device *d,
                                                        unsigned int off);
-extern unsigned int _cs_read(struct cs_device *d, unsigned int off);
-extern unsigned long long _cs_read64(struct cs_device *d,
-                                     unsigned int off);
+extern uint32_t _cs_read(struct cs_device *d, unsigned int off);
+extern uint64_t _cs_read64(struct cs_device *d, unsigned int off);
 
 extern int _cs_write_wo(struct cs_device *d, unsigned int off,
-                        unsigned int data);
+                        uint32_t data);
 extern int _cs_write64_wo(struct cs_device *d, unsigned int off,
-                          unsigned long long data);
+                          uint64_t data);
 extern int _cs_write_traced(struct cs_device *d, unsigned int off,
-                            unsigned int data, char const *oname);
+                            uint32_t data, char const *oname);
 extern int _cs_write64_traced(struct cs_device *d, unsigned int off,
-                              unsigned long long data, char const *oname);
+                              uint64_t data, char const *oname);
 extern int _cs_write_mask(struct cs_device *d, unsigned int off,
-                          unsigned int mask, unsigned int data);
+                          uint32_t mask, uint32_t data);
 extern int _cs_set_mask(struct cs_device *d, unsigned int off,
-                        unsigned int mask, unsigned int data);
+                        uint32_t mask, uint32_t data);
 extern int _cs_set_bit(struct cs_device *d, unsigned int off,
-                       unsigned int mask, int value);
+                       uint32_t mask, int value);
 extern int _cs_set(struct cs_device *d, unsigned int off,
-                   unsigned int bits);
+                   uint32_t bits);
 extern int _cs_set_wo(struct cs_device *d, unsigned int off,
-                      unsigned int bits);
+                      uint32_t bits);
 extern int _cs_clear(struct cs_device *d, unsigned int off,
-                     unsigned int bits);
+                     uint32_t bits);
 extern int _cs_isset(struct cs_device *d, unsigned int off,
-                     unsigned int bits);
+                     uint32_t bits);
 extern void _cs_set_wait_iterations(int iterations);
 extern int _cs_wait(struct cs_device *d, unsigned int off,
                     unsigned int bit);
 extern int _cs_waitnot(struct cs_device *d, unsigned int off,
                        unsigned int bit);
 extern int _cs_waitbits(struct cs_device *d, unsigned int off,
-                        unsigned int bits, cs_reg_waitbits_op_t operation,
-                        unsigned int pattern, unsigned int *p_last_val);
-extern int _cs_claim(struct cs_device *d, unsigned int bit);
-extern int _cs_unclaim(struct cs_device *d, unsigned int bit);
-extern int _cs_isclaimed(struct cs_device *d, unsigned int bit);
+                        uint32_t bits, cs_reg_waitbits_op_t operation,
+                        uint32_t pattern, uint32_t *p_last_val);
+
+extern int _cs_claim(struct cs_device *d, uint32_t bit);
+extern int _cs_unclaim(struct cs_device *d, uint32_t bit);
+extern int _cs_isclaimed(struct cs_device *d, uint32_t bit);
+
 extern int _cs_isunlocked(struct cs_device *d);
+extern int _cs_is_lockable(struct cs_device *d);
 extern void _cs_unlock(struct cs_device *d);
 extern void _cs_lock(struct cs_device *d);
 
 extern void *io_map(cs_physaddr_t addr, unsigned int size, int writable);
-extern void io_unmap(void *addr, unsigned int size);
+extern void io_unmap(void volatile *addr, unsigned int size);
+extern int _cs_map(struct cs_device *d, int writable);
+extern void _cs_unmap(struct cs_device *d);
 
 #define _cs_write(d, off, data) _cs_write_traced(d, off, data, #off)
 #define _cs_write64(d, off, data) _cs_write64_traced(d, off, data, #off)

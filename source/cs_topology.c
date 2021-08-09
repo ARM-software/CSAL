@@ -24,13 +24,7 @@
 #include "cs_trace_sink.h"
 
 /* ---------- Local functions ------------- */
-static int cs_scan_romtable(cs_physaddr_t rom_addr, void const *tabv);
-
-static unsigned int raw_read(unsigned char const *local,
-                             unsigned int offset)
-{
-    return *(unsigned int const volatile *) (local + offset);
-}
+static int cs_scan_romtable(struct cs_device *d);
 
 static int cs_addr_is_excluded(cs_physaddr_t addr)
 {
@@ -51,12 +45,40 @@ static void cs_stm_device_unregister(struct cs_device *d)
         unsigned int i;
         for (i = 0; i < d->v.stm.n_masters; i++) {
             if (d->v.stm.ext_ports[i] != NULL) {
+                /* Unmap the (generally large, multi-page) external stimulus area */
                 io_unmap(d->v.stm.ext_ports, cs_stm_get_ext_ports_size(d));
             }
         }
         free(d->v.stm.ext_ports);
     }
 }
+
+
+/*
+ * Test whether a device conforms to a given Arm-defined architecture.
+ * This is a more reliable way of determining the programming model
+ * than looking at the device type, and a more scalable way than looking
+ * at the part number.
+ */
+static int cs_is_arm_arch(struct cs_device *d, unsigned int arch)
+{
+    /* TBD: should also check JEDEC architect code */
+    return (_cs_read(d, CS_DEVARCH) & 0xFFFF) == arch;
+}
+
+
+static int cs_is_romtable(struct cs_device *d)
+{
+    unsigned int dc = CS_CLASS_OF(_cs_read(d, CS_CIDR1));
+    if (dc == CS_CLASS_ROMTABLE) {
+        return 1;
+    } else if (dc == CS_CLASS_CORESIGHT && cs_is_arm_arch(d, CS_ARM_ARCHID_ROM)) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 
 /*
   Register a device (or ROM table) at a given address.
@@ -83,7 +105,8 @@ static void cs_stm_device_unregister(struct cs_device *d)
 static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
 {
     unsigned int cs_class;
-    unsigned char *local;
+    //unsigned char *local;
+    struct cs_device protod;  /* Temporary device while we're probing */
     struct cs_device *d = NULL;
 
     assert(is_4k_page_address(addr));
@@ -95,28 +118,31 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         diagf("!skipping excluded device at %" CS_PHYSFMT "\n", addr);
         return ERRDESC;
     }
-    local = (unsigned char *) io_map(addr, 4096, /*writable= */ 1);
-    if (!local) {
+
+    cs_device_init(&protod, addr);
+
+    /* From this point on, we may need to access the device to read ID registers. */
+    if (!_cs_map(&protod, /*writable=*/1)) {
         cs_report_error("can't map device at %" CS_PHYSFMT "", addr);
         return ERRDESC;
     }
-    if (raw_read(local, CS_CIDR3) != 0xB1) {
+    if (_cs_read(&protod, CS_CIDR3) != 0xB1) {
         //cs_report_error("not a CoreSight component at %" CS_PHYSFMT "", addr);
         return ERRDESC;
     }
-    cs_class = CS_CLASS_OF(raw_read(local, CS_CIDR1));
-    if (cs_class == CS_CLASS_ROMTABLE) {
+    cs_class = CS_CLASS_OF(_cs_read(&protod, CS_CIDR1));
+    if (cs_is_romtable(&protod)) {
         /* Recursively scan a secondary ROM table */
-        cs_scan_romtable(addr, local);
-        io_unmap(local, 4096);
+        cs_scan_romtable(&protod);
+        _cs_unmap(&protod);
         return ERRDESC;		/* not a device */
     }
 
     if (cs_class == CS_CLASS_CORESIGHT) {
         unsigned int major, minor;
-        unsigned int devaff0, devaff1, devid;
+        unsigned int devaff0, devaff1, devid, devarch;
 
-        d = cs_device_new(addr, local);
+        d = cs_device_new(addr, protod.local_addr);
         assert(d != NULL);
 
         diagf("%" CS_PHYSFMT ":", addr);
@@ -128,6 +154,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         }
         devaff1 = cs_device_read(d, CS_DEVAFF1);
         devid = cs_device_read(d, CS_DEVID);
+        devarch = cs_device_read(d, CS_DEVARCH);
         /* Get the 3-digit PrimeCell device number */
         d->part_number =
             ((_cs_read(d, CS_PIDR1) & 0xF) << 8) | (_cs_read(d, CS_PIDR0) &
@@ -139,9 +166,11 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
 
         /* Just in case the component's already unlocked when we register it,
            ensure our cached flag of its lock status is correctly set. */
-        d->is_unlocked = _cs_isunlocked(d);
-        d->is_permanently_unlocked = 0;
-
+        {
+            unsigned int lsr = _cs_read(d, CS_LSR);
+            d->is_permanently_unlocked = !(lsr & CS_LSR_SLI);
+            d->is_unlocked = !(lsr & CS_LSR_SLK);
+        }
         /* Show basic information for the device. The first two numbers
            indicate the CoreSight device class. */
         diagf(" %u.%u %03X", major, minor, d->part_number);
@@ -152,7 +181,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         diagf(" %02X/%02X", _cs_read(d, CS_CLAIMCLR) & 0xFF,
               _cs_read(d, CS_CLAIMSET) & 0xFF);
 
-        /* See http://wiki.arm.com/Eng/PerphIDRegs */
+        /* Arm internal: see http://wiki.arm.com/Eng/PerphIDRegs */
         if (major == 1) {
             /* Trace sinks */
             d->devclass |= CS_DEVCLASS_SINK;
@@ -169,7 +198,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 d->type = DEV_ETB;
                 d->devclass |= CS_DEVCLASS_BUFFER;
                 /* Find buffer size */
-                if (d->part_number == 0x961) {	/* TMC */
+                if (d->part_number == 0x961 || d->part_number == 0x9e8 || d->part_number == 0x9e9 || d->part_number == 0x9ea) {	/* TMC */
                     d->v.etb.is_tmc_device = 1;
                     /* The TMC configuration type is a static property of the way the RTL was configured:
                        0 for ETB, 1 for ETR, 2 for ETF. */
@@ -363,6 +392,19 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 /* Device PMU */
                 d->v.pmu.n_counters = -1;	/* unknown */
             }
+        } else if (devarch != 0) {
+            if ((devarch & 0xFFFF) == CS_ARM_ARCHID_MEMAP) {
+                unsigned int cfg = _cs_read(d, CS_MEMAP_CFG);
+                d->devclass |= CS_DEVCLASS_MEMAP;                
+                d->v.memap.DAR_present = (((cfg >> 4) & 0xF) == 0xA);
+                d->v.memap.memap_LPAE = (cfg >> 1) & 1;
+            } else {
+                diagf("!Unclassified CoreSight device, architecture=0x%08X at %" CS_PHYSFMT "\n", devarch, d->phys_addr);
+            }
+        } else {
+            /* Zero or unknown major device category, not defined in CoreSight architecture. */
+            /* For example: 0x9EE, CoreSight SoC-600 ATU */
+            diagf("!Unclassified CoreSight device with no architecture at %" CS_PHYSFMT "\n", d->phys_addr);
         }
 
         /* If we haven't identified this as a CPU-affine device,
@@ -373,11 +415,12 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         }
     } else if (cs_class == CS_CLASS_PRIMECELL) {
         /* Wouldn't normally be seen in a CoreSight ROM table. */
+        /* CoreSight timestamp generators do have these non-CoreSight ids though. */
         unsigned int part_number =
-            ((raw_read(local, CS_PIDR1) & 0xF) << 8) |
-            (raw_read(local, CS_PIDR0) & 0xFF);
-        if (part_number == 0x101) {
-            d = cs_device_new(addr, local);
+            ((_cs_read(&protod, CS_PIDR1) & 0xF) << 8) |
+            (_cs_read(&protod, CS_PIDR0) & 0xFF);
+        if (part_number == 0x101 || part_number == 0x193) {
+            d = cs_device_new(protod.phys_addr, protod.local_addr);
             assert(d != NULL);
             d->is_unlocked = 1;
             d->is_permanently_unlocked = 1;
@@ -479,6 +522,8 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
             case DEV_REPLICATOR:
                 diagf(" [REPLICATOR: %u out ports]", d->n_out_ports);
                 break;
+            default:
+                break;
             }
         }
         if (d->devclass & CS_DEVCLASS_DEBUG) {
@@ -503,7 +548,6 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                     }
                 }
             } else {		/* v7 debug */
-
                 switch ((d->v.debug.didr >> 16) & 0xF) {
                 case 1:
                     diagf(" v6");
@@ -559,8 +603,16 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
             /* Each has 3 states: 00 (n.imp.), 10 (imp.dis), 11 (imp.en) */
             diagf(" auth=%02X", auth);
         }
-        if (d->devclass & CS_DEVCLASS_TIMESTAMP)
+        if (d->devclass & CS_DEVCLASS_TIMESTAMP) {
             diagf(" TIMESTAMP");
+        }
+        if (d->devclass & CS_DEVCLASS_MEMAP) {
+            unsigned int idr = _cs_read(d, 0xDFC);
+            diagf(" type:%u", (idr & 0xF));
+            if (d->v.memap.DAR_present) {
+                diagf(" DAR");
+            }
+        }
         switch (d->type) {
         case DEV_ETM:
 	    {
@@ -574,6 +626,8 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                   minor);
 	    }
 	    break;
+        default:
+            break;
         }
         diagf("\n");
         /* Keep it mapped */
@@ -603,25 +657,24 @@ static void cs_set_default_power_domain(cs_power_domain_t pd)
 /*
   CSARCH2 16.2.5
 */
-static int cs_scan_romtable(cs_physaddr_t rom_addr, void const *tabv)
+static int cs_scan_romtable(struct cs_device *d)
 {
     unsigned int i;
-    unsigned int const *tab = (unsigned int const *) tabv;
-
     if (DTRACEG) {
         diagf("!Scanning ROM table at %" CS_PHYSFMT " (mapped to %p)\n",
-              rom_addr, tabv);
+              d->phys_addr, d->local_addr);
     }
     assert(G.registration_open);
-    if (CS_CLASS_OF(tab[CS_CIDR1 / 4]) != CS_CLASS_ROMTABLE) {
+    if (!cs_is_romtable(d)) {
         return cs_report_error("page at %" CS_PHYSFMT
-                               " is not a CoreSight ROM table", rom_addr);
+                               " is not a CoreSight ROM table",
+                               d->phys_addr);
     }
     /* "The first entry is at address 0x000. Each subsequent entry is at
        the next 4-byte boundary, until a value of 0x00000000 is read which
        is the final entry." */
-    for (i = 0; i <= (0xEFC / 4); ++i) {
-        unsigned int entry = tab[i];
+    for (i = 0; i <= 0xEFC; i += 4) {
+        unsigned int entry = _cs_read(d, i);
         if (entry == 0x00000000) {
             break;
         }
@@ -629,10 +682,10 @@ static int cs_scan_romtable(cs_physaddr_t rom_addr, void const *tabv)
             /* Entry not present */
         } else {
             cs_physaddr_t dev_addr;
-            unsigned int offset = (entry & 0xFFFFF000);
+            signed int offset = (entry & 0xFFFFF000);   /* May be -ve */
             int power_domain = (entry & 4) ? ((entry >> 4) & 31) : -1;
             cs_set_default_power_domain(power_domain);
-            dev_addr = rom_addr + offset;
+            dev_addr = d->phys_addr + offset;
             cs_device_or_romtable_register(dev_addr);
         }
     }
@@ -645,7 +698,7 @@ static void _cs_link_affinity(struct cs_device *dbg,
     assert(dbg->type == DEV_CPU_DEBUG);
     switch (other->type) {
     case DEV_CPU_DEBUG:
-        /* ignore */
+        assert(dbg == other);    /* ok to add self, adding another CPU doesn't make sense */
         break;
     case DEV_CPU_PMU:
         dbg->v.debug.pmu = other;
@@ -655,6 +708,11 @@ static void _cs_link_affinity(struct cs_device *dbg,
         break;
     case DEV_CTI:
         dbg->v.debug.cti = other;
+        break;
+    default:
+        /* Possibly, other devices (ELA, RAS?) might have CPU affinity.
+           But we cannot represent this. So treat this as an API usage error. */
+        assert(0);
         break;
     }
 }
@@ -688,22 +746,22 @@ static int cs_device_inport_is_valid(struct cs_device *d, unsigned int p)
 int cs_register_romtable(cs_physaddr_t rom_addr)
 {
     int rc;
-    unsigned int *tab;
+    struct cs_device protod;
 
     if (!is_4k_page_address(rom_addr)) {
         return cs_report_error("ROM table must be 4K-aligned");
     }
     if (DTRACEG) {
-        diagf("!registering ROM table at %" CS_PHYSFMT "\n", rom_addr);
+        diagf("!Registering ROM table at %" CS_PHYSFMT "\n", rom_addr);
     }
     assert(G.init_called);
-    tab = (unsigned int *) io_map(rom_addr, 4096, /*writable= */ 0);
-    if (!tab) {
+    cs_device_init(&protod, rom_addr);
+    if (!_cs_map(&protod, /*writable=*/0)) {
         return cs_report_error("can't map ROM table at %" CS_PHYSFMT "",
                                rom_addr);
     }
-    rc = cs_scan_romtable(rom_addr, tab);
-    io_unmap(tab, 4096);
+    rc = cs_scan_romtable(&protod);
+    _cs_unmap(&protod);
     return rc;
 }
 

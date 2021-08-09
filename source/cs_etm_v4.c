@@ -810,13 +810,13 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t * c)
     int i, numregs, a_size;
     unsigned int masksel;
     static char sz_buf1[256], sz_buf2[128];
-    static char *inst_p0_sz[] = {
+    static char const *const inst_p0_sz[] = {
         "Trace LD & ST instructions as P0 off",
         "Trace LD instructions as P0",
         "Trace ST instructions as P0",
         "Trace LD & ST instructions as P0"
     };
-    static char *cond_sz[] = {
+    static char const *const cond_sz[] = {
         "disabled",
         "LD instr traced",
         "ST instr traced",
@@ -824,7 +824,7 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t * c)
         "reserved value", "reserved value", "reserved value",
         "All instr traced"
     };
-    static char *qe_sz[] = {
+    static char const *const qe_sz[] = {
         "disabled",
         "QE with instruction counts enabled",
         "reserved value",

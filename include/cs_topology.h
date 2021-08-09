@@ -115,6 +115,21 @@ int cs_atid_is_valid(cs_atid_t id);
  */
 cs_device_t cs_atb_add_replicator(unsigned int n_out_ports);
 
+/**
+ *  Set the default MEM-AP for devices (needs CSAL_MEMAP)
+ *
+ *  The MEM-AP device must already have been created.
+ */
+void cs_set_default_memap(cs_device_t dev);
+
+/**
+ * Get the parent MEM-AP component for a device, or NULL if not under a MEM-AP.
+ *
+ * \param device  the target device
+ * \return        the parent MEM-AP device, or NULL
+ */
+cs_device_t cs_device_memap(cs_device_t device);
+
 /** Indicate that registration is complete */
 int cs_registration_complete(void);
 
@@ -215,7 +230,7 @@ cs_cpu_t cs_device_get_affinity(cs_device_t dev);
  *
  *  Warning: this might read as always zero, depending on CoreSight configuration.
  *
- *  On Linux, the various files in /sys/devices/system/cpu/cpu<n>/topology
+ *  On Linux, the various files in /sys/devices/system/cpu/cpu{n}/topology
  *  may be helpful in relating MPIDR to CPU numbers.
  */
 unsigned int cs_device_get_MPIDR(cs_device_t dev);
@@ -224,6 +239,7 @@ unsigned int cs_device_get_MPIDR(cs_device_t dev);
 Given a CPU, get a CPU-specific device of a specific class (e.g. ETM, CTI).
 */
 cs_device_t cs_cpu_get_device(cs_cpu_t cpu, unsigned int classes);
+
 
 
 /** @} End of topology iteration section */

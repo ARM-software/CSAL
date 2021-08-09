@@ -31,12 +31,16 @@ int cs_init(void)
     memset(&G, 0, sizeof(struct global));
 
 #ifdef UNIX_USERSPACE
+#ifndef USE_DEVMEMD
     int fd = open("/dev/mem", O_RDWR);
     if (fd < 0) {
         G.mem_fd = -1;
         return cs_report_error("can't open /dev/mem");
     }
     G.mem_fd = fd;
+#else
+    devmemd_init();
+#endif
 #endif				/* UNIX_USERSPACE */
     G.init_called = 1;
     G.registration_open = 1;
@@ -61,6 +65,10 @@ int cs_init(void)
     G.virt_addr_64bit = 0;
 #endif
 
+#ifdef CSAL_MEMAP
+    G.memap_default = NULL;
+#endif
+
     return 0;
 }
 
@@ -73,6 +81,21 @@ int cs_diag_set(int n)
 }
 
 
+#ifdef CSAL_MEMAP
+void cs_set_default_memap(cs_device_t dev)
+{
+    if (dev) {    
+        assert(cs_device_has_class(dev, CS_DEVCLASS_MEMAP));
+        if (DTRACEG) {
+            diagf("!Set default MEM-AP\n");
+        }
+        _cs_claim(DEV(dev), CS_CLAIM_INTERNAL);
+    }
+    G.memap_default = dev;
+}
+#endif
+
+
 /*
   Call this when the library is unloaded.  This doesn't generally disable
   all trace devices, but it may lock them.
@@ -81,6 +104,7 @@ int cs_shutdown(void)
 {
     if (G.init_called) {
         /* Do anything that needs memory-mapped access */
+        cs_release();
         cs_checkpoint();
 #ifdef UNIX_USERSPACE
         /* Now remove memory-mapped access */

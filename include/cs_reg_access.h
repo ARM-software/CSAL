@@ -29,7 +29,9 @@
  */
 
 /** Physical address for device.  
- *  This will be zero for a non-mapped replicator. 
+ *  This will be zero for a non-mapped replicator.
+ *
+ *  For a device accessed via a MEM-AP, it will be the address behind the MEM-AP.
  *
  *   \param dev     device descriptor
  *   \return Physical address for the device.
@@ -50,7 +52,7 @@ unsigned short cs_device_part_number(cs_device_t dev);
   *   \param offset  register address offset, in bytes
   *   \return        Value in the register.
 */
-unsigned int cs_device_read(cs_device_t dev, unsigned int offset);
+uint32_t cs_device_read(cs_device_t dev, unsigned int offset);
 
 /** Write a value to a device register.
   *
@@ -61,8 +63,7 @@ unsigned int cs_device_read(cs_device_t dev, unsigned int offset);
   *   \param offset  register address offset, in bytes
   *   \param data    value to write to the register.
   */
-int cs_device_write(cs_device_t dev, unsigned int offset,
-		    unsigned int data);
+int cs_device_write(cs_device_t dev, unsigned int offset, uint32_t data);
 
 /** Write a value to a device register.
   *
@@ -72,8 +73,7 @@ int cs_device_write(cs_device_t dev, unsigned int offset,
   *   \param offset  register address offset, in bytes
   *   \param data    value to write to the register.
   */
-int cs_device_write_only(cs_device_t dev, unsigned int offset,
-			 unsigned int data);
+int cs_device_write_only(cs_device_t dev, unsigned int offset, uint32_t data);
 
 /** Write a value to a device register using a bitmask. 
   *
@@ -87,7 +87,7 @@ int cs_device_write_only(cs_device_t dev, unsigned int offset,
   *   \param bitmask bits to write - a '1' bit in the mask will write the bit from the data value.
   */
 int cs_device_write_masked(cs_device_t dev, unsigned int offset,
-			   unsigned int data, unsigned int bitmask);
+			   uint32_t data, uint32_t bitmask);
 
 /**
  *   Set bit(s) in a device register, using a read-modify-write operation.
@@ -96,7 +96,7 @@ int cs_device_write_masked(cs_device_t dev, unsigned int offset,
  *   \param offset  register offset, in bytes
  *   \param bits    bits to set - a '1' bit in the mask will set the bit.
  */
-int cs_device_set(cs_device_t dev, unsigned int offset, unsigned int bits);
+int cs_device_set(cs_device_t dev, unsigned int offset, uint32_t bits);
 
 /**
  *   Clear bit(s) in a device register, using a read-modify-write operation.
@@ -105,8 +105,7 @@ int cs_device_set(cs_device_t dev, unsigned int offset, unsigned int bits);
  *   \param offset  register offset, in bytes
  *   \param bits    bits to clear - a '1' bit in the mask will clear the bit.
  */
-int cs_device_clear(cs_device_t dev, unsigned int offset,
-		    unsigned int bits);
+int cs_device_clear(cs_device_t dev, unsigned int offset, uint32_t bits);
 
 /**
  *   Wait for bit(s) in a device register, to achieve a given state.
@@ -123,8 +122,28 @@ int cs_device_clear(cs_device_t dev, unsigned int offset,
  * 
  */
 int cs_device_wait(cs_device_t dev, unsigned int offset,
-		   unsigned int bit_mask, cs_reg_waitbits_op_t operation,
-		   unsigned int pattern, unsigned int *p_last_val);
+		   uint32_t bit_mask, cs_reg_waitbits_op_t operation,
+		   uint32_t pattern, uint32_t *p_last_val);
+
+
+/**
+ *   Device data barrier.
+ *
+ *   This is needed when a device register write must complete
+ *   (i.e. be observed by the device) before an access to normal memory.
+ */
+void cs_device_data_barrier(cs_device_t dev);
+
+/**
+ *   Device instruction barrier.
+ *
+ *   This is needed when a device register write must complete before
+ *   any further local code execution. A situation where this might be needed
+ *   is when programming the current core's ETM prior to executing code that
+ *   must be traced. It should not normally be necessary.
+ */
+void cs_device_instruction_barrier(cs_device_t dev);
+
 
 /**
  *   Number of repeat register checks the library will do when waiting on bits to

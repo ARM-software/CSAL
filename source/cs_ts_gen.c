@@ -73,7 +73,7 @@ int cs_tsgen_readvalue(cs_device_t dev, uint64_t * value)
 
 /* global TS value read - moved from cs_trace_source.c */
 
-int cs_get_global_timestamp(unsigned long long *ts)
+int cs_get_global_timestamp(uint64_t *ts)
 {
     if (G.timestamp_device != NULL) {
         if (ts != NULL) {

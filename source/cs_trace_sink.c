@@ -287,8 +287,10 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
        then reads from this register must be performed four at a time.
        When a full memory width of data has been read, the RAM Read Pointer is
        incremented to the next memory word." */
+
+    /* As an optimization, to speed up the read loop below, we attempt to get the
+       local address of the ETB's data transfer register. This might not be possible. */
     etb_read_reg = _cs_get_register_address(d, CS_ETB_RAM_DATA);
-    int xx = 0;			/* TBD and following lines */
     if (0) {
         fprintf(stderr,
                 "TraceCaptEn=%u TMCReady=%u Empty=%u CBUFLEVEL=0x%x\n",
@@ -298,10 +300,8 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
                 _cs_read(d, CS_TMC_CBUFLEVEL));
     }
     while (words_left_to_read > 0) {
-        unsigned int data = *etb_read_reg;
-        //printf("%u: read %08x, read ptr now %08x\n", xx/4, data, _cs_read(d, CS_ETB_RAM_RD_PTR));
-        __asm__ __volatile__("dsb sy");	/* TBD */
-        ++xx;			/* TBD */
+        unsigned int data = etb_read_reg ? *etb_read_reg : _cs_read(d, CS_ETB_RAM_DATA);
+        //printf("read %08x, read ptr now %08x\n", data, _cs_read(d, CS_ETB_RAM_RD_PTR));
         if (data != 0xFFFFFFFF) {
             *op++ = data;
         } else {
@@ -315,7 +315,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
                 diagf("  read all 1s (%08X): readptr=%08X\n", data,
                       _cs_read(d, CS_ETB_RAM_RD_PTR));
             }
-            *op++ = data;
+            *op++ = data;     /* Write the 0xFFFFFFFF to the output buffer. */
         }
         /* Reading the RAM data register will have triggered a RAM access cycle
            so we don't need to write the RAM read pointer register again here. */

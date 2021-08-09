@@ -57,9 +57,11 @@ The following options can be added the make command line:-
 - `NO_CHECK=1`  : This will disable additional diagnostic self checks - writes to CS registers are logged and read back.
 
 - `DBG_HALT=1`  : This will build a version of the library with the optional v7 Architecture intrusive 
-  halt mode debug functions built into the library. 
-   
-  The library names will be altered to `libcsaccess_dbghlt.a` and `libcsaccess_dbghlt.so`
+  halt mode debug functions built into the library. The library names will be altered to `libcsaccess_dbghlt.a` and `libcsaccess_dbghlt.so`
+
+- `MEMAP=1`     : This will enable registering CoreSight devices behind a MEM-AP.
+
+- `USE_DEVMEMD=1` : This will compile CSAL to use the devmemd daemon on a remote target. This option is provided for development use.
 
 Options can be combined on the command line to create specific versions of the library.
 
@@ -78,3 +80,11 @@ demos   : build the demos.
 docs    : build doxygen documentation.
 clean   : clean library and demos.
 rebuild : clean and build all.
+
+Portability
+-----------
+
+The source code is portable standard C and can also be compiled as C++.
+No compiler warnings are expected.
+The code has been tested with multiple compilers.
+Please report any porting issues on the github issue tracker.

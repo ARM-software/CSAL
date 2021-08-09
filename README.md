@@ -1,46 +1,57 @@
 CoreSight Access Library        {#mainpage}
 ========================
 
-The __CoreSight Access Library__ provides an API which enables user code to interact directly with CoreSight trace devices on your target.  
+The __CoreSight Access Library__ (CSAL) provides an API which enables user code to interact directly with CoreSight devices on a target.
 This allows, for example, program execution trace to be captured in a production system without the need to 
-have an external debugger connected.  The saved trace can be retrieved later and loaded into a debugger for analysis.  
+have an external debugger connected.  The saved trace can be retrieved later and loaded into a debugger for analysis. CSAL can be run on application core or a management core.
 
-The library supports a number of different CoreSight components on several target boards as described in the 
-[demos `readme`](@ref demos) file described below. 
+The library supports a number of different CoreSight components,
+and has configurations for several target SoCs and boards as described in the
+[demos `readme`](@ref demos) file described below.
   
 You can modify the library and demos to support other CoreSight components and/or boards.  An example Linux application 
 (`tracedemo`) that exercises the library is provided.  As it runs, `tracedemo` creates several files on the target, 
 including the captured trace. Ready-made example capture files are provided that can be loaded into a debugger.
 
-CoreSight Trace Component Support
----------------------------------
+CoreSight Component Support
+---------------------------
 
-The following trace components are supported by the library:-
+The following trace components are supported by the library:
 
 - ETMv3.x: used in Cortex A5, A7 cores; Cortex R4, R5 cores.
 - PTMv1.x: used in Cortex A9, A15, A17 cores.
-- ETMv4.x: Used in Cortex R7 cores.
-  Used in **V8 Architecture** Cores - Cortex A57 and A53.
+- ETMv4.x: Used in Cortex R7 and later R-profile cores.
+  Used in **V8 Architecture** Cores - Cortex A and Neoverse cores.
 - CoreSight ITM.
 - CoreSight STM.
 - CoreSight ETB.
 - CoreSight TMC in buffer mode.
 - CoreSight CTI.
 - Global Timestamp Generator.
+- CoreSight MEM-AP.
 
 The library also supports access to the v7 Arch or v8 Arch debug sampling registers,
 allowing non intrusive sampling of PC, VMID and ContextID on a running core.
 
 Optional support is provided for intrusive halting mode debug support of v7 Arch debug cores.
 
+Normally, components are accessed in the local memory space.
+The library also supports accessing components through a MEM-AP device.
+
+In addition, it provides several ways to get access to physical memory:
+- directly, suitable for a bare-metal system
+- as a Linux userspace device driver, by memory-mapping /dev/mem
+- using Linux kernel features (this is experimental)
+- through a simple OS-hosted network daemon (devmemd, provided in the package), for development
+
 Installation
 ------------
 
-Library supplied as a git repository on github - git@github.com:ARM-software/CSAL.git
+CSAL is supplied as a git repository on github - git@github.com:ARM-software/CSAL.git
 
-`./source` : Contains all the library source .c files.
+`./source` : Contains all the CSAL library source .c files.
 
-`./include`: Contains the library API header include files.
+`./include`: Contains the CSAL library API header include files.
 
 `./demos`  : Contains the source and build files for the demonstration programs.
 
@@ -50,11 +61,15 @@ Library supplied as a git repository on github - git@github.com:ARM-software/CSA
 
 `./experimental` : Unmaintained and unsupported additional demos.
 
-`./doxygen-cfg.txt` : File to generate API documentation using __doxygen__.
+`./doxygen-cfg.txt` : File to generate CSAL API documentation using __doxygen__.
 
 `./README.md` : This readme text file - which is also processed by __doxygen__.
 
 `./makefile`  : master makefile - `make help` for list of targets.
+
+`./coresight-tools` : Self-contained Python tools for CoreSight topology discovery.
+
+`./devmemd`   : a simple network daemon to forward memory accesses, for testing during development.
 
 
 Documentation
@@ -83,6 +98,57 @@ link to the built library.
 See [`./build/readme_buildlib.md`](@ref buildlib) for further information on building the library.
 
 See [`./demos/readme_demos.md`](@ref demos) for further information on running the demos.
+
+__Simple usage__:
+
+Each CoreSight component that you need to access (trace unit, funnel, sink etc.)
+should be registered with CSAL by calling `cs_device_register`:
+see the "CoreSight component and topology registration" section of the API.
+You will need to know the physical address of the component.
+This may be obtained from a vendor datasheet, or sometimes it is discoverable
+from an on-chip ROM table. See `coresight-tools/discovery.md` for more details.
+Connections between devices should also be registered with CSAL.
+
+__Accessing components via a MEM-AP__:
+
+On some SoCs, components are accessed indirectly, via a MEM-AP component,
+which acts as a gateway into a separate address space.
+CSAL supports indirect access via MEM-AP when built with the `CSAL_MEMAP` option.
+The MEM-AP device, and any other directly accessible devices, should first
+be registered in the usual way,
+then `cs_set_default_memap()` should be called to register the MEM-AP as the
+owner for new devices.
+Subsequent device registrations take place in the address space of the MEM-AP,
+and the CSAL API functions can then act on the devices as normal.
+
+Note that access via a MEM-AP makes it especially important to avoid conflicts
+between multiple debug agents, to avoid race conditions on the MEM-AP's
+transfer registers.
+Each MEM-AP component provides two independent transfer areas, the second being at offset 0x1000.
+One can be used by an external debugger while the other is used by CSAL.
+CSAL will check the settings of MEM-AP's CLAIM register, to check if it is in use
+by an external debugger, and will then set the claim bit indicating self-hosted use.
+However, note that some external debuggers do not check or set the CLAIM bits.
+When using a MEM-AP,
+we recommend finding out which half of the MEM-AP is used by the
+debugger and using the other half.
+
+__Multithreading__:
+
+CSAL's global state is not thread-safe in general.
+However, once components are registered, it should generally be safe to use them
+concurrently from different threads as long as two threads are
+not writing to (or causing side-effects in) the same component at the same time.
+For example, one thread could program a trace unit while another is
+monitoring a trace sink and a third is sampling from a PMU,
+all via the CSAL APIs.
+
+When components are accessed indirectly via a shared MEM-AP,
+access from different threads will attempt to update the MEM-AP.
+It will generally be necessary to use some form of locking
+so that updates to the MEM-AP's transfer address register and use of its
+data transfer registers are within a critical section.
+This has not currently been implemented in CSAL.
 
 __Using the Library in Python__:
 
@@ -157,6 +223,14 @@ Version 2.3
 - Transfer to github project
 - makefile updates for x-compile and master makefile in project root dir.
 - moved some code to 'experimental' directory - demos that are not maintained / supported. 
+
+Version 3.0
+-----------
+- Added support for CoreSight SoC-600 components
+- Added support for MEM-AP
+- The API now uses types 'uint32_t' and 'uint64_t' for types representing target registers
+- Minor portability and languge conformance improvements
+- Added support for network connection (devmemd) - a development aid, not intended for production
 
 ------------------------------------
 

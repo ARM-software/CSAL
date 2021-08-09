@@ -2,6 +2,8 @@
  * Minimal /dev/csmem for direct userspace access to physical memory.
  *
  * Adapted from linux/drivers/char/mem.c
+ *
+ * For the license check: CSAL-ALTERNATE-LICENSE
  */
 
 #include <linux/init.h>

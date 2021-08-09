@@ -70,6 +70,10 @@ endif
 
 endif
 
+ifeq ($(MEMAP),1)
+CFLAGS+= -DCSAL_MEMAP
+endif
+
 # set the include paths - for the CS Access library API
 INCS=   -I. \
 		-I../include

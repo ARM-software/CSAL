@@ -35,6 +35,15 @@
  * @{
  */
 
+#include <stdint.h>
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS   /**< Enable printf formats for physaddr etc. */
+#endif
+#ifndef __STDC_CONSTANT_MACROS
+#define __STDC_CONSTANT_MACROS /**< Enable constants for physaddr etc. */
+#endif
+#include <inttypes.h>
+
 
 /** \brief Handle to CoreSight component */
 typedef void *cs_device_t;
@@ -45,20 +54,22 @@ typedef void *cs_device_t;
 
 /** \brief Physical address 
     Defines the size type for a physical address. 
-    If library compiled with <tt>\b LPAE</tt> defined then this value will be large
+    If library is compiled with <tt>\b LPAE</tt> defined then this value will be large
     enough for the 40 bit LPAE extension addresses.
     See \ref buildlib "Building the Library" for information on building the library.
 */
 #ifdef LPAE
-typedef unsigned long long cs_physaddr_t;
+typedef uint64_t cs_physaddr_t;
 /** printf format to match cs_physaddr_t */
-#define CS_PHYSFMT "010llX"    /**< printf format for physical address */
+#define CS_PHYSFMT "010" PRIX64  /**< printf format for physical address */
+#define CS_PHYSADDR(x) INT64_C(x)
 #ifdef UNIX_USERSPACE
 #define _FILE_OFFSET_BITS 64
 #endif
 #else				/* !LPAE */
-typedef unsigned long cs_physaddr_t;
-#define CS_PHYSFMT "08lX"      /**< printf format for physical address */
+typedef uint32_t cs_physaddr_t;
+#define CS_PHYSFMT "08" PRIX32   /**< printf format for physical address */
+#define CS_PHYSADDR(x) INT32_C(x)
 #endif				/* LPAE */
 
 /** @brief Virtual address
@@ -69,14 +80,13 @@ typedef unsigned long cs_physaddr_t;
  *  Compile library with <tt>\b CS_VA64BIT </tt> defined to enable 64 bit virtual address sizes.
  *  See \ref buildlib "Building the Library" for information on building the library.
  */
-#include <stdint.h>
 
 #ifdef CS_VA64BIT
 typedef uint64_t cs_virtaddr_t;
-#define CS_VAFMT "010llX"    /**< printf format for virtual address */
+#define CS_VAFMT "010" PRIX64   /**< printf format for virtual address */
 #else
 typedef uint32_t cs_virtaddr_t;
-#define CS_VAFMT "08lX"	     /**< printf format for virtual address */
+#define CS_VAFMT "08" PRIX32    /**< printf format for virtual address */
 #endif
 
 /*! @name Device classes
@@ -101,6 +111,7 @@ typedef uint32_t cs_virtaddr_t;
 #define CS_DEVCLASS_SWSTIM     0x400  /**< Software trace (ITM, STM) */
 #define CS_DEVCLASS_ELA        0x800  /**< Logic Analyzer (Stygian, ELA-500) */
 #define CS_DEVCLASS_TRIGSRC   0x1000  /**< Generates triggers only, not trace */
+#define CS_DEVCLASS_MEMAP     0x2000  /**< Memory access port e.g. APB-AP, AXI-AP */
 
 
 /** @} */

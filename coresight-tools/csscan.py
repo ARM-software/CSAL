@@ -4,15 +4,7 @@
 Scan the ROM table and report on CoreSight devices.
 Also do ATB and CTI topology detection.
 
-We report three levels of status:
-  - the "hard wired" configuration selected at SoC design time
-  - the "programming" configuration, e.g. address comparator settings
-  - the actual status, e.g. busy/ready bits, values of counters etc.
-
-To do:
-  - ETMv3.x/PTF
-  - power requestors
-
+---
 Copyright (C) ARM Ltd. 2018-2021.  All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,6 +18,16 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+---
+
+We report three levels of status:
+  - the "hard wired" configuration selected at SoC design time
+  - the "programming" configuration, e.g. address comparator settings
+  - the actual status, e.g. busy/ready bits, values of counters etc.
+
+To do:
+  - ETMv3.x/PTF
+  - power requestors
 """
 
 from __future__ import print_function
@@ -75,10 +77,14 @@ jedec_designers = {
 #   IHI0029E CoreSight Architecture Specification 3.0, Table B2-8
 #   other product information
 #
-# The CoreSight architecture defines
-#   DEVARCH[15:0]:ARCHID  DEVARCH[19:16]:revision
-# Conventionally Arm uses
-#   DEVARCH[11:0]:architecture  DEVARCH[15:12]:major-rev  DEVARCH[19:16]:minor-rev
+# The CoreSight architecture defines:
+#   DEVARCH[15:0]   ARCHID
+#   DEVARCH[19:16]  REVISION
+#
+# Conventionally Arm uses:
+#   DEVARCH[11:0]   ARCHPART  architecture
+#   DEVARCH[15:12]  ARCHREV   major-rev
+#   DEVARCH[19:16]  REVISION  minor-rev
 
 ARM_ARCHID_ETM      = 0x4a13
 ARM_ARCHID_CTI      = 0x1a14
@@ -145,7 +151,7 @@ cs_types = {(1,1):"port", (1,2):"buffer", (1,3):"router",
 # DEVTYPE and DEVARCH to indicate the programming model.
 #
 arm_part_numbers = {}
-with open("part-numbers.json") as f:
+with open(os.path.join(os.path.dirname(__file__), "part-numbers.json")) as f:
     pj = json.load(f)
     for p in pj["parts"]:
         pn = int(p["part"],16)
@@ -298,6 +304,7 @@ class Device:
         self.affinity_group = None   # AffinityGroup containing related devices
         self.map_is_write = False
         self.map()
+        # For convenience, CIDR is formed from CIDR3..CIDR0.
         self.CIDR = self.idbytes([0xFFC, 0xFF8, 0xFF4, 0xFF0])
         self.PIDR = self.idbytes([0xFD0, 0xFEC, 0xFE8, 0xFE4, 0xFE0])
         self.jedec_designer = (((self.PIDR>>32)&15) << 7) | ((self.PIDR >> 12) & 0x3f)
@@ -718,6 +725,7 @@ class DevMem:
 
     def __init__(self):
         self.page_size = os.sysconf("SC_PAGE_SIZE")
+        self.fd = None
         try:
             # This may fail because not present or access-restricted.
             self.fd = open("/dev/mem", "r+b")
@@ -791,6 +799,9 @@ class CSROM:
     def __init__(self, memap=None):
         self.fd = None
         self.memap = memap
+        self.device_by_base_address = {}
+        self.affinity_group_map = {}
+        self.restore_locks = True
         if memap is None:
             if g_devmem is not None:
                 self.devmem = g_devmem
@@ -798,9 +809,6 @@ class CSROM:
                 self.devmem = DevMem()
         else:
             self.devmem = None
-        self.device_by_base_address = {}
-        self.affinity_group_map = {}
-        self.restore_locks = True
 
     def close(self):
         for d in self.device_by_base_address.values():
@@ -1162,7 +1170,7 @@ class CSROM:
             idr = d.read32(0xDFC)
             print(" idr:0x%08x" % idr, end="")
             aptype = bits(idr,0,4)
-            aptypes = { 6: "APB4", 7: "AXI5", 8: "AHB5+HPROT" }
+            aptypes = { 0: "JTAG", 1: "AHB3", 2: "APB2", 4: "AXI", 6: "APB4", 7: "AXI5", 8: "AHB5+HPROT" }
             if aptype in aptypes:
                 saptype = aptypes[aptype]
             else:
@@ -1181,8 +1189,8 @@ class CSROM:
                 print(" TARINC:%u" % (9+bits(cfg,16,4)), end="")
             if cfg & 0xfff0fe09:
                 print(" CFG:0x%08x" % cfg, end="")
-            rombase = d.read32(0xDF8)
-            if rombase:
+            rombase = d.read32x2(0xDF0,0xDF8)
+            if rombase not in [0x0,0x2]:
                 print(" ROM:%#x" % rombase, end="")
         elif d.is_arm_architecture(ARM_ARCHID_ELA):
             rwidth = bits(devid,8,8)
@@ -1510,14 +1518,32 @@ class CSROM:
                 # TBD show older ETMs
                 pass
         elif d.is_arm_architecture(ARM_ARCHID_MEMAP):
+            idr = d.read32(0xDFC)
+            aptype = bits(idr,0,4)
             csw = d.read32(0xD00)
             print("  CSW: 0x%08x (%s)" % (csw, ["disabled","enabled"][bit(csw,6)]))
+            bprot = bits(csw,24,7)
+            btype = bits(csw,12,4)
             if bit(csw,7):
                 print("  Transfer in progress")
+            if bits(csw,8,4) != 0:
+                print("  Barrier support enabled")
             if bit(csw,16):
                 print("  Errors are not passed upstream")
             if bit(csw,17):
                 print("  Stop on error")
+            print("  Type/Prot=0x%x/0x%x" % (btype, bprot), end="")
+            # Recommendations for bus-specific CSW fields are defined by ADI Appendix E
+            if aptype == 4:
+                # AXI
+                print(" %s" % (["S","NS"][bit(bprot,5)]), end="")
+                print(" %s" % (["data","code"][bit(bprot,6)]), end="")
+                print(" %s" % (["unpriv","priv"][bit(bprot,4)]), end="")
+                print(" AxCACHE:0x%x" % bits(bprot,0,4), end="")
+            elif aptype == 6:
+                # APB4
+                print(" %s" % (["S","NS"][bit(bprot,5)]), end="")
+            print()
             print("  TAR: 0x%08x" % (d.read32(0xD04)))
             if (d.read32(0xD24) & 1) != 0:
                 print("  Error response logged")
@@ -1689,7 +1715,10 @@ class CSROM:
         # while SoC-400 r3p2 has funnel rev r1p1 indicated by REVISION=3.
         print("  0x%03x 0x%03x r%u.%u  " % (d.jedec_designer, d.part_number, rev, patch), end="")
         if (d.CIDR & 0xffff0fff) != 0xb105000d:
-            print("unexpected CIDR: 0x%08x" % d.CIDR)
+            if d.CIDR:
+                print("unexpected CIDR: 0x%08x " % d.CIDR, end="")
+            else:
+                print("no CIDR ", end="")
         if d.is_arm_part() and d.part_number in arm_part_numbers:
             part_string = arm_part_numbers[d.part_number]
         elif d.is_rom_table():
@@ -2193,6 +2222,12 @@ if __name__ == "__main__":
     o_force_memap = False
     d_memap = None
     cssys = []
+    def enable_devmemd(remote):
+        (addr, port) = remote.split(':')
+        global g_devmem
+        g_devmem = DevMemRemote(addr, int(port))
+    if 'DEVMEMD' in os.environ:
+        enable_devmemd(os.environ['DEVMEMD'])
     for arg in sys.argv[1:]:
         if arg == "-v" or arg == "--verbose":
             o_verbose += 1
@@ -2237,8 +2272,7 @@ if __name__ == "__main__":
             d_memap = MemAP(memap_device)      # The gateway device
         elif arg.startswith("--remote="):
             # Access physical memory on a network-connected target running devmemd
-            (addr, port) = arg[9:].split(':')
-            g_devmem = DevMemRemote(addr, int(port))
+            enable_devmemd(arg[9:])
         elif arg == "--top-only":
             o_top_only = True
         else:

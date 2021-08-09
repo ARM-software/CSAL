@@ -79,14 +79,26 @@ Common register definitions in the management group of all CoreSight devices
 #define CS_DEVID0  0xFC0    /**< CS Device ID register 0 */
 
 #define CS_DEVARCH  0xFBC   /**< CS device architecture register  */
+
+/* Architectures */
+#define CS_ARM_ARCHID_ETM4     0x4a13
+#define CS_ARM_ARCHID_CTI      0x1a14
+#define CS_ARM_ARCHID_MEMAP    0x0a17
+#define CS_ARM_ARCHID_ROM      0x0af7
+
 #define CS_DEVAFF0  0xFA8   /**< CS device affinity register 0 */
 #define CS_DEVAFF1  0xFAC   /**< CS device affinity register 1 */
 
 #define CS_CLAIMSET  0xFA0  /**< CS component claim tag set register */
 #define CS_CLAIMCLR  0xFA4  /**< CS component claim tag clear register */
+/* For claim tag conventions, see e.g. ADI 6.0 C1.4.3 */
+#define CS_CLAIM_INTERNAL  0x01  /**< Device is in use by self-hosted software */
+#define CS_CLAIM_EXTERNAL  0x02  /**< Device is in use by external debugger */
 
 #define CS_LAR  0xFB0	    /**< CS component Software Lock access register */
 #define CS_LSR  0xFB4	    /**< CS component Software Lock status register */
+#define CS_LSR_SLI 0x01     /**< Software Lock Implemented */
+#define CS_LSR_SLK 0x02     /**< Software Lock is Locked */
 #define CS_KEY  0xC5ACCE55  /**< CS component Software Lock - unlock key value */
 /**@}*/
 
@@ -870,6 +882,29 @@ on a cortex core.
 #define CS_PMCEID0           0xE20     /**< Common Event Identification 0 */
 #define CS_PMCEID1           0xE24     /**< Common Event Identification 1 */
 #define CS_PMAUTHSTATUS      0xFB8     /**< Authentication Status Register */
+/** @} */
+
+/** @defgroup cs_memap CoreSight MEM-AP registers 
+    @ingroup reg_defs
+
+Register definitions and bitfield values for MEM-AP devices.
+@{
+*/
+
+#define CS_MEMAP_DAR0    0x000    /**< Direct Access Registers, 0..255 */
+#define CS_MEMAP_CSW     0xD00    /**< Control and Status Word */
+#define CS_MEMAP_TAR     0xD04    /**< Transfer Address Register */
+#define CS_MEMAP_TARHI   0xD08    /**< TAR high word (LPAE only) */
+#define CS_MEMAP_DRW     0xD0C    /**< Data Read/Write Register */
+#define CS_MEMAP_BD0     0xD10    /**< Banked Data Registers, 0..3 */
+#define CS_MEMAP_MBT     0xD20    /**< Memory Barrier Transfer */
+#define CS_MEMAP_TRR     0xD24    /**< Transfer Response Register */
+#define CS_MEMAP_TRR_ERR  0x01    /**< Read: error was logged; Write: clear error */
+#define CS_MEMAP_BASEHI  0xDF0    /**< ROM Base Register high word (LPAE only) */
+#define CS_MEMAP_CFG     0xDF4    /**< Configuration Register */
+#define CS_MEMAP_BASE    0xDF8    /**< ROM Base Register */
+#define CS_MEMAP_IDR     0xDFC    /**< Identification Register */
+
 /** @} */
 
 /** @}*/

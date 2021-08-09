@@ -56,7 +56,7 @@ int _cs_swstim_trace_disable(struct cs_device *d)
         if (d->v.stm.ext_ports) {
             unsigned char *master0 = d->v.stm.ext_ports[0];
             if (master0) {
-                +*(unsigned int volatile *) master0;
+                (void)+*(uint32_t volatile *)master0;
             }
         }
         _cs_clear(d, CS_STM_TCSR, CS_STM_TCSR_EN);
@@ -114,8 +114,7 @@ int cs_trace_swstim_get_port_count(cs_device_t dev)
   would in general be expected to acquire a memory mapping to a segment
   of the stimulus area, supporting all sizes and flavors of STP packet.
 */
-int cs_trace_stimulus(cs_device_t dev, unsigned int port,
-                      unsigned int value)
+int cs_trace_stimulus(cs_device_t dev, unsigned int port, uint32_t value)
 {
     struct cs_device *d = DEV(dev);
 
@@ -134,7 +133,7 @@ int cs_trace_stimulus(cs_device_t dev, unsigned int port,
             if (master == NULL)
                 return cs_report_device_error(d,
                                               "STM master memory address not configured.");
-            *(unsigned int volatile *) (master +
+            *(uint32_t volatile *) (master +
                                         CS_STM_EXT_PORT_I_DMTS(port)) =
                 value;
             return 0;
@@ -149,8 +148,7 @@ int cs_trace_stimulus(cs_device_t dev, unsigned int port,
     }
 }
 
-int cs_trace_swstim_enable_trigger(cs_device_t dev, unsigned int mask,
-                                   unsigned int value)
+int cs_trace_swstim_enable_trigger(cs_device_t dev, uint32_t mask, uint32_t value)
 {
     int ret = 0;
     struct cs_device *d = DEV(dev);

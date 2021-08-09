@@ -500,7 +500,7 @@ int cs_ect_add_trigdst(cs_channel_t chan, cs_trigdst_t dst)
 
 int cs_ect_diag(cs_channel_t chan)
 {
-    int i;
+    unsigned int i;
     struct cs_channel const *c = (struct cs_channel const *) chan;
 
     diagf("Channel request:\n");

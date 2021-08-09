@@ -147,7 +147,7 @@ int main(int argc, char **argv)
     } else {
         printf("CS_ETM_DEMO: Showing ETMs for all CPUs\n");
     }
-    const struct board *board = malloc(sizeof(struct board));
+    const struct board *board = (struct board *)malloc(sizeof(struct board));
     if (!board)
         return EXIT_FAILURE;
 

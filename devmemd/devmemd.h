@@ -22,16 +22,18 @@ limitations under the License.
 #ifndef __included_devmemd_h
 #define __included_devmemd_h
 
-/* We don't use stdint.h. We assume 'unsigned long' is 8 bytes. */
+#include <stdint.h>
+
+typedef uint64_t physaddr_t;
 
 /* Request packet, 24 bytes */
 typedef struct {
-    unsigned short seq;        /* Arbitrary number, copied to response */
+    uint16_t seq;              /* Arbitrary number, copied to response */
     unsigned char pkt_len;     /* Packet length, 24 */
     unsigned char req;         /* Request type, see REQ_xxx */
     unsigned char size;        /* Read or write size */
-    unsigned long phys_addr;   /* The physical address, naturally aligned */
-    unsigned long data;        /* Data, for a write */
+    uint64_t phys_addr;        /* The physical address, naturally aligned */
+    uint64_t data;             /* Data, for a write */
 } devmemd_request_t;
 
 #define DEVMEMD_REQ_NOP    0    /* do nothing */
@@ -45,10 +47,10 @@ typedef struct {
 
 /* Response packet, 16 bytes */
 typedef struct {
-    unsigned short seq;        /* Number copied from request */
+    uint16_t seq;              /* Number copied from request */
     unsigned char pkt_len;     /* Packet length, 16 */
     unsigned char status;      /* Status, see ERR_xxx */
-    unsigned long data;        /* e.g. data read from /dev/mem */
+    uint64_t data;             /* e.g. data read from /dev/mem */
 } devmemd_response_t;
 
 #define DEVMEMD_ERR_OK     0   /* no error */

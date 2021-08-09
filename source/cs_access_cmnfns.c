@@ -38,7 +38,7 @@ void _diagf(char const *s, ...)
     va_list args;
     va_start(args, s);
     if (s[0] == '!') {
-	fprintf(stderr, "** ");
+	fprintf(stderr, "** csaccess: ");
 	++s;
     }
     vfprintf(stderr, s, args);
@@ -142,20 +142,38 @@ struct cs_device *cs_get_device_struct(cs_device_t dev)
     return (struct cs_device *) (dev);
 }
 
-struct cs_device *cs_device_new(cs_physaddr_t addr,
-				void volatile *local_addr)
+
+/*
+ * Initialize a device object.
+ */
+void cs_device_init(struct cs_device *d, cs_physaddr_t addr)
 {
-    struct cs_device *d =
-	(struct cs_device *) malloc(sizeof(struct cs_device));
     memset(d, 0, sizeof(struct cs_device));
     /* N.b. phys addr may be CS_NO_PHYS_ADDR, e.g. for non-programmable replicators */
     d->phys_addr = addr;
-    d->local_addr = local_addr;
     d->affine_cpu = CS_CPU_UNKNOWN;
     d->power_domain = G.power_domain_default;
 #ifdef DIAG
     d->diag_tracing = G.diag_tracing_default;
 #endif				/* DIAG */
+#ifdef CSAL_MEMAP
+    d->memap = G.memap_default;
+#endif
+}
+
+
+/*
+ * Create a new device object at a given physical address,
+ * and insert it into the global list.
+ * This routine does not access the device in any way.
+ */
+struct cs_device *cs_device_new(cs_physaddr_t addr,
+				void volatile *local_addr)
+{
+    struct cs_device *d =
+	(struct cs_device *) malloc(sizeof(struct cs_device));
+    cs_device_init(d, addr);
+    d->local_addr = (unsigned char volatile *)local_addr;
     d->next = G.device_top;
     G.device_top = d;
     ++G.n_devices;
@@ -163,30 +181,67 @@ struct cs_device *cs_device_new(cs_physaddr_t addr,
 }
 
 
-unsigned int volatile *_cs_get_register_address(struct cs_device *d,
+/*
+ * Return the local address of a register that can be directly polled.
+ * Return NULL if this is not possible, e.g. if the device is accessed
+ * indirectly. This is intended for performance-sensitive use only,
+ * e.g. reading out from an ETB, and even then it probably doesn't
+ * gain much given that APB accesses are typically slow.
+ *
+ * This is not used with MEM-AP and/or devmemd.
+ */
+uint32_t volatile *_cs_get_register_address(struct cs_device *d,
 						unsigned int off)
 {
-    assert(d->local_addr != NULL);
     assert((off & 3) == 0);	/* For 64-bit registers this check should be stronger */
     assert(off < 4096);
-    return (unsigned int volatile *) (d->local_addr + off);
+#ifdef CSAL_MEMAP
+    /* If this device is accessed via a MEM-AP, its registers aren't directly
+       accessible in our address space. Now, if we were guaranteed to be polling
+       only this register, we could set up the MEM-AP's TAR and return the
+       address of the relevant data-transfer register, but that relies on the
+       caller not doing any other register accesses that might change the TAR.
+       It seems safer not to support direct access. */
+    if (d->memap) {
+        return NULL;
+    }
+#endif
+#ifndef USE_DEVMEMD
+    assert(d->local_addr != NULL);
+    return (uint32_t volatile *)(d->local_addr + off);
+#else
+    return NULL;     /* Caller must fall back to _cs_read/_cs_write */
+#endif
 }
 
 
-unsigned int _cs_read(struct cs_device *d, unsigned int off)
+uint32_t _cs_read(struct cs_device *d, unsigned int off)
 {
-    assert(d->local_addr != NULL);
     assert((off & 3) == 0);
     assert(off < 4096);
-    return *(unsigned int volatile const *) (d->local_addr + off);
+#ifdef CSAL_MEMAP
+    if (d->memap) {
+        return cs_memap_read32(d->memap, d->phys_addr+off);
+    }
+#endif
+#ifndef USE_DEVMEMD
+    assert(d->local_addr != NULL);
+    return *(uint32_t volatile const *)(d->local_addr + off);
+#else
+    return devmemd_read32(d->phys_addr + off);
+#endif
 }
 
-unsigned long long _cs_read64(struct cs_device *d, unsigned int off)
+uint64_t _cs_read64(struct cs_device *d, unsigned int off)
 {
-    assert(d->local_addr != NULL);
     assert((off & 7) == 0);
     assert(off < 4096);
-    return *(unsigned long long volatile const *) (d->local_addr + off);
+#ifndef USE_DEVMEMD
+    assert(d->local_addr != NULL);
+    return *(uint64_t volatile const *) (d->local_addr + off);
+#else
+    return devmemd_read64(d->phys_addr + off);
+#endif
 }
 
 
@@ -194,31 +249,39 @@ unsigned long long _cs_read64(struct cs_device *d, unsigned int off)
   Low-level write, with no read-back.
 
   Example uses:
-  - as part of the implementation of checking writes
-  - writing key to lock-registers when locked
-  - S/W stimulus ports (usable when device locked)
+  - directly, for WO registers
+  - as part of the implementation of checking writes (with read-back)
+  - writing the key to lock-registers when locked
+  - S/W stimulus ports for STM (usable when the STM programming page is locked)
 */
-int _cs_write_wo(struct cs_device *d, unsigned int off, unsigned int data)
+int _cs_write_wo(struct cs_device *d, unsigned int off, uint32_t data)
 {
-    assert(d->local_addr != NULL);
     assert((off & 3) == 0);
     assert(off < 4096);
-    *(unsigned int volatile *) (d->local_addr + off) = data;
+#ifndef USE_DEVMEMD
+    assert(d->local_addr != NULL);
+    *(uint32_t volatile *)(d->local_addr + off) = data;
+#else
+    devmemd_write32(d->phys_addr + off, data);
+#endif
     return 0;
 }
 
-int _cs_write64_wo(struct cs_device *d, unsigned int off,
-		   unsigned long long data)
+int _cs_write64_wo(struct cs_device *d, unsigned int off, uint64_t data)
 {
-    assert(d->local_addr != NULL);
     assert((off & 7) == 0);
     assert(off < 4096);
-    *(unsigned long long volatile *) (d->local_addr + off) = data;
+#ifndef USE_DEVMEMD
+    assert(d->local_addr != NULL);
+    *(uint64_t volatile *)(d->local_addr + off) = data;
+#else
+    devmemd_write64(d->phys_addr + off, data);
+#endif
     return 0;
 }
 
 int _cs_write_traced(struct cs_device *d, unsigned int off,
-		     unsigned int data, char const *oname)
+		     uint32_t data, char const *oname)
 {
     unsigned int ndata;
     if (DTRACE(d)) {
@@ -234,22 +297,19 @@ int _cs_write_traced(struct cs_device *d, unsigned int off,
     _cs_write_wo(d, off, data);
     if (DCHECK(d)) {
 	/* Read the data back */
-	ndata = *(unsigned int volatile *) (d->local_addr + off);
+	ndata = _cs_read(d, off);
 	if (ndata != data) {
 	    diagf("!%" CS_PHYSFMT ": write %03X (%s) = %08X now %08X\n",
 		  d->phys_addr, off, oname, data, ndata);
 	}
     }
-#if defined(__arm__) || defined(__aarch64__)
-    __asm__ __volatile__("dmb sy");
-#endif
     return 0;
 }
 
 int _cs_write64_traced(struct cs_device *d, unsigned int off,
-		       unsigned long long data, char const *oname)
+		       uint64_t data, char const *oname)
 {
-    unsigned long long ndata;
+    uint64_t ndata;
     if (DTRACE(d)) {
 	diagf("!%" CS_PHYSFMT ": write %03X (%s) = %016llX\n",
 	      d->phys_addr, off, oname, data);
@@ -263,24 +323,21 @@ int _cs_write64_traced(struct cs_device *d, unsigned int off,
     _cs_write64_wo(d, off, data);
     if (DCHECK(d)) {
 	/* Read the data back */
-	ndata = *(unsigned long long volatile *) (d->local_addr + off);
+	ndata = _cs_read64(d, off);
 	if (ndata != data) {
 	    diagf("!%" CS_PHYSFMT
 		  ": write %03X (%s) = %016llX now %016llX\n",
 		  d->phys_addr, off, oname, data, ndata);
 	}
     }
-#if defined(__arm__) || defined(__aarch64__)
-    __asm__ __volatile__("dmb sy");
-#endif
     return 0;
 }
 
 int _cs_set_mask(struct cs_device *d, unsigned int off,
-		 unsigned int mask, unsigned int data)
+		 uint32_t mask, uint32_t data)
 {
-    unsigned int nword;
-    unsigned int const word = _cs_read(d, off);
+    uint32_t nword;
+    uint32_t const word = _cs_read(d, off);
     /* Check caller is not trying to set any bits outside their mask */
     assert((data & ~mask) == 0);
     nword = (word & ~mask) | data;
@@ -297,41 +354,41 @@ int _cs_set_mask(struct cs_device *d, unsigned int off,
 }
 
 int _cs_write_mask(struct cs_device *d, unsigned int off,
-		   unsigned int mask, unsigned int data)
+		   uint32_t mask, uint32_t data)
 {
-    unsigned int nword;
-    unsigned int const word = _cs_read(d, off);
+    uint32_t nword;
+    uint32_t const word = _cs_read(d, off);
     nword = (word & ~mask) | (data & mask);
     return _cs_write(d, off, nword);
 }
 
-int _cs_set_bit(struct cs_device *d, unsigned int off, unsigned int mask,
+int _cs_set_bit(struct cs_device *d, unsigned int off, uint32_t mask,
 		int value)
 {
     return _cs_set_mask(d, off, mask, value ? mask : 0);
 }
 
-int _cs_set(struct cs_device *d, unsigned int off, unsigned int bits)
+int _cs_set(struct cs_device *d, unsigned int off, uint32_t bits)
 {
     return _cs_set_mask(d, off, bits, bits);
 }
 
-int _cs_set_wo(struct cs_device *d, unsigned int off, unsigned int bits)
+int _cs_set_wo(struct cs_device *d, unsigned int off, uint32_t bits)
 {
     return _cs_write_wo(d, off, (_cs_read(d, off) | bits));
 }
 
-int _cs_clear(struct cs_device *d, unsigned int off, unsigned int bits)
+int _cs_clear(struct cs_device *d, unsigned int off, uint32_t bits)
 {
     return _cs_set_mask(d, off, bits, 0);
 }
 
-int _cs_isset(struct cs_device *d, unsigned int off, unsigned int bits)
+int _cs_isset(struct cs_device *d, unsigned int off, uint32_t bits)
 {
     return (_cs_read(d, off) & bits) == bits;
 }
 
-int _cs_wait(struct cs_device *d, unsigned int off, unsigned int bit)
+int _cs_wait(struct cs_device *d, unsigned int off, uint32_t bit)
 {
     int i;
     for (i = 0; i < wait_iterations; ++i) {
@@ -370,14 +427,14 @@ void _cs_set_wait_iterations(int iterations)
     wait_iterations = iterations;
 }
 
-int _cs_waitbits(struct cs_device *d, unsigned int off, unsigned int bits,
-		 cs_reg_waitbits_op_t operation, unsigned int pattern,
-		 unsigned int *p_last_val)
+int _cs_waitbits(struct cs_device *d, unsigned int off, uint32_t bits,
+		 cs_reg_waitbits_op_t operation, uint32_t pattern,
+		 uint32_t *p_last_val)
 {
-    unsigned int regval = 0;
+    uint32_t regval = 0;
     int ret = -1, i;
 
-    static char *err_msgs[] = {
+    static char const *const err_msgs[] = {
 	"waitbits(CS_REG_WAITBITS_ALL_1): all bits %03X.%08X failed to be set\n",
 	"waitbits(CS_REG_WAITBITS_ANY_1): none of bits %03X.%08X set\n",
 	"waitbits(CS_REG_WAITBITS_ALL_0): all bits %03X.%08X failed to clear\n",
@@ -392,7 +449,7 @@ int _cs_waitbits(struct cs_device *d, unsigned int off, unsigned int bits,
 	    if ((regval & bits) == bits) {
 		if (DTRACE(d)) {
 		    diagf("!%" CS_PHYSFMT
-			  ": bits %03X.%08X set after %d iterations\n",
+			  ": bits %03X.%08" PRIX32 " set after %d iterations\n",
 			  d->phys_addr, off, bits, i);
 		}
 		ret = 0;
@@ -404,7 +461,7 @@ int _cs_waitbits(struct cs_device *d, unsigned int off, unsigned int bits,
 	    if ((regval & bits) != 0) {
 		if (DTRACE(d)) {
 		    diagf("!%" CS_PHYSFMT
-			  ": bits %03X.%08X any set after %d iterations\n",
+			  ": bits %03X.%08" PRIX32 " any set after %d iterations\n",
 			  d->phys_addr, off, bits, i);
 		}
 		ret = 0;
@@ -416,7 +473,7 @@ int _cs_waitbits(struct cs_device *d, unsigned int off, unsigned int bits,
 	    if ((regval & bits) == 0) {
 		if (DTRACE(d)) {
 		    diagf("!%" CS_PHYSFMT
-			  ": bits %03X.%08X clear after %d iterations\n",
+			  ": bits %03X.%08" PRIX32 " clear after %d iterations\n",
 			  d->phys_addr, off, bits, i);
 		}
 		ret = 0;
@@ -428,24 +485,28 @@ int _cs_waitbits(struct cs_device *d, unsigned int off, unsigned int bits,
 	    if ((regval & bits) != bits) {
 		if (DTRACE(d)) {
 		    diagf("!%" CS_PHYSFMT
-			  ": bits %03X.%08X any clear after %d iterations\n",
+			  ": bits %03X.%08" PRIX32 " any clear after %d iterations\n",
 			  d->phys_addr, off, bits, i);
 		}
 		ret = 0;
-		break;
 	    }
+            break;
 
 	case CS_REG_WAITBITS_PTTRN:
-	    /* any bits clear */
+	    /* bits under mask match a pattern */
 	    if ((regval & bits) == (pattern & bits)) {
 		if (DTRACE(d)) {
 		    diagf("!%" CS_PHYSFMT
-			  ": bits %03X.%08X matched pattern %08X after %d iterations\n",
+			  ": bits %03X.%08" PRIX32 " matched pattern %08" PRIX32 " after %d iterations\n",
 			  d->phys_addr, off, bits, pattern, i);
 		}
 		ret = 0;
-		break;
 	    }
+            break;
+
+        default:
+            assert(0);
+            break;
 	}
 
 	if (ret == 0)
@@ -468,12 +529,12 @@ int _cs_waitbits(struct cs_device *d, unsigned int off, unsigned int bits,
     return ret;
 }
 
-int _cs_claim(struct cs_device *d, unsigned int bit)
+int _cs_claim(struct cs_device *d, uint32_t bit)
 {
     return _cs_write_wo(d, CS_CLAIMSET, bit);
 }
 
-int _cs_unclaim(struct cs_device *d, unsigned int bit)
+int _cs_unclaim(struct cs_device *d, uint32_t bit)
 {
     return _cs_write_wo(d, CS_CLAIMCLR, bit);
 }
@@ -482,7 +543,7 @@ int _cs_unclaim(struct cs_device *d, unsigned int bit)
   To read the current settings of the claim bits, use the CLAIMCLR register.
   (Reading the CLAIMSET register indicates which claim bits are implemented.)
 */
-int _cs_isclaimed(struct cs_device *d, unsigned int bit)
+int _cs_isclaimed(struct cs_device *d, uint32_t bit)
 {
     return _cs_isset(d, CS_CLAIMCLR, bit);
 }
@@ -495,6 +556,12 @@ int _cs_isunlocked(struct cs_device *d)
 }
 
 
+int _cs_is_lockable(struct cs_device *d)
+{
+    return (_cs_read(d, CS_LSR) & 1) == 1;
+}
+
+
 void _cs_unlock(struct cs_device *d)
 {
     if (!d->is_unlocked) {
@@ -502,7 +569,7 @@ void _cs_unlock(struct cs_device *d)
 	d->is_unlocked = 1;
     }
     if (DCHECK(d)) {
-	unsigned int lsr = _cs_read(d, CS_LSR);
+	uint32_t lsr = _cs_read(d, CS_LSR);
 	if ((lsr & 3) == 3) {
 	    /* Implemented (bit 0) and still locked (bit 1) */
 	    diagf("!%" CS_PHYSFMT ": after unlock, LSR=%08X\n",
@@ -536,10 +603,11 @@ void _cs_lock(struct cs_device *d)
 void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
 {
     void *localv;
-    cs_physaddr_t addr_to_map = addr;	/* may be rounded down to phys page size */
     assert(size > 0);
     assert((addr % 4096) == 0);
 #ifdef UNIX_USERSPACE
+#ifndef USE_DEVMEMD
+    cs_physaddr_t addr_to_map = addr;	/* may be rounded down to phys page size */
     {
 	unsigned int pagesize = sysconf(_SC_PAGESIZE);
 	if (size < pagesize) {
@@ -556,25 +624,44 @@ void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
 	return NULL;
     }
     localv = (unsigned char *) localv + (addr - addr_to_map);
+#else
+    /* When using devmemd, the local address is not used, but must be non-zero. */
+    localv = (unsigned char *)0xBAD;
+#endif
 #elif defined(UNIX_KERNEL)
     localv = ioremap(addr, size);
 #else
-    localv = (void *) addr_to_map;
+    localv = (void *)addr;
 #endif
     return localv;
 }
 
 
-void io_unmap(void *addr, unsigned int size)
+int _cs_map(struct cs_device *d, int writable)
+{
+    d->local_addr = (unsigned char volatile *)io_map(d->phys_addr, 4096, writable);
+    return d->local_addr != NULL;
+}
+
+
+void io_unmap(void volatile *addr, unsigned int size)
 {
 #ifdef UNIX_USERSPACE
-
-    (void) munmap(addr, size);
+#ifndef USE_DEVMEMD
+    (void)munmap((void *)addr, size);
+#endif
 #elif defined(UNIX_KERNEL)
     iounmap(addr);
 #else
     /* do nothing */
 #endif
+}
+
+void _cs_unmap(struct cs_device *d)
+{
+    if (d->local_addr) {
+        io_unmap(d->local_addr, 4096);
+    }
 }
 
 /* end of cs_access_cmnfns.c */

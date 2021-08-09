@@ -28,6 +28,7 @@ int main(int argc, char **argv)
     int do_custom = 0;
     int argidx = 1;
     unsigned long exclude_lo, exclude_hi;
+    cs_physaddr_t memap_addr = 0;
 
     printf("** CSLS: listing CoreSight config...\n");
     fflush(stdout);
@@ -56,6 +57,15 @@ int main(int argc, char **argv)
                             "** CSLS::Error: -romaddr needs an address parameter\n");
                     return EXIT_FAILURE;
                 }
+            } else if (strcmp(argv[argidx], "-memap") == 0) {
+                if (argc > ++argidx) {
+                    memap_addr = (cs_physaddr_t)strtoul(argv[argidx], NULL, 0);
+                    printf("** CSLS: Using MEM-AP at %" CS_PHYSFMT "\n", memap_addr);
+                } else {
+                    fprintf(stderr,
+                            "** CSLS::Error: -memap needs an address parameter\n");
+                    return EXIT_FAILURE;
+                }
             } else if (strcmp(argv[argidx], "-exclude") == 0) {
                 if ((argidx + 2) < argc) {
                     do_custom = 1;
@@ -79,6 +89,9 @@ int main(int argc, char **argv)
                             "** CSLS::Error: -exclude needs two address parameters\n");
                     return EXIT_FAILURE;
                 }
+            } else if ((strcmp(argv[argidx], "-v") == 0)
+                       || (strcmp(argv[argidx], "-verbose") == 0)) {
+                cs_diag_set(1);
             } else if ((strcmp(argv[argidx], "--help") == 0)
                        || (strcmp(argv[argidx], "-help") == 0)) {
                 printf
@@ -87,6 +100,10 @@ int main(int argc, char **argv)
                     ("    -snowball - uses snowball rom address - standalone option\n    -romaddr 0xNNNNNNNN uses 0xNNNNNNNN as ROM Address\n");
                 printf
                     ("    -exclude <addr_low> <addr_hi>  - exclude range from logging. Can be used multiple times with -romaddr. <addr> in 0xNNNNNNNN format\n\n");
+                printf
+                    ("    -memap <addr>    - access devices through a MEM-AP\n");
+                printf
+                    ("    -v/-verbose      - increase verbosity\n");
                 return EXIT_SUCCESS;
             } else {
                 fprintf(stderr, "**CSLS Error: unknown option '%s'\n",
@@ -99,6 +116,15 @@ int main(int argc, char **argv)
         printf("** CSLS: Using default ROM address 0x%08lX\n", romAddr);
     }
 
+    if (memap_addr) {
+#ifdef CSAL_MEMAP
+        cs_device_t memap_dev = cs_device_register(memap_addr);
+        cs_set_default_memap(memap_dev);
+#else
+        fprintf(stderr, "** CSLS: Not compiled with CSAL_MEMAP option\n");
+        return EXIT_FAILURE;
+#endif
+    }
     if (do_custom) {
         /* custom platform */
         cs_register_romtable(romAddr);

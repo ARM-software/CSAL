@@ -20,20 +20,19 @@
 #include "cs_reg_access.h"
 
 
-unsigned int cs_device_read(cs_device_t dev, unsigned int off)
+uint32_t cs_device_read(cs_device_t dev, unsigned int off)
 {
     return _cs_read(DEV(dev), off);
 }
 
-int cs_device_write(cs_device_t dev, unsigned int off, unsigned int data)
+int cs_device_write(cs_device_t dev, unsigned int off, uint32_t data)
 {
     /* Unlock the device if it is locked */
     _cs_unlock(DEV(dev));
     return _cs_write(DEV(dev), off, data);
 }
 
-int cs_device_write_only(cs_device_t dev, unsigned int off,
-                         unsigned int data)
+int cs_device_write_only(cs_device_t dev, unsigned int off, uint32_t data)
 {
     /* Unlock the device if it is locked */
     _cs_unlock(DEV(dev));
@@ -41,7 +40,7 @@ int cs_device_write_only(cs_device_t dev, unsigned int off,
 }
 
 int cs_device_write_masked(cs_device_t dev, unsigned int offset,
-                           unsigned int data, unsigned int bitmask)
+                           uint32_t data, uint32_t bitmask)
 {
 /* Unlock the device if it is locked */
     _cs_unlock(DEV(dev));
@@ -49,21 +48,21 @@ int cs_device_write_masked(cs_device_t dev, unsigned int offset,
 }
 
 
-int cs_device_set(cs_device_t dev, unsigned int off, unsigned int bits)
+int cs_device_set(cs_device_t dev, unsigned int off, uint32_t bits)
 {
     _cs_unlock(DEV(dev));
     return _cs_set(DEV(dev), off, bits);
 }
 
-int cs_device_clear(cs_device_t dev, unsigned int off, unsigned int bits)
+int cs_device_clear(cs_device_t dev, unsigned int off, uint32_t bits)
 {
     _cs_unlock(DEV(dev));
     return _cs_clear(DEV(dev), off, bits);
 }
 
 int cs_device_wait(cs_device_t dev, unsigned int offset,
-                   unsigned int bit_mask, cs_reg_waitbits_op_t operation,
-                   unsigned int pattern, unsigned int *p_last_val)
+                   uint32_t bit_mask, cs_reg_waitbits_op_t operation,
+                   uint32_t pattern, uint32_t *p_last_val)
 {
     assert((operation >= CS_REG_WAITBITS_ALL_1)
            && (operation < CS_REG_WAITBITS_END));
@@ -89,6 +88,37 @@ unsigned short cs_device_part_number(cs_device_t dev)
 {
     struct cs_device *d = DEV(dev);
     return d->part_number;
+}
+
+
+/*
+ * Barriers.
+ *
+ * These ensure completion of a write to a device, and they take a device parameter
+ * because there might in principle be different ways of accessing devices.
+ * E.g. if a device was accessed through an AXI-AP we might need to push a
+ * barrier through the AP.
+ *
+ * As it is, we assume any MEM-AP is an APB-AP so doesn't need additional
+ * action other than the barrier on the write to the MEM-AP itself.
+ */
+
+void cs_device_data_barrier(cs_device_t dev)
+{
+#ifndef USE_DEVMEMD
+    __asm__ __volatile__("dmb sy");
+#else
+    /* devmemd can be assumed to have executed sufficient barriers */
+#endif
+}
+
+void cs_device_instruction_barrier(cs_device_t dev)
+{
+#ifndef USE_DEVMEMD
+    __asm__ __volatile__("dsb sy");
+#else
+    /* devmemd can be assumed to have executed sufficient barriers */
+#endif
 }
 
 /* end of cs_reg_access.c */

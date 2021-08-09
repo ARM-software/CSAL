@@ -216,30 +216,30 @@ typedef struct cs_etm_config {
         union _u_cr_reg_bits {
             unsigned int reg; /**< Control register - dynamic configuration */
             struct _cr_bits {
-                unsigned int etm_power_down:1;
-                unsigned int monitor_cprt:1;
-                unsigned int data_access:2;
-                unsigned int _port_size_20:3;
-                unsigned int stall_processor:1;
-                unsigned int branch_output:1;
-                unsigned int debug_req_ctrl:1;
-                unsigned int prog_mode:1;
-                unsigned int etm_en:1;
-                unsigned int cycle_accurate:1;
-                unsigned int _port_mode_2:1;
-                unsigned int cxid_size:2;
-                unsigned int _port_mode_10:2;
-                unsigned int suppress_data:1;
-                unsigned int filter_cprt:1;
-                unsigned int data_only_mode:1;
-                unsigned int _port_size_3:1;
-                unsigned int disable_dbg_writes:1;
-                unsigned int disable_sw_writes:1;
-                unsigned int instr_res_ac:1;
-                unsigned int proc_select:3;
-                unsigned int timestamp_enabled:1;
-                unsigned int ret_stack:1;
-                unsigned int vmid_trace:1;
+                unsigned int etm_power_down:1;    /**< Power down trace unit, disable writes */
+                unsigned int monitor_cprt:1;      /**< ETM: Trace coprocessor transfers (if supported) */
+                unsigned int data_access:2;       /**< ETM: Data trace (x1: data, 1x: address) */
+                unsigned int _port_size_20:3;     /**< ETM: External pins for trace output */
+                unsigned int stall_processor:1;   /**< ETM: FIFOFULL stalls core (if supported) */
+                unsigned int branch_output:1;     /**< Enable Branch-broadcast */
+                unsigned int debug_req_ctrl:1;    /**< Assert DBGRQ when trigger occurs */
+                unsigned int prog_mode:1;         /**< Trace unit is being programmed */
+                unsigned int etm_en:1;            /**< ETM: Enable trace output */
+		unsigned int cycle_accurate:1;    /**< Enable Cycle counts */
+                unsigned int _port_mode_2:1;      /**< ETM: See _port_mode_10 */
+                unsigned int cxid_size:2;         /**< Select width of CONTEXTID to trace */
+                unsigned int _port_mode_10:2;     /**< ETM: Trace port clocking mode - not supported */
+                unsigned int suppress_data:1;     /**< ETM: Suppress data when overloaded */
+                unsigned int filter_cprt:1;       /**< ETM: Filter coprocessor transfers (if supported) */
+                unsigned int data_only_mode:1;    /**< ETM: Data only, instruction trace disabled */
+                unsigned int _port_size_3:1;      /**< ETM: See _port_size_20 */
+                unsigned int disable_dbg_writes:1;/**< ETM: Disable writes from external debugger */
+                unsigned int disable_sw_writes:1; /**< ETM: Disable writes from s/w */
+                unsigned int instr_res_ac:1;      /**< Instrumentation is privileged only */
+                unsigned int proc_select:3;       /**< Core Select for shared trace - not supported */
+                unsigned int timestamp_enabled:1; /**< PTM: Enable timestamping */
+                unsigned int ret_stack:1;         /**< PTM: Enable return stack */
+                unsigned int vmid_trace:1;        /**< PTM: Trace VMID changes */
             } c;  /**< register bit fields */
         } raw;	 /**< Union between the raw control register and its bit fields */
         unsigned int port_size;	    /**< Port size value extracted from bit fields */

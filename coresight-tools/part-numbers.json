@@ -1,5 +1,6 @@
 {
     "_type": "Part numbers",
+    "_license": "SPDX-License-Identifier: Apache 2.0",
     "parts": [        
         { "part": "0x193", "name": "CSSoC-600 Timestamp" },
         { "part": "0x906", "name": "CS CTI" },

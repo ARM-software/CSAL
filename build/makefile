@@ -34,7 +34,7 @@ include ../makefile-arch.inc
 
 # default settings - allow for cross compile of library 
 CC=$(CROSS_COMPILE)gcc
-CFLAGS=-Wall -Wno-switch
+CFLAGS=-Wall -Wno-switch -Werror
 
 LIB_DIR = ../lib/$(ARCH)/rel
 LIB_DIR_BM=../lib/$(ARCH)/rel_bm
@@ -103,6 +103,7 @@ CSSRC=  cs_init_manage.c \
 		cs_cti_ect.c \
 		cs_etm.c \
 		cs_etm_v4.c \
+		cs_memap.c \
 		cs_reg_access.c \
 		cs_sw_stim.c \
 		cs_topology.c \
@@ -113,6 +114,21 @@ CSSRC=  cs_init_manage.c \
 # add in the extra for halting debug - blank if not in use 
 CSSRC+=$(CSSRC_HALT)
 
+#
+# For development use only, we can enable redirecting physical
+# memory references to a remote target over a network connection.
+#
+ifeq ($(DEVMEMD),1)
+CSSRC+=cs_stub_devmemd.c
+CFLAGS+=-DUSE_DEVMEMD
+endif
+
+#
+# Enable support for indirecting device accesses via MEM-AP.
+#
+ifeq ($(MEMAP),1)
+CFLAGS+=-DCSAL_MEMAP
+endif
 
 CSUTILSRC=	cs_trace_metadata.c \
 		cs_util_create_snapshot.c \
@@ -192,11 +208,16 @@ clean: clean_objs
 	rm -fr $(LIB_DIR)/*.so
 	rm -fr $(LIB_DIR)/*.a
 
+#
+# Clean all objects in build directories, even ones not selected by whatever
+# make options were passed to make when we ran "make clean".
+#
 .PHONY: clean_objs
 clean_objs:
-	rm -fr $(A_OBJS) $(A_DEPS)
-	rm -fr $(A_OBJS_UTIL) $(A_DEPS_UTIL)
-	rm -fr $(SO_OBJS) $(SO_DEPS)
-	rm -fr $(SO_OBJS_UTIL) $(SO_DEPS_UTIL)
-
+	#rm -fr $(A_OBJS) $(A_DEPS)
+	#rm -fr $(A_OBJS_UTIL) $(A_DEPS_UTIL)
+	#rm -fr $(SO_OBJS) $(SO_DEPS)
+	#rm -fr $(SO_OBJS_UTIL) $(SO_DEPS_UTIL)
+	rm -fr $(BUILD_DIR)/a/*.o $(BUILD_DIR)/a/*.d
+	rm -fr $(BUILD_DIR)/so/*.o $(BUILD_DIR)/so/*.d
 

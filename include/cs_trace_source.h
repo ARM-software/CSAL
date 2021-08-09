@@ -62,7 +62,7 @@ int cs_replicator_set_filter(cs_device_t dev, unsigned int port,
 /**
    Get the current global timestamp from the system timestamp generator, if available.
 */
-int cs_get_global_timestamp(unsigned long long *ts);
+int cs_get_global_timestamp(uint64_t *ts);
 
 /** @} */
 

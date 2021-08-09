@@ -21,7 +21,9 @@
   limitations under the License.
 */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <sched.h>		/* for CPU_* family, requires glibc 2.6 or later */
 #include <unistd.h>		/* for usleep() */
@@ -116,7 +118,7 @@ static void create_dump_ini(int index, cs_device_t device, bool zeroindex,
             n = cs_get_trace_metadata(CS_METADATA_INI, device, index, buf,
                                       sizeof buf, name_buf, name_buf_size);
         }
-        if (n < sizeof buf) {
+        if (n < (int)(sizeof buf)) {
             fprintf(fd, "%s", buf);
             fclose(fd);
         }
@@ -190,7 +192,7 @@ int dump_kernel_memory(char const *fn, unsigned long start,
         if (pkcba == 1) {
             printf
                 ("can't read the physical kernel code base address from /proc/iomem\n");
-            local = MAP_FAILED;
+            local = (unsigned char *)MAP_FAILED;
         } else {
             fd_mem = open("/dev/mem", O_RDONLY);
             if (fd_mem >= 0) {
@@ -205,7 +207,7 @@ int dump_kernel_memory(char const *fn, unsigned long start,
                 close(fd_mem);
             } else {
                 printf("can't open /dev/mem either\n");
-                local = MAP_FAILED;
+                local = (unsigned char *)MAP_FAILED;
             }
         }
     }

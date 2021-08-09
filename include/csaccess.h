@@ -33,6 +33,7 @@
 #include "cs_debug_sample.h"   /**< access core debug registers - PC sampling  */
 #include "cs_pmu.h"	       /**< access core PMU registers - event sampling */
 #include "cs_ts_gen.h"	       /**< access CS timestamp generator */
+#include "cs_memap.h"          /**< MEM-AP devices */
 
 #endif				/* included */
 

@@ -87,8 +87,7 @@ int cs_trace_swstim_get_port_count(cs_device_t dev);
  *  \param port   the stimulus port index - must be in valid range for the device
  *  \param value  the stimulus message value (payload)
  */
-int cs_trace_stimulus(cs_device_t dev, unsigned int port,
-		      unsigned int value);
+int cs_trace_stimulus(cs_device_t dev, unsigned int port, uint32_t value);
 
 /*!
  * Enable triggers on stimulus port write.
@@ -103,8 +102,7 @@ int cs_trace_stimulus(cs_device_t dev, unsigned int port,
  *
  * @return int  : 0 for success.
  */
-int cs_trace_swstim_enable_trigger(cs_device_t dev, unsigned int mask,
-				   unsigned int value);
+int cs_trace_swstim_enable_trigger(cs_device_t dev, uint32_t mask, uint32_t value);
 
 /*!
  * Enable all SW stimulus ports on the device.

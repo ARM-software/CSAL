@@ -29,6 +29,10 @@ limitations under the License.
 #include <stdlib.h>
 #include <signal.h>
 #include <setjmp.h>
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+#include <inttypes.h>
 
 #include <getopt.h>
 #include <unistd.h>
@@ -47,7 +51,7 @@ static int verbosity;
 
 struct page {
     struct page *next;         /* Next page in bucket */
-    unsigned long phys_addr;   /* Base physical address of page */
+    physaddr_t phys_addr;      /* Base physical address of page */
     unsigned char *virt_addr;  /* Base virtual address of our mapping */
 };
 
@@ -60,6 +64,13 @@ static int devmem_fd;
 /* Daemon is in read-only mode */
 static int o_readonly = 0;
 
+/* New mappings on demand are enabled */
+static int mmap_enabled = 1;
+
+/* Memory limits */
+static physaddr_t lomem = 0x0000;
+static physaddr_t himem = (physaddr_t)(-1);
+
 /* mmap flags - device access requires MAP_SHARED */
 static int mmap_flags = MAP_SHARED;
 
@@ -70,18 +81,19 @@ static unsigned long page_size;
 static sigjmp_buf bussig;
 
 
-static int is_aligned(unsigned long addr, unsigned int size)
+static int is_aligned(physaddr_t addr, unsigned int size)
 {
     return (addr & (size-1)) == 0;
 }
 
 
 /*
- * Get the page structure for a physical address
+ * Get the page structure for a physical address.
+ * Always returns non-NULL.
  */
-static struct page *devmem_page(unsigned long addr)
+static struct page *devmem_page(physaddr_t addr)
 {
-    unsigned long const page_base = (addr & -page_size);
+    physaddr_t const page_base = (addr & -page_size);
     struct page **page_head = &pages;
     struct page *page;
     assert(is_aligned(page_base, page_size));
@@ -102,7 +114,7 @@ static struct page *devmem_page(unsigned long addr)
 
 
 /*
- * mmap() a page
+ * mmap() a page, if not already mapped.
  */
 static void *devmem_map_page(struct page *p)
 {
@@ -126,11 +138,19 @@ static void *devmem_map_page(struct page *p)
 /*
  * Get a virtual address for a physical address
  */
-static unsigned char *devmem_loc(unsigned long addr)
+static unsigned char *devmem_loc(physaddr_t addr)
 {
     struct page *p = devmem_page(addr);
-    if (!devmem_map_page(p)) {
-        return NULL;
+    if (!p->virt_addr) {
+        if (!mmap_enabled) {
+            return NULL;
+        }
+        if (addr < lomem || addr >= himem) {
+            return NULL;
+        }
+        if (!devmem_map_page(p)) {
+            return NULL;
+        }
     }
     /* VA result is the base VA of the mapping plus the offset between the
        requested physical address and the base physical address of the page. */
@@ -138,7 +158,7 @@ static unsigned char *devmem_loc(unsigned long addr)
 }
 
 
-static int devmem_read(unsigned long addr, unsigned long *data, unsigned int size)
+static int devmem_read(physaddr_t addr, uint64_t *data, unsigned int size)
 {
     void *p = devmem_loc(addr);
     if (!p) {
@@ -154,28 +174,28 @@ static int devmem_read(unsigned long addr, unsigned long *data, unsigned int siz
     } 
     switch (size) {
     case 1:
-        *data = *(unsigned char *)p;
+        *data = *(uint8_t *)p;
         break;
     case 2:
-        *data = *(unsigned short *)p;
+        *data = *(uint16_t *)p;
         break;
     case 4:
-        *data = *(unsigned int *)p;
+        *data = *(uint32_t *)p;
         break;
     case 8:
-        *data = *(unsigned long *)p;
+        *data = *(uint64_t *)p;
         break;
     default:
         assert(0);
     }
     if (verbosity >= 2) {
-        printf("devmemd: 0x%lx -> %p -[%u]> 0x%lx\n", addr, p, size, *data);
+        printf("devmemd: 0x%lx -> %p -[%u]> 0x%" PRIx64 "\n", addr, p, size, *data);
     }
     return DEVMEMD_ERR_OK;
 }
 
 
-static int devmem_write(unsigned long addr, unsigned long data, unsigned int size)
+static int devmem_write(physaddr_t addr, uint64_t data, unsigned int size)
 {
     void *p = devmem_loc(addr);
     if (!p) {
@@ -187,19 +207,22 @@ static int devmem_write(unsigned long addr, unsigned long data, unsigned int siz
     if (sigsetjmp(bussig, 1)) {
         printf("devmemd: bus error: %u-byte write to 0x%lx\n", size, addr);
         return DEVMEMD_ERR_BUS;
-    } 
+    }
+    if (verbosity >= 2) {
+        printf("devmemd: 0x%lx -> %p <[%u]- 0x%" PRIx64 "\n", addr, p, size, data);
+    }
     switch (size) {
     case 1:
-        *(unsigned char *)p = (unsigned char)data;
+        *(uint8_t volatile *)p = (uint8_t)data;
         break;
     case 2:
-        *(unsigned short *)p = (unsigned short)data;
+        *(uint16_t volatile *)p = (uint16_t)data;
         break;
     case 4:
-        *(unsigned int *)p = (unsigned int)data;
+        *(uint32_t volatile *)p = (uint32_t)data;
         break;
     case 8:
-        *(unsigned long *)p = (unsigned long)data;
+        *(uint64_t volatile *)p = (uint64_t)data;
         break;
     default:
         assert(0);
@@ -218,7 +241,10 @@ static void sigbus_handler(int sig)
 /* Options for getopt_long() */
 static struct option const long_options[] = {
     { "help", no_argument, NULL, 'h' },
+    { "himem", required_argument, NULL, 'H' },
+    { "lomem", required_argument, NULL, 'L' },
     { "map", required_argument, NULL, 'm' },
+    { "nomap", no_argument, NULL, 'n' },
     { "port", required_argument, NULL, 'p' },
     { "private", no_argument, NULL, 'P' },
     { "readonly", no_argument, NULL, 'r' },
@@ -231,11 +257,14 @@ static void help(void)
 {
     printf(
 "Usage: devmemd [OPTION]...\n"
-"  --map=<addr>  pre-map this physical address\n"
-"  --port=<n>    listen on TCP port <n> (default is random)\n"
-"  --private     use MAP_PRIVATE mapping (won't update devices)\n"
-"  --readonly    reject write requests\n"
-"  --verbose     increase verbosity level\n"
+"  --himem=<addr>   set upper bound for physical memory\n"
+"  --lomem=<addr>   set lower bound for physical memory\n"
+"  --map=<addr>     pre-map this physical address\n"
+"  --nomap          no on-demand mappings\n"
+"  --port=<n>       listen on TCP port <n> (default is random)\n"
+"  --private        use MAP_PRIVATE mapping (won't update devices)\n"
+"  --readonly       reject write requests\n"
+"  --verbose        increase verbosity level\n"
     );
 }
 
@@ -264,13 +293,23 @@ int main(int argc, char **argv)
         case 'h':
             help();
             exit(EXIT_SUCCESS);
+        case 'H':
+            sscanf(optarg, "%lx", &himem);
+            break;
+        case 'L':
+            sscanf(optarg, "%lx", &lomem);
+            break;
         case 'm':
             {
-                unsigned long phys_addr;
+                physaddr_t phys_addr;
                 sscanf(optarg, "%lx", &phys_addr);
                 printf("devmemd: will pre-map 0x%lx...\n", phys_addr);
+                /* Creating the page record will cause it to be mmap'ed later */
                 (void)devmem_page(phys_addr);
             }
+            break;
+        case 'n':
+            mmap_enabled = 0;
             break;
         case 'p':
             o_port = atoi(optarg);
@@ -303,7 +342,8 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
     }
-    printf("devmemd: opened fd=%d on %s, page size 0x%lx\n", devmem_fd, devmem_fn, page_size);
+    printf("devmemd: opened fd=%d on %s, page size 0x%lx, 0x%lx..0x%lx\n",
+        devmem_fd, devmem_fn, page_size, lomem, himem);
     /* Map any preload pages */
     {
         struct page *p;
