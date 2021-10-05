@@ -25,6 +25,11 @@ uint32_t cs_device_read(cs_device_t dev, unsigned int off)
     return _cs_read(DEV(dev), off);
 }
 
+uint64_t cs_device_read32x2(cs_device_t dev, unsigned int hioff, unsigned int looff)
+{
+    return ((uint64_t)cs_device_read(dev, hioff) << 32) | cs_device_read(dev, looff);
+}
+
 int cs_device_write(cs_device_t dev, unsigned int off, uint32_t data)
 {
     /* Unlock the device if it is locked */

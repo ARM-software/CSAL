@@ -38,8 +38,8 @@ void _diagf(char const *s, ...)
     va_list args;
     va_start(args, s);
     if (s[0] == '!') {
-	fprintf(stderr, "** csaccess: ");
-	++s;
+        fprintf(stderr, "** csaccess: ");
+        ++s;
     }
     vfprintf(stderr, s, args);
     va_end(args);

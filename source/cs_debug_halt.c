@@ -18,6 +18,39 @@
 
 #include "cs_access_cmnfns.h"
 #include "cs_debug_sample.h"
+#include "cs_reg_access.h"
+
+uint32_t cs_debug_recv32(cs_device_t dev)
+{
+    struct cs_device *d = DEV(dev);
+    return _cs_read(d, CS_DBGDTRTX);
+}
+
+
+uint64_t cs_debug_recv64(cs_device_t dev)
+{
+    return cs_device_read32x2(dev, CS_DBGDTRRX, CS_DBGDTRTX);
+}
+
+
+int cs_debug_send32(cs_device_t dev, uint32_t data)
+{
+    struct cs_device *d = DEV(dev);
+    return _cs_write_wo(d, CS_DBGDTRRX, data);
+}
+
+
+int cs_debug_send64(cs_device_t dev, uint64_t data)
+{
+    int rc;
+    struct cs_device *d = DEV(dev);
+    rc = _cs_write_wo(d, CS_DBGDTRTX, (data >> 32));
+    if (!rc) {
+        rc = _cs_write_wo(d, CS_DBGDTRRX, (data & 0xffffffff));
+    }
+    return rc;
+}
+
 
 #ifdef USING_V7_DBG_HALT
 
@@ -27,7 +60,7 @@ int cs_debug_halt(cs_device_t dev, unsigned int flags)
     unsigned int req;
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_CPU_DEBUG);
-    assert(!IS_V8(d));
+    assert(!IS_V8(d));   /* In v8, we need to halt via the CTI */
 
     /* Request halt */
     _cs_unlock(d);

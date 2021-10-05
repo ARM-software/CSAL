@@ -54,6 +54,14 @@ unsigned short cs_device_part_number(cs_device_t dev);
 */
 uint32_t cs_device_read(cs_device_t dev, unsigned int offset);
 
+/** Read a 64-bit value from a pair of device registers
+  *   \param dev     device descriptor
+  *   \param hioff   register offset for high word
+  *   \param looff   register offset for low word
+  *   \return        value in the register pair
+*/
+uint64_t cs_device_read32x2(cs_device_t dev, unsigned int hioff, unsigned int looff);
+
 /** Write a value to a device register.
   *
   * This should be used for normal configuration registers that are expected to

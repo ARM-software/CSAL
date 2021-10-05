@@ -75,6 +75,38 @@ typedef enum cs_debug_moe {
  */
 int cs_debug_is_halted(cs_device_t dev, cs_debug_moe_t * reason);
 
+
+/**
+ *  Write a 32-bit value to the transfer register
+ *
+ *  \param dev      device descriptor for CPU
+ *  \param data     data to write
+ */
+int cs_debug_send32(cs_device_t dev, uint32_t data);
+
+/**
+ *  Write a 64-bit value to the transfer registers (ARMv8)
+ *
+ *  \param dev      device descriptor for CPU
+ *  \param data     data to write
+ */
+int cs_debug_send64(cs_device_t dev, uint64_t data);
+
+/**
+ *  Read a 32-bit value from the transfer register; ignore errors
+ *
+ *  \param dev      device descriptor for CPU
+ */
+uint32_t cs_debug_recv32(cs_device_t dev);
+
+/**
+ *  Read a 64-bit value from the transfer registers; ignore errors
+ *
+ *  \param dev      device descriptor for CPU
+ */
+uint64_t cs_debug_recv64(cs_device_t dev);
+
+
 /**
  *  Attempt to check if a CPU is currently executing instructions.
  *  We do this by clearing a flag that is set by instruction execution

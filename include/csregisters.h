@@ -76,7 +76,8 @@ Common register definitions in the management group of all CoreSight devices
 #define CS_DEVTYPE 0xFCC    /**< CS Device Type register */
 #define CS_DEVID   0xFC8    /**< CS Device ID register */
 #define CS_DEVID1  0xFC4    /**< CS Device ID register 1 */
-#define CS_DEVID0  0xFC0    /**< CS Device ID register 0 */
+#define CS_DEVID2  0xFC0    /**< CS Device ID register 2 */
+#define CS_DEVID0  0xFC0    /**< CS Device ID register 0 (old name) */
 
 #define CS_DEVARCH  0xFBC   /**< CS device architecture register  */
 
@@ -691,16 +692,22 @@ The cross trigger matrix does not have any programmable elements so needs no reg
 /* CTI */
 #define CS_CTICONTROL        0x000     /**< CTI Control Register */
 #define CS_CTICONTROL_GLBEN    0x00000001  /**< CTI CTRL bitfield (#CS_CTICONTROL): Enables or disables the ECT */
+#define CS_CTIINTACK         0x010     /**< CTI Interrupt Acknowledge Register (SoC-600) */
 #define CS_CTIAPPSET         0x014     /**< CTI Application Channel Trigger Set Register */
 #define CS_CTIAPPCLEAR       0x018     /**< CTI Application Channel Trigger Clear Register */
 #define CS_CTIAPPPULSE       0x01C     /**< CTI Application Channel Pulse Register */
 #define CS_CTIINEN(n)        (0x020 + (n)*4)	 /**< CTI Input Trigger (n) to Channel Enable */
 #define CS_CTIOUTEN(n)       (0x0A0 + (n)*4)	 /**< CTI Channel to Output Trigger (n) Enable */
-#define CS_CTITRIGINSTATUS   0x130     /**< CTI Trigger In Status Register */
+#define CS_CTITRIGINSTATUS   0x130     /**< CTI Trigger In Status Register - for pulsed events, generally 0 */
 #define CS_CTITRIGOUTSTATUS  0x134     /**< CTI Trigger Out Status Register */
 #define CS_CTICHINSTATUS     0x138     /**< CTI Channel In Status Register */
 #define CS_CTICHOUTSTATUS    0x13C     /**< CTI Channel Out Status Register */
 #define CS_CTIGATE           0x140     /**< Enable CTI Channel Gate Register */
+#define CS_CTIITCHOUT        0xEE4     /**< CTI Integration Test Channel Output Register */
+#define CS_CTIITTRIGOUT      0xEE8     /**< CTI Integration Test Trigger Output Register */
+#define CS_CTIITCHIN         0xEF4     /**< CTI Integration Test Channel Input Register (latched) */
+#define CS_CTIITTRIGIN       0xEF8     /**< CTI Integration Test Trigger Input Register (latched) */
+#define CS_CTIITCTRL         0xF00     /**< CTI Integration Mode Control Register */
 
 /** CTI Event channel enable bitfield values.
  'OR' combine for multiple channel source/sink for event. 
@@ -780,8 +787,8 @@ Register definitions and bitfield values for the Architecture v7 Cortex Core deb
 /** @name DBGDRCR Bit Values 
  see #CS_DBGDRCR
 @{*/
-#define CS_DBGDRCR_HRQ         0x00000001   /**< Halt */
-#define CS_DBGDRCR_RRQ         0x00000002   /**< Restart */
+#define CS_DBGDRCR_HRQ         0x00000001   /**< Halt (not v8) */
+#define CS_DBGDRCR_RRQ         0x00000002   /**< Restart (not v8) */
 #define CS_DBGDRCR_CSE         0x00000004   /**< Clear Sticky Exceptions */
 #define CS_DBGDRCR_CSPA        0x00000008   /**< Clear Sticky Pipeline Advance */
 #define CS_DBGDRCR_CBRRQ       0x00000010   /**< Cancel Bus Requests */
@@ -904,6 +911,67 @@ Register definitions and bitfield values for MEM-AP devices.
 #define CS_MEMAP_CFG     0xDF4    /**< Configuration Register */
 #define CS_MEMAP_BASE    0xDF8    /**< ROM Base Register */
 #define CS_MEMAP_IDR     0xDFC    /**< Identification Register */
+
+/** @} */
+
+
+/** @defgroup cs_ela CoreSight ELA registers
+    @ingroup reg_defs
+
+Register definitions and bitfield values for ELA devices.
+@{
+*/
+
+/* Control */
+#define CS_ELA_CTRL      0x000    /**< Control register */
+#define CS_ELA_CTRL_RUN         0x0001  /**< ELA enabled */
+#define CS_ELA_CTRL_TRACE_BUSY  0x0002  /**< Trace busy (ELA-600) */
+#define CS_ELA_TIMECTRL  0x004    /**< Timestamp control register */
+#define CS_ELA_TSSR      0x008    /**< Trigger state select register */
+#define CS_ELA_ATBCTRL   0x00C    /**< ATB control (ELA-600) */
+#define CS_ELA_ATBCTRL_ATID_VALUE   0x7F00  /**< Set ATID for ATB transactions */
+#define CS_ELA_PTACTION  0x010    /**< Pre-trigger action register (use CS_ELA_ACTION fields) */
+#define CS_ELA_AUXCTRL   0x014    /**< Auxiliary control (ELA-600) */
+#define CS_ELA_CNTSEL    0x018    /**< Counter select (ELA-600) */
+
+/* Current state */
+#define CS_ELA_CTSR      0x020    /**< Current trigger state (RO) */
+#define CS_ELA_CTSR_FINALSTATE  0x80000000  /**< Trigger states no longer advancing */
+#define CS_ELA_CCVR      0x024    /**< Current counter value (RO; sampled by CTSR) */
+#define CS_ELA_CAVR      0x028    /**< Current action value (RO; sampled by CTSR) */
+#define CS_ELA_RDCAPTID  0x02C    /**< Read captured transaction ID */
+#define CS_ELA_RDCAPTIDEXT 0x030  /**< Read extended captured transaction ID (ELA-600) */
+
+/* RAM */
+#define CS_ELA_RRAR      0x040    /**< RAM read address */
+#define CS_ELA_RRDR      0x044    /**< RAM read data */
+#define CS_ELA_RWAR      0x048    /**< RAM write address */
+#define CS_ELA_RWDR      0x04C    /**< RAM write data */
+
+/* Trigger state */
+#define _ELATR(n,r) ((0x100*n)+r)
+#define CS_ELA_SIGSEL(n)       _ELATR(n,0x100)  /**< Signal select */
+#define CS_ELA_TRIGCTRL(n)     _ELATR(n,0x104)  /**< Trigger control */
+#define CS_ELA_NEXTSTATE(n)    _ELATR(n,0x108)  /**< Next state */
+#define CS_ELA_ACTION          _ELATR(n,0x10C)  /**< Action */
+#define CS_ELA_ACTION_CTTRIGOUT  0x03       /**< Values to drive on CTTRIGOUT[1:0] */
+#define CS_ELA_ACTION_STOPCLOCK  0x04       /**< Drive 1 on STOPCLOCK */
+#define CS_ELA_ACTION_TRACE      0x08       /**< Trace active */
+#define CS_ELA_ACTION_ELAOUTPUT  0xF0       /**< Values to drive on ELAOUTPUT[3:0] */
+#define CS_ELA_ALTNEXTSTATE(n) _ELATR(n,0x110)  /**< Alt next state */
+#define CS_ALTACTION(n)        _ELATR(n,0x114)  /**< Alt action */
+#define CS_COMPCTRL(n)         _ELATR(n,0x118)  /**< Comparator control (ELA-600) */
+#define CS_ALTCOMPCTRL(n)      _ELATR(n,0x11C)  /**< Alt comparator control (ELA-600) */
+#define CS_COUNTCOMP(n)        _ELATR(n,0x120)  /**< Counter compare */
+#define CS_TWBSEL              _ELATR(n,0x128)  /**< Trace write byte select (ELA-600) */
+#define CS_EXTMASK(n)          _ELATR(n,0x130)  /**< External mask */
+#define CS_EXTMASK_CTTRIGIN      0x03       /**< Mask CTTRIGIN[1:0] signals */
+#define CS_EXTMASK_EXTTRIG       0xFC       /**< Mask EXTTRIG[5:0] signals */
+#define CS_EXTCOMP(n)          _ELATR(n,0x134)  /**< External compare */
+#define CS_QUALMASK(n)         _ELATR(n,0x138)  /**< Qualifier mask (ELA-600) */
+#define CS_QUALCOMP(n)         _ELATR(n,0x13C)  /**< Qualifier compare (ELA-600) */
+#define CS_SIGMASK(n)          _ELATR(n,0x140)  /**< Signal mask (first word) */
+#define CS_SIGCOMP(n)          _ELATR(n,0x180)  /**< Signal compare (first word) */
 
 /** @} */
 

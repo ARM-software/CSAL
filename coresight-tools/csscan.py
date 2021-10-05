@@ -7,6 +7,8 @@ Also do ATB and CTI topology detection.
 ---
 Copyright (C) ARM Ltd. 2018-2021.  All rights reserved.
 
+SPDX-License-Identifer: Apache 2.0
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -177,6 +179,17 @@ def bits_set(w,m):
         return "-"
 
 assert bits_set(0x011,{0:"x",2:"y",4:"z"}) == "x z"
+
+
+def decode_one_hot(x,n):
+    bs = []
+    for i in range(n):
+        if bit(x,i):
+            bs.append(i)
+    if len(bs) == 1:
+        return str(bs[0])
+    else:
+        return "?%s" % str(bs)
 
 
 class DevicePhy:
@@ -1045,6 +1058,8 @@ class CSROM:
             if (edprsr & 0x4) == 1:
                 print(" halted", end="")
             if not core_powered_off:
+                midr = d.read32(0xD00)
+                print(" midr=0x%08x" % midr, end="")
                 pfr = d.read32x2(0xD24,0xD20)     # EDPFR: External Debug Processor Feature Register
                 if True or o_verbose:
                     print(" pfr=0x%x" % (pfr), end="")
@@ -1193,10 +1208,21 @@ class CSROM:
             if rombase not in [0x0,0x2]:
                 print(" ROM:%#x" % rombase, end="")
         elif d.is_arm_architecture(ARM_ARCHID_ELA):
-            rwidth = bits(devid,8,8)
-            print(" devid:0x%08x entries:%u" % (devid, (1<<rwidth)), end="")
+            devid1 = d.read32(0xFC4)
+            devid2 = d.read32(0xFC0)
+            ram_addr_width = bits(devid,8,8)    # SRAM address width in bits, e.g. 6 bits => 64 entries
+            print(" devid:0x%08x entries:%u" % (devid, (1<<ram_addr_width)), end="")
+            print(" trace-format-%u" % bits(devid,4,4), end="")
             if bits(devid,0,4):
                 print(" ATB", end="")
+            if bits(devid,16,4):
+                print(" COND_TRIG:%u" % bits(devid,16,5), end="")
+            if bits(devid,25,4) == 1:
+                print(" scrambler", end="")
+            print(" groupwidth=%u" % ((bits(devid1,8,8)+1)*8), end="")
+            print(" trigstates=%u" % bits(devid1,16,8), end="")
+            if bits(devid2,8,8):
+                print(" compwidth=%u" % ((bits(devid2,8,8)+1)*8), end="")
         elif d.is_cti():
             # CoreSight CTI (SoC400) or CoreSight CTI (SoC600) or core CTI
             # n.b. SoC600 CTI is fixed at 4 channels
@@ -1262,8 +1288,45 @@ class CSROM:
         integration_regs = []
 
         if d.is_arm_architecture_core():
-            # Core debug interface
-            pass
+            # Core debug interface: show the current status
+            dscr = d.read32(0x088)
+            dstatus = dscr & 0x3f
+            dstatus_str = {
+                0x1: "PE restarting",
+                0x2: "PE in non-debug state",
+                0x7: "breakpoint",
+                0x13: "external debug request",
+                0x1b: "halting step, normal",
+                0x1f: "halting step, exclusive",
+                0x23: "OS unlock catch",
+                0x27: "reset catch",
+                0x2b: "watchpoint",
+                0x2f: "HLT instruction",
+                0x33: "software access to debug register",
+                0x37: "exception catch",
+                0x3b: "halting step, no syndrome"
+            }
+            if dstatus in dstatus_str:
+                sd = dstatus_str[dstatus]
+            else:
+                sd = "status 0x%x?" % dstatus
+            print("  dscr: 0x%08x (%s)" % (dscr, sd))
+            print("  halting debug for bkpt/wpt/hlt (HDE): %s" % ["disabled","enabled"][bit(dscr,14)])
+            print("  secure debug (SDD): %s" % ["enabled","disabled"][bit(dscr,16)])
+            print("  access mode: %s" % ["normal","memory"][bit(dscr,20)])
+            if bit(dscr,25):
+                print("  pipeline advanced")
+            if bit(dscr,29):
+                print("  TX full")
+            if bit(dscr,30):
+                print("  RX full")
+            if dstatus != 2:
+                # in debug state (only), some other status fields are meaningful
+                print("  EL%u" % bits(dscr,8,2))
+                if not bit(dscr,18):
+                    print("  Secure")
+                if bit(dscr,24):
+                    print("  ITR empty")
         elif d.is_arm_architecture(ARM_ARCHID_PMU):
             pmcr = d.read32(0xE04)
             print("  pmcr: 0x%08x" % pmcr)
@@ -1517,6 +1580,84 @@ class CSROM:
             else:
                 # TBD show older ETMs
                 pass
+        elif d.is_arm_architecture(ARM_ARCHID_ELA):
+            n_trig_states = bits(devid1,16,8)
+            group_width = (bits(devid1,8,8)+1)*8
+            if bits(devid2,8,8):
+                comp_width = (bits(devid2,8,8)+1)*8
+            else:
+                comp_width = group_width
+            ctrl = d.read32(0x000)
+            timectrl = d.read32(0x004)
+            tssr = d.read32(0x008)
+            pta = d.read32(0x010)
+            print("  %s" % ["disabled (programming permitted)","enabled"][bit(ctrl,0)])
+            print("  PTA: output:0x%x trace:%u stopclock:%u trigout:0x%x" % (bits(pta,4,4), bit(pta,3), bit(pta,2), bits(pta,0,2)))
+            n_comp_words = comp_width // 32
+            def print_words(d, off, n):
+                for j in range(n):
+                    w = n - 1 - j
+                    print(" %08x" % (d.read32(off + (w*4))), end="")
+            # Show the rules for each trigger state. Each rule has a matching condition and an action.
+            for i in range(0,n_trig_states):
+                b = 0x100 + i*0x100
+                print("  trigger state #%u:" % i)
+                print("    group:%u ctrl:0x%08x" % (d.read32(b+0x100),d.read32(b+0x104)))
+                print("    ext: mask:%08x comp:%08x countcomp:%08x" % (d.read32(b+0x130),d.read32(b+0x134),d.read32(b+0x120)))
+                print("    mask:", end="")
+                print_words(d, b+0x140, n_comp_words)
+                print()
+                print("    comp:", end="")
+                print_words(d, b+0x180, n_comp_words)
+                print()
+                # Now show what happens when the trigger matches
+                ac = d.read32(b+0x10C)
+                print("    action:0x%08x (trace:%u stopclock:%u elaout:0x%x ctiout:0x%x) next:0x%x" % (ac,bit(ac,3),bit(ac,2),bits(ac,4,4),bits(ac,0,2),d.read32(b+0x108)))
+                print("    altaction:%08x altnext:0x%x" % (d.read32(b+0x114),d.read32(b+0x110)))
+            # Reading CTSR takes a snapshot into CCVR and CAVR
+            if o_show_sample:
+                ctsr = d.read32(0x020)
+                ccvr = d.read32(0x024)
+                cavr = d.read32(0x028)
+                print("  state:")
+                # Trigger state is one-hot in CTSR. ELA-500 TRM says that the trigger state is RAZ when CTRL.RUN=0, but it appears not to be
+                print("    %s" % ["tracing","stopped"][bit(ctsr,31)])
+                soh = bits(ctsr,0,n_trig_states)
+                print("    state:%s" % decode_one_hot(soh,n_trig_states))
+                print("    counter:0x%x" % ccvr)
+                print("    captid:0x%x" % d.read32(0x02C))
+            print("  RAM read:0x%08x write:0x%08x" % (d.read32(0x040), d.read32(0x48)))
+            if o_show_all_status:
+                # Show contents of trace SRAM: see ELA-500 2.4.4 "Trace SRAM format"
+                saved_rra = d.read32(0x040)
+                ram_addr_width = bits(devid,8,8)    # SRAM address width in bits, e.g. 6 bits => 64 entries
+                n_ram_entries = 1 << ram_addr_width
+                n_group_words = group_width // 32
+                d.write_enable()
+                # Set RRA to the beginning of the internal RAM. "Writes to the RRA cause
+                # the trace SRAM data at this address to be transferred into the holding register.
+                # After the SRAM read data is transferred to the holding register,
+                # RRA increments by one."
+                d.write32(0x040,0)
+                # So if we read it back now, it would read back as 1.
+                # Read out whole captured lines from the RAM.
+                for i in range(n_ram_entries):
+                    print("    %04x:" % i, end="")
+                    # "The first read of the RRD after an RRA update returns the trace data header byte value"
+                    header = d.read32(0x044)
+                    print(" [%08x]" % header, end="")
+                    rtype = bits(header,0,2)            # timestamp or captured group
+                    rstate = bits(header,2,3)
+                    print(" st:%u" % rstate, end="")    # trigger state shows what was traced, look at SIGSEL<rstate>
+                    for j in range(n_group_words):
+                        dat = d.read32(0x044)   # automatically increments RRA
+                        print(" %08x" % dat, end="")
+                    print()
+                # After reading all the lines, the RRA is already 0, and reaing the last word via RRD
+                # causes the next line (i.e. the very first one) to be read to the holding register,
+                # and the RRA then auto-increments to 1. So that's what we expect to see here.
+                assert d.read32(0x040) == 0x0001, "RRA should have wrapped: 0x%08x" % d.read32(0x040)
+                d.write32(0x040,saved_rra)
         elif d.is_arm_architecture(ARM_ARCHID_MEMAP):
             idr = d.read32(0xDFC)
             aptype = bits(idr,0,4)
@@ -1634,7 +1775,21 @@ class CSROM:
             # CoreSight CTI or core CTI
             n_trigs = (devid>>8) & 0xff
             n_channels = (devid>>16) & 0xf
+            # Pulsed trigger inputs will generally read as 0. We could read the latched
+            # value from the integration-test input register, but that's destructive.
+            print("  CTI %s" % (["disabled","enabled"][bit(d.read32(0x000),0)]))
+            # Show the channel-to-trigger connections and the system gate
+            for c in range(0,n_channels):
+                cin = d.read32(0x020 + c*4)
+                cout = d.read32(0x0A0 + c*4)
+                if cin:
+                    print("  channel #%u <- %s" % (c, binstr(cin,n_trigs)))
+                if cout:
+                    print("  channel #%u -> %s" % (c, binstr(cout,n_trigs)))
+            print("  channel gate:    %s" % (binstr(d.read32(0x140),n_channels)))
             print("  trigger inputs:  %s" % (binstr(d.read32(0x130),n_trigs)))
+            if o_show_sample:
+                print("    latched:       %s" % (binstr(d.read32(0xEF8),n_trigs)))
             print("  trigger outputs: %s" % (binstr(d.read32(0x134),n_trigs)))
             print("  channel inputs:  %s" % (binstr(d.read32(0x138),n_channels)))
             print("  channel outputs: %s" % (binstr(d.read32(0x13C),n_channels)))

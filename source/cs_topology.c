@@ -145,7 +145,9 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         d = cs_device_new(addr, protod.local_addr);
         assert(d != NULL);
 
-        diagf("%" CS_PHYSFMT ":", addr);
+        if (DTRACEG) {
+            diagf("%" CS_PHYSFMT ":", addr);
+        }
 
         d->devtype_from_id = cs_device_read(d, CS_DEVTYPE);
         d->devaff0 = cs_device_read(d, CS_DEVAFF0);
@@ -171,15 +173,17 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
             d->is_permanently_unlocked = !(lsr & CS_LSR_SLI);
             d->is_unlocked = !(lsr & CS_LSR_SLK);
         }
-        /* Show basic information for the device. The first two numbers
-           indicate the CoreSight device class. */
-        diagf(" %u.%u %03X", major, minor, d->part_number);
-        if (0)
-            diagf(" %08X %08X %08X", devaff0, devaff1,
-                  cs_device_read(d, CS_DEVARCH));
-        diagf(" %08X", devid);
-        diagf(" %02X/%02X", _cs_read(d, CS_CLAIMCLR) & 0xFF,
-              _cs_read(d, CS_CLAIMSET) & 0xFF);
+        if (DTRACEG) {
+            /* Show basic information for the device. The first two numbers
+               indicate the CoreSight device class. */
+            diagf(" %u.%u %03X", major, minor, d->part_number);
+            if (0)
+                diagf(" %08X %08X %08X", devaff0, devaff1,
+                      cs_device_read(d, CS_DEVARCH));
+            diagf(" %08X", devid);
+            diagf(" %02X/%02X", _cs_read(d, CS_CLAIMCLR) & 0xFF,
+                  _cs_read(d, CS_CLAIMSET) & 0xFF);
+        }
 
         /* Arm internal: see http://wiki.arm.com/Eng/PerphIDRegs */
         if (major == 1) {
@@ -444,7 +448,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         return ERRDESC;
     }
 
-    if (d != NULL) {
+    if (d != NULL && DTRACEG) {
         diagf(" type=%2d", d->type);
         diagf(" %c", (d->is_unlocked ? 'O' : '-'));
         if (d->devclass & CS_DEVCLASS_CPU) {
