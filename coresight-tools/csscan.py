@@ -1211,6 +1211,18 @@ class CSROM:
             devid1 = d.read32(0xFC4)
             devid2 = d.read32(0xFC0)
             ram_addr_width = bits(devid,8,8)    # SRAM address width in bits, e.g. 6 bits => 64 entries
+            # Show ELA-500 version from PIDR2
+            prod_rev = (d.PIDR >> 20) & 15       # PIDR2.REVISION
+            if d.is_arm_part_number(0x9B8):     # ELA-500
+                rev_names = ["r0p0","r1p0","r2p0","r2p1","r2p2"]
+            elif d.is_arm_part_number(0x9D0):   # ELA-600
+                rev_names = ["r0p0","r1p0","r2p0"]
+            else:
+                rev_names = None
+            if rev_names is not None and prod_rev < len(rev_names):
+                print(" %s" % rev_names[prod_rev], end="")
+            else:
+                print(" revcode=%u" % prod_rev, end="")
             print(" devid:0x%08x entries:%u" % (devid, (1<<ram_addr_width)), end="")
             print(" trace-format-%u" % bits(devid,4,4), end="")
             if bits(devid,0,4):
@@ -1600,7 +1612,7 @@ class CSROM:
                     print(" %08x" % (d.read32(off + (w*4))), end="")
             # Show the rules for each trigger state. Each rule has a matching condition and an action.
             for i in range(0,n_trig_states):
-                b = 0x100 + i*0x100
+                b = i*0x100
                 print("  trigger state #%u:" % i)
                 print("    group:%u ctrl:0x%08x" % (d.read32(b+0x100),d.read32(b+0x104)))
                 print("    ext: mask:%08x comp:%08x countcomp:%08x" % (d.read32(b+0x130),d.read32(b+0x134),d.read32(b+0x120)))
@@ -1626,37 +1638,65 @@ class CSROM:
                 print("    state:%s" % decode_one_hot(soh,n_trig_states))
                 print("    counter:0x%x" % ccvr)
                 print("    captid:0x%x" % d.read32(0x02C))
-            print("  RAM read:0x%08x write:0x%08x" % (d.read32(0x040), d.read32(0x48)))
+            ram_addr_width = bits(devid,8,8)    # SRAM address width in bits, e.g. 6 bits => 64 entries
+            n_ram_entries = 1 << ram_addr_width
+            rwa = d.read32(0x048)    # Next entry to be written
+            if not (rwa & 0x80000000):
+                # RAM has not wrapped
+                ram_lo = 0
+                ram_n = rwa
+            else:
+                # RAM has wrapped
+                ram_lo = rwa & 0x7FFFFFFF
+                ram_n = n_ram_entries
+            print("  RAM read:0x%08x write:0x%08x: %u entries from %u" % (d.read32(0x040), rwa, ram_n, ram_lo))
             if o_show_all_status:
                 # Show contents of trace SRAM: see ELA-500 2.4.4 "Trace SRAM format"
+                # We can either dump out the raw data from entry 0, or we can dump out the range indicated by RWAR
                 saved_rra = d.read32(0x040)
-                ram_addr_width = bits(devid,8,8)    # SRAM address width in bits, e.g. 6 bits => 64 entries
-                n_ram_entries = 1 << ram_addr_width
                 n_group_words = group_width // 32
+                might_be_scrambled = (bits(devid,25,4) == 1)
                 d.write_enable()
                 # Set RRA to the beginning of the internal RAM. "Writes to the RRA cause
                 # the trace SRAM data at this address to be transferred into the holding register.
                 # After the SRAM read data is transferred to the holding register,
                 # RRA increments by one."
-                d.write32(0x040,0)
+                d.write32(0x040,ram_lo)
                 # So if we read it back now, it would read back as 1.
                 # Read out whole captured lines from the RAM.
-                for i in range(n_ram_entries):
-                    print("    %04x:" % i, end="")
+                for i in range(ram_n):
+                    print("    %3u @%04x:" % (i, ((ram_lo+i)%n_ram_entries)), end="")
                     # "The first read of the RRD after an RRA update returns the trace data header byte value"
                     header = d.read32(0x044)
                     print(" [%08x]" % header, end="")
-                    rtype = bits(header,0,2)            # timestamp or captured group
-                    rstate = bits(header,2,3)
-                    print(" st:%u" % rstate, end="")    # trigger state shows what was traced, look at SIGSEL<rstate>
+                    rtype = bits(header,0,2)        # 1: captured group, 2: timestamp
+                    rstate = bits(header,2,3)       # trigger state when captured
+                    roverwrite = bit(header,5)      # data was overwritten by TS4
+                    rcount = bits(header,6,2)
+                    print(" c:%u st:%u" % (rcount, rstate), end="")    # trigger state shows what was traced, look at SIGSEL<rstate>
+                    data = []
                     for j in range(n_group_words):
-                        dat = d.read32(0x044)   # automatically increments RRA
-                        print(" %08x" % dat, end="")
+                        dat = d.read32(0x044)
+                        data.append(dat)       # automatically increments RRA
+                    if rtype == 2:
+                        print(" -- timestamp: %08x%08x --" % (data[1], data[0]), end="")
+                        if len(data) >= 2:
+                            # Timestamp should be padded with zeroes. But if this is an uninitialized
+                            # SRAM buffer it might contain anything.
+                            if data[2] != 0x00000000:
+                                print(" ** timestamp not padded with zeroes", end="")
+                    else:
+                        # Print data, high word first
+                        for dat in reversed(data):
+                            print(" %08x" % dat, end="")
+                        dbits = 0
+                        for (di, dat) in enumerate(data):
+                            dbits = dbits | (dat << (di*32))
                     print()
                 # After reading all the lines, the RRA is already 0, and reaing the last word via RRD
                 # causes the next line (i.e. the very first one) to be read to the holding register,
                 # and the RRA then auto-increments to 1. So that's what we expect to see here.
-                assert d.read32(0x040) == 0x0001, "RRA should have wrapped: 0x%08x" % d.read32(0x040)
+                assert d.read32(0x040) == ((ram_lo+ram_n+1) % n_ram_entries), "RRA should have wrapped: 0x%08x" % d.read32(0x040)
                 d.write32(0x040,saved_rra)
         elif d.is_arm_architecture(ARM_ARCHID_MEMAP):
             idr = d.read32(0xDFC)
