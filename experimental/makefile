@@ -38,20 +38,21 @@ CFLAGS=-Wall -Werror=implicit-function-declaration -Wno-switch -fno-omit-frame-p
 CFLAGS_EX=
 
 # directories
-CS_LIB_DIR = ../lib/rel
-BUILD_DIR=./rel
-BIN_DIR=../bin/rel
+CS_LIB_DIR = ../lib/$(ARCH)/rel
+BUILD_DIR=./rel-$(ARCH)
+BIN_DIR=../bin/$(ARCH)/rel
 
 
 # build options
 ifeq ($(DEBUG),1)
 CFLAGS+= -O0 -DDEBUG -g
-CS_LIB_DIR = ../lib/dbg
-BUILD_DIR=./dbg
-BIN_DIR=../bin/dbg
+CS_LIB_DIR = ../lib/$(ARCH)/dbg
+BUILD_DIR=./dbg-$(ARCH)
+BIN_DIR=../bin/$(ARCH)/dbg
 else
 CFLAGS+= -O2 -g
 endif
+
 
 # LPAE options
 ifeq ($(LPAE),1)
