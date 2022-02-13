@@ -96,7 +96,7 @@ $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a:
 	@$(MAKE) -C ../build
 
 # **** the known boards source
-CSBOARDS_SRC=../demo/cs_demo_known_boards.c
+CSBOARDS_SRC=../demos/cs_demo_known_boards.c
 
 #  **** build the topology generator utility
 TOPOGEN_SRC=topogen.c $(CSBOARDS_SRC) cs_topology_detect.c cs_topology_print.c
