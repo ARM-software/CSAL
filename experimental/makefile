@@ -30,6 +30,9 @@
 # to build the csprofile example with halting debug sampling option active (v7 cores only),
 # add DBG_HALT=1 to the command line.
 
+# setup architecture & x-compile
+include ../makefile-arch.inc
+
 # default settings
 CC=gcc
 CFLAGS=-Wall -Werror=implicit-function-declaration -Wno-switch -fno-omit-frame-pointer
@@ -67,12 +70,13 @@ endif
 
 # set the include paths - for the CS Access library API
 INCS=   -I. \
-		-I../include
+		-I../include \
+		-I../demos
 
 
 # build rules for the executables
 $(BUILD_DIR)/%.o: %.c
-	$(CC) $(CFLAGS) $(CFLAGS_EX) $(INCS) -c $< -o $@
+	$(CC) $(CFLAGS) $(CFLAGS_EX) $(INCS) -c $< -o $(BUILD_DIR)/$(notdir $@)
 
 # library dependencies
 LIB_NAME=csaccess
@@ -102,7 +106,7 @@ CSBOARDS_SRC=../demos/cs_demo_known_boards.c
 #  **** build the topology generator utility
 TOPOGEN_SRC=topogen.c $(CSBOARDS_SRC) cs_topology_detect.c cs_topology_print.c
 
-topogen: $(TOPOGEN_SRC) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/Makefile
+topogen: $(TOPOGEN_SRC) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/makefile
 	$(CC) $(CFLAGS) $(INCS) -o $@ $(TOPOGEN_SRC) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a
 
 #  **** build the traceprofile program
@@ -121,7 +125,7 @@ PROF_CFLAGS=
 endif
 
 csprofile: CFLAGS_EX=$(PROF_CFLAGS) -UNDEBUG
-csprofile: bin_dir $(CSTP_OBJS) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/Makefile
+csprofile: bin_dir $(CSTP_OBJS) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/makefile
 	$(CC) -o $(BIN_DIR)/$@ $(CSTP_OBJS) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a -lrt -lpthread
 
 # clean all object files and libraries
