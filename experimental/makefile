@@ -126,12 +126,13 @@ endif
 
 csprofile: CFLAGS_EX=$(PROF_CFLAGS) -UNDEBUG
 csprofile: bin_dir $(CSTP_OBJS) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/makefile
-	$(CC) -o $(BIN_DIR)/$@ $(CSTP_OBJS) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a -lrt -lpthread
+	$(CC) -o $(BIN_DIR)/$@ $(addprefix $(BUILD_DIR)/,$(notdir $(CSTP_OBJS))) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a -lrt -lpthread
 
 # clean all object files and libraries
 .PHONY: clean
 clean: clean_objs
 	rm -fr $(BIN_DIR)/csprofile
+	rm -fr topogen
 
 .PHONY: clean_objs
 clean_objs:
