@@ -86,8 +86,11 @@ int cs_set_trace_source_id(cs_device_t dev, cs_atid_t id)
             _cs_write(d, CS_ETMTRACEIDR, id);
     } else if ((d->type == DEV_ITM) || (d->type == DEV_STM)) {
         _cs_swstim_set_trace_id(d, id);
+    } else if (d->type == DEV_ELA) {
+        /* We've already asserted that it's a trace source */
+        _cs_set_mask(d, CS_ELA_ATBCTRL, CS_ELA_ATBCTRL_ATID_VALUE, (id << CS_ELA_ATBCTRL_ATID_VALUE_SHIFT));
     } else {
-        return -1;
+        return cs_report_device_error(d, "device does not support trace source id");
     }
     /* Trace source ids are worth getting correct, and we don't change them often,
        so do a quick check here. */

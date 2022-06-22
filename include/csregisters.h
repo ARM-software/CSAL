@@ -930,6 +930,7 @@ Register definitions and bitfield values for ELA devices.
 #define CS_ELA_TSSR      0x008    /**< Trigger state select register */
 #define CS_ELA_ATBCTRL   0x00C    /**< ATB control (ELA-600) */
 #define CS_ELA_ATBCTRL_ATID_VALUE   0x7F00  /**< Set ATID for ATB transactions */
+#define CS_ELA_ATBCTRL_ATID_VALUE_SHIFT 8   /**< Shift for ATID at ATBCTRL[14:8] */
 #define CS_ELA_PTACTION  0x010    /**< Pre-trigger action register (use CS_ELA_ACTION fields) */
 #define CS_ELA_AUXCTRL   0x014    /**< Auxiliary control (ELA-600) */
 #define CS_ELA_CNTSEL    0x018    /**< Counter select (ELA-600) */
@@ -972,6 +973,9 @@ Register definitions and bitfield values for ELA devices.
 #define CS_QUALCOMP(n)         _ELATR(n,0x13C)  /**< Qualifier compare (ELA-600) */
 #define CS_SIGMASK(n)          _ELATR(n,0x140)  /**< Signal mask (first word) */
 #define CS_SIGCOMP(n)          _ELATR(n,0x180)  /**< Signal compare (first word) */
+
+#define CS_ELA_DEVID 0xFC8
+#define CS_ELA_DEVID_TRACETYPE        0x0f     /**< 1: ATB trace is implemented */
 
 /** @} */
 

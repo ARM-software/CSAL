@@ -371,6 +371,11 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
             } else if (minor == 7) {
                 /* logic analysers - Stygian or ELA-500 */
                 d->devclass |= CS_DEVCLASS_TRIGSRC | CS_DEVCLASS_ELA;
+                /* Check for ATB output. Although this wasn't available in ELA-500,
+                   it's still documented as having the relevant ID field. */
+                if ((d->v.debug.devid & 0xf) == 1) {
+                    d->devclass |= CS_DEVCLASS_SOURCE;
+                }
                 d->type = DEV_ELA;
             }
         } else if (major == 6) {

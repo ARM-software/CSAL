@@ -125,7 +125,7 @@ struct cs_device {
     unsigned char devtype_from_id;
     cs_devtype_t type;
     unsigned short part_number;	  /**< CoreSight part number, 3 hex digits */
-    unsigned int devclass;
+    unsigned int devclass;        /**< One or more CS_DEVCLASS_xxx flags indicating generic device properties */
     unsigned int devaff0;	  /**< Device affinity register for CPU-affine devices - might be CPU's MPIDR, but might also be zero */
     cs_cpu_t affine_cpu;	  /**< Set by the user via the API */
     cs_power_domain_t power_domain;
