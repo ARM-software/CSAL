@@ -145,7 +145,7 @@ cs_types = {(1,1):"port", (1,2):"buffer", (1,3):"router",
 # Where DEVARCH is not set, the part numbers can be used to find the
 # programmer's model for the part.
 #
-# For older CPUs, there will be separate part numbers for
+# For older CPUs, there will be separate CPU-specific part numbers for
 # the CPU's separate interfaces: debug, ETM, PMU, CTI, ELA etc.
 #
 # More recent CPUs have the same part number for all these,
@@ -201,10 +201,12 @@ class DevicePhy:
         self.memap = None
         self.mmap_offset = base_address % devmem.page_size
         mmap_address = base_address - self.mmap_offset
+        self.m = None         # avoid cleanup errors if exception in next line
         self.m = devmem.map(mmap_address, write=write)
 
     def __del__(self):
-        self.devmem.unmap(self.m)
+        if self.m is not None:
+            self.devmem.unmap(self.m)
 
     def read32(self, off):
         off += self.mmap_offset
@@ -304,7 +306,13 @@ class Device:
     A single CoreSight device mapped by a ROM table (including ROM tables themselves).    
     """
 
-    def __init__(self, cs, addr):
+    def __init__(self, cs, addr, write=False, unlock=False):
+        """
+        Construct a device object at the given address.
+        'cs' is the device map (e.g. virtual memory via CSROM(), or a MEM-AP) through which we access the device.
+        """
+        if unlock:
+            write = True
         self.we_unlocked = False
         self.we_claimed = 0
         self.n_reads = 0
@@ -315,8 +323,8 @@ class Device:
         self.base_address = addr     # Device base address within its address space
         self.affine_core = None      # Link to the Device object for the core debug block
         self.affinity_group = None   # AffinityGroup containing related devices
-        self.map_is_write = False
-        self.map()
+        self.map_is_write = write
+        self.map(write=write)
         # For convenience, CIDR is formed from CIDR3..CIDR0.
         self.CIDR = self.idbytes([0xFFC, 0xFF8, 0xFF4, 0xFF0])
         self.PIDR = self.idbytes([0xFD0, 0xFEC, 0xFE8, 0xFE4, 0xFE0])
@@ -331,6 +339,8 @@ class Device:
             if (arch & 0x00100000) != 0:
                 self.devarch = arch
             self.devtype = self.read32(0xFCC)
+        if unlock:
+            self.unlock()
 
     def map(self, write=False):
         # The mmap() base address must be a multiple of the OS page size.
@@ -514,6 +524,18 @@ class Device:
         else:
             return False
 
+    def is_core_trace(self):
+        return self.is_coresight_device_type(3,1)
+
+    def is_core_trace_etm(self):
+        """
+        Check for ETM-compatible (ETMv3, PFT, ETMv4, ETE) core trace.
+        Anything that sets ARCHID ETM should also be reporting DEVTYPE (3,1) so the
+        below test is slightly redundant. If we ever encountered non-ETM trace we
+        might need to include/exclude on the basis of part number.
+        """
+        return self.is_core_trace() or self.is_arm_architecture(ARM_ARCHID_ETM)
+
     def is_core_debug(self):
         return self.is_coresight_device_type(5,1)
 
@@ -568,8 +590,12 @@ class Device:
     def atb_out_ports(self):
         if self.is_replicator():
             return 2
-        elif self.coresight_device_type()[0] in [2,3]:
+        elif self.coresight_device_type()[0] in [2,3]:   # link or source
             return 1
+        elif d.is_arm_architecture(ARM_ARCHID_ELA):
+            # ELA-600 may be configured with ATB, but doesn't change its DEVTYPE
+            devid = td.read32(0xFC8)
+            return [0,1][bits(devid,0,4)!=0]
         else:
             return 0
 
@@ -583,6 +609,11 @@ class Device:
         return None
 
     def is_affine_to_core(self):
+        """
+        Check if the device is affine to a core.
+        Clearly true if affinity has already been detected, but we might also be able to report
+        true on the basis of DEVTYPE e.g. (5,1) is specifically a core PMU and not an uncore PMU.
+        """
         return self.affine_core is not None
 
     def affine_device(self, typ):
@@ -843,20 +874,25 @@ class CSROM:
         else:
             return None
 
-    def device_at(self, addr, unlock=True):
+    def device_at(self, addr, unlock=False):
+        """
+        Return the device at a given address, which must already have been registered.
+        """
         assert addr in self.device_by_base_address, "missing device at 0x%x" % addr
         d = self.device_by_base_address[addr]
         if unlock:
-            d.unlock()
+            d.unlock()         # This will enable for write if not already
         return d
 
-    def create_device_at(self, addr, rom_table_entry=None, write=False):
+    def create_device_at(self, addr, rom_table_entry=None, write=False, unlock=False):
         assert not addr in self.device_by_base_address, "device at 0x%x already collected" % addr
         d = Device(self, addr)
         d.rom_table_entry = rom_table_entry
         self.device_by_base_address[addr] = d
         if write:
             d.write_enable()
+        if unlock:
+            d.unlock()
         return d
 
     def affinity_group(self, id):
@@ -967,7 +1003,8 @@ class CSROM:
             else:
                 yield e 
 
-    def show_coresight_device(self, d):
+    @staticmethod
+    def show_coresight_device(d):
         """
         Show some information about the device.
         We organize this to show information progressively from the static
@@ -1086,8 +1123,7 @@ class CSROM:
                 if bits(devid,4,4):
                     print(" DoPD", end="")
         elif d.is_arm_architecture(ARM_ARCHID_PMU):
-            # PMU doesn't have a register of its own to indicate power state - you have to
-            # find the affine core.
+            # PMU doesn't have a register of its own to indicate power state - you have to find the affine core.
             if not d.is_affine_to_core():
                 core_powered_off = True
             else:
@@ -1116,7 +1152,7 @@ class CSROM:
                 if bits(devid,0,4):
                     # ARMv8.2 moves PC sampling from core debug into PMU
                     print(" pc-sampling:%u" % bits(devid,0,4), end="")
-        elif d.is_arm_architecture(ARM_ARCHID_ETM):
+        elif d.is_core_trace_etm():
             # Test if the registers are invalid/unreadable, either because the core power domain
             # is powered off or because the ETM hasn't been initialized since reset.
             #   TRCPDSR.STICKYPD[1]  indicates that trace register power has been removed
@@ -1256,6 +1292,9 @@ class CSROM:
         elif d.is_arm_part_number(0x912) or d.is_arm_part_number(0x9e7):
             # CoreSight TPIU
             print(" TPIU", end="")
+        elif d.is_arm_part_number(0x914):
+            # CoreSight SWO
+            print(" SWO", end="")
         elif d.is_arm_part_number(0x907):
             # CoreSight ETB
             print(" ETB size:%u" % (d.read32(0x004)*4), end="")
@@ -1340,6 +1379,7 @@ class CSROM:
                 if bit(dscr,24):
                     print("  ITR empty")
         elif d.is_arm_architecture(ARM_ARCHID_PMU):
+            # Show dynamic configuration and current state for PMU
             pmcr = d.read32(0xE04)
             print("  pmcr: 0x%08x" % pmcr)
             ovs = d.read32(0xC80)
@@ -1360,7 +1400,8 @@ class CSROM:
                 if bit(ovs,i):
                     print(" overflowed", end="")
                 print()
-        elif d.is_arm_architecture(ARM_ARCHID_ETM):
+        elif d.is_core_trace_etm():
+            # Show dynamic configuration and current state for ETM-like core trace
             if emajor >= 4:
                 def res_str(rn):
                     # ETMv4 4.4.2
@@ -1895,8 +1936,8 @@ class CSROM:
             for r in integration_regs:
                 print("  r%X = 0x%x" % (r, d.read32(r)))
 
-
-    def show_device(self, d):
+    @staticmethod
+    def show_device(d):
         """
         Show device details on a single line.
         """
@@ -1939,7 +1980,7 @@ class CSROM:
                 for i in range(0, 10):
                     print("    %08x %08x" % (d.read32(0x00C), d.read32(0x008)))
         elif d.is_coresight():
-            self.show_coresight_device(d)
+            show_coresight_device(d)
         elif d.device_class() == 0xF:
             # might be worth reading DEVARCH even though Class 0xF doesn't guarantee to have it (and it might not be readable
             # could also look up part number
@@ -1952,6 +1993,15 @@ class CSROM:
                     print("  0x%03x: %08x" % (a, d.read32(a)))
         else: 
             print("class:%u" % (d.device_class()))
+
+
+
+def show_coresight_device(d):
+    CSROM.show_coresight_device(d)
+
+
+def show_device(d):
+    CSROM.show_device(d)
 
 
 def topology_detection_atb(atb_devices, topo):
@@ -2003,6 +2053,9 @@ def topology_detection_atb(atb_devices, topo):
                     # at 0xEFC rather than 0xEF8.
                     # We set both, just in case. It should be harmless.                
                     d.write32(0xEFC, flag*mask, check=False)
+                    # as noted above, we set both: we now falll through to set 0xEF8.
+        elif d.is_arm_architecture(ARM_ARCHID_ELA):
+            reg = 0xEF4      # ITATBCTR0
         else:
             reg = 0xEF8
         if False and flag:
