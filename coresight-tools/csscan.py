@@ -592,9 +592,9 @@ class Device:
             return 2
         elif self.coresight_device_type()[0] in [2,3]:   # link or source
             return 1
-        elif d.is_arm_architecture(ARM_ARCHID_ELA):
+        elif self.is_arm_architecture(ARM_ARCHID_ELA):
             # ELA-600 may be configured with ATB, but doesn't change its DEVTYPE
-            devid = td.read32(0xFC8)
+            devid = self.read32(0xFC8)
             return [0,1][bits(devid,0,4)!=0]
         else:
             return 0
@@ -1264,7 +1264,8 @@ class CSROM:
             if bits(devid,0,4):
                 print(" ATB", end="")
             if bits(devid,16,4):
-                print(" COND_TRIG:%u" % bits(devid,16,5), end="")
+                print(" COND_TRIG:%u" % bits(devid,16,4), end="")
+            print(" id-capture:%u" % bits(devid,20,5), end="")
             if bits(devid,25,4) == 1:
                 print(" scrambler", end="")
             print(" groupwidth=%u" % ((bits(devid1,8,8)+1)*8), end="")
@@ -1645,7 +1646,9 @@ class CSROM:
             tssr = d.read32(0x008)
             pta = d.read32(0x010)
             print("  %s" % ["disabled (programming permitted)","enabled"][bit(ctrl,0)])
-            print("  PTA: output:0x%x trace:%u stopclock:%u trigout:0x%x" % (bits(pta,4,4), bit(pta,3), bit(pta,2), bits(pta,0,2)))
+            def action_str(ac):
+                return "0x%08x (trace:%u stopclock:%u trigout:0x%x elaout:0x%x)" % (ac, bit(ac,3), bit(ac,2), bits(ac,0,2), bits(ac,4,4))
+            print("  PTA: %s" % (action_str(pta)))
             n_comp_words = comp_width // 32
             def print_words(d, off, n):
                 for j in range(n):
@@ -1665,8 +1668,8 @@ class CSROM:
                 print()
                 # Now show what happens when the trigger matches
                 ac = d.read32(b+0x10C)
-                print("    action:0x%08x (trace:%u stopclock:%u elaout:0x%x ctiout:0x%x) next:0x%x" % (ac,bit(ac,3),bit(ac,2),bits(ac,4,4),bits(ac,0,2),d.read32(b+0x108)))
-                print("    altaction:%08x altnext:0x%x" % (d.read32(b+0x114),d.read32(b+0x110)))
+                print("    action:    %s  next:0x%x" % (action_str(ac),d.read32(b+0x108)))
+                print("    altaction: %s  altnext:0x%x" % (action_str(d.read32(b+0x114)),d.read32(b+0x110)))
             # Reading CTSR takes a snapshot into CCVR and CAVR
             if o_show_sample:
                 ctsr = d.read32(0x020)
