@@ -369,14 +369,25 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                     }
                 }
             } else if (minor == 7) {
-                /* logic analysers - Stygian or ELA-500 */
+                /* logic analysers - Stygian or ELA-500 or ELA-600 */
+                uint32_t const devid = _cs_read(d, CS_ELA_DEVID);
+                uint32_t const devid1 = _cs_read(d, CS_ELA_DEVID1);
+                uint32_t const devid2 = _cs_read(d, CS_ELA_DEVID2);
                 d->devclass |= CS_DEVCLASS_TRIGSRC | CS_DEVCLASS_ELA;
+                d->type = DEV_ELA;
+                d->v.ela.is_ela600 = ((devarch >> 16) & 0xF) >= 1;
                 /* Check for ATB output. Although this wasn't available in ELA-500,
                    it's still documented as having the relevant ID field. */
-                if ((d->v.debug.devid & 0xf) == 1) {
-                    d->devclass |= CS_DEVCLASS_SOURCE;
+                if ((devid & 0xf) == 1) {
+                    d->devclass |= CS_DEVCLASS_SOURCE;   /* ATB, not SRAM */
+                    d->v.ela.ram_size = 0;
+                } else {
+                    d->v.ela.ram_size = 1 << ((devid >> 8) & 0xFF);
+                    d->v.ela.is_scrambled = ((devid >> 25) & 0xF) == 1;
                 }
-                d->type = DEV_ELA;
+                d->v.ela.signal_width = 8 * (1 + ((devid1 >> 8) & 0xFF));
+                d->v.ela.comp_width = !(devid2 & 0xff00) ? d->v.ela.signal_width : ((((devid2 >> 8) & 0xff)+1)*8);
+                d->v.ela.n_trigger_states = (devid1 >> 16) & 0xFF;
             }
         } else if (major == 6) {
             /* Performance monitor */

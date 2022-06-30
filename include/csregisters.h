@@ -927,10 +927,15 @@ Register definitions and bitfield values for ELA devices.
 #define CS_ELA_CTRL_RUN         0x0001  /**< ELA enabled */
 #define CS_ELA_CTRL_TRACE_BUSY  0x0002  /**< Trace busy (ELA-600) */
 #define CS_ELA_TIMECTRL  0x004    /**< Timestamp control register */
+#define CS_ELA_TIMECTRL_TSEN 0x10000   /**< Timestamp enable */
+#define CS_ELA_TIMECTRL_TSINT_SHIFT 12   /**< Position of timestamp interval control */
 #define CS_ELA_TSSR      0x008    /**< Trigger state select register */
 #define CS_ELA_ATBCTRL   0x00C    /**< ATB control (ELA-600) */
+#define CS_ELA_ATBCTRL_ASYNC_INTERVAL_SHIFT 0  /**< Shift for max interval between ASYNCs */
 #define CS_ELA_ATBCTRL_ATID_VALUE   0x7F00  /**< Set ATID for ATB transactions */
 #define CS_ELA_ATBCTRL_ATID_VALUE_SHIFT 8   /**< Shift for ATID at ATBCTRL[14:8] */
+#define CS_ELA_ATBCTRL_ATID_TRIG_EN 0x8000  /**< Cause an ATB trigger when trigger states ended */
+#define CS_ELA_ATBCTRL_PREDICT  0x80000000  /**< Enable delta basis prediction */
 #define CS_ELA_PTACTION  0x010    /**< Pre-trigger action register (use CS_ELA_ACTION fields) */
 #define CS_ELA_AUXCTRL   0x014    /**< Auxiliary control (ELA-600) */
 #define CS_ELA_CNTSEL    0x018    /**< Counter select (ELA-600) */
@@ -949,32 +954,56 @@ Register definitions and bitfield values for ELA devices.
 #define CS_ELA_RWAR      0x048    /**< RAM write address */
 #define CS_ELA_RWDR      0x04C    /**< RAM write data */
 
-/* Trigger state */
-#define _ELATR(n,r) ((0x100*n)+r)
+/* Trigger state, counting from 0. Note the offsets below already start from 0x100. */
+#define _ELATR(n,r) ((0x100*(n))+r)
 #define CS_ELA_SIGSEL(n)       _ELATR(n,0x100)  /**< Signal select */
 #define CS_ELA_TRIGCTRL(n)     _ELATR(n,0x104)  /**< Trigger control */
-#define CS_ELA_NEXTSTATE(n)    _ELATR(n,0x108)  /**< Next state */
-#define CS_ELA_ACTION          _ELATR(n,0x10C)  /**< Action */
-#define CS_ELA_ACTION_CTTRIGOUT  0x03       /**< Values to drive on CTTRIGOUT[1:0] */
-#define CS_ELA_ACTION_STOPCLOCK  0x04       /**< Drive 1 on STOPCLOCK */
-#define CS_ELA_ACTION_TRACE      0x08       /**< Trace active */
-#define CS_ELA_ACTION_ELAOUTPUT  0xF0       /**< Values to drive on ELAOUTPUT[3:0] */
-#define CS_ELA_ALTNEXTSTATE(n) _ELATR(n,0x110)  /**< Alt next state */
-#define CS_ALTACTION(n)        _ELATR(n,0x114)  /**< Alt action */
-#define CS_COMPCTRL(n)         _ELATR(n,0x118)  /**< Comparator control (ELA-600) */
-#define CS_ALTCOMPCTRL(n)      _ELATR(n,0x11C)  /**< Alt comparator control (ELA-600) */
-#define CS_COUNTCOMP(n)        _ELATR(n,0x120)  /**< Counter compare */
-#define CS_TWBSEL              _ELATR(n,0x128)  /**< Trace write byte select (ELA-600) */
-#define CS_EXTMASK(n)          _ELATR(n,0x130)  /**< External mask */
-#define CS_EXTMASK_CTTRIGIN      0x03       /**< Mask CTTRIGIN[1:0] signals */
-#define CS_EXTMASK_EXTTRIG       0xFC       /**< Mask EXTTRIG[5:0] signals */
-#define CS_EXTCOMP(n)          _ELATR(n,0x134)  /**< External compare */
-#define CS_QUALMASK(n)         _ELATR(n,0x138)  /**< Qualifier mask (ELA-600) */
-#define CS_QUALCOMP(n)         _ELATR(n,0x13C)  /**< Qualifier compare (ELA-600) */
-#define CS_SIGMASK(n)          _ELATR(n,0x140)  /**< Signal mask (first word) */
-#define CS_SIGCOMP(n)          _ELATR(n,0x180)  /**< Signal compare (first word) */
+#define CS_ELA_TRIGCTRL_COMP_DISABLED    0x0
+#define CS_ELA_TRIGCTRL_COMP_EQ          0x1
+#define CS_ELA_TRIGCTRL_COMP_GT          0x2
+#define CS_ELA_TRIGCTRL_COMP_GE          0x3
+#define CS_ELA_TRIGCTRL_COMP_NE          0x5
+#define CS_ELA_TRIGCTRL_COMP_LT          0x6
+#define CS_ELA_TRIGCTRL_COMP_LE          0x7
+#define CS_ELA_TRIGCTRL_COMPSEL         0x08      /**< Compare counter, not signals; enable counters */
+#define CS_ELA_TRIGCTRL_WATCHRST        0x10      /**< Reset counter after signal match */
+#define CS_ELA_TRIGCTRL_COUNTSRC        0x20      /**< Increment counter only on match */
+#define CS_ELA_TRIGCTRL_TRACE_COUNTCOMP 0x40      /**< Trace is captured when counter comparison succeeds */
+#define CS_ELA_TRIGCTRL_TRACE_CYCLE     0x80      /**< Trace is captured every ELA clock cycle */
+#define CS_ELA_TRIGCTRL_TRACE_COUNTER   0xC0      /**< Counters are traced on signal comparison */
+#define CS_ELA_TRIGCTRL_COUNTCLR       0x100      /**< Clear counter when moving to next state */
+#define CS_ELA_TRIGCTRL_COUNTBRK       0x200      /**< Loop counter break */
+#define CS_ELA_TRIGCTRL_CAPTID_CAP     0x400      /**< Capture ID on signal match */
+#define CS_ELA_TRIGCTRL_CAPTID_MATCH   0x800      /**< Match relevant signals against captured ID, not SIGCOMP */
+#define CS_ELA_TRIGCTRL_CAPTID_USECAP  0xC00      /**< Match SIGCOMP against captured ID, not relevant signals */
+#define CS_ELA_TRIGCTRL_ALTCOMPSEL    0x8000      /**< Alt compare counter, not signals */
+#define CS_ELA_NEXTSTATE(n)    _ELATR(n,0x108)  /**< Next state (one-hot or zero) */
+#define CS_ELA_ACTION(n)       _ELATR(n,0x10C)  /**< Action */
+#define CS_ELA_ACTION_NONE                 0      /**< Don't trace or do other action */
+#define CS_ELA_ACTION_CTTRIGOUT_MASK    0x03      /**< Values to drive on CTTRIGOUT[1:0] (mask) */
+#define CS_ELA_ACTION_CTTRIGOUT(x)       (x)      /**< Values to drive on CTTRIGOUT[1:0] */
+#define CS_ELA_ACTION_STOPCLOCK         0x04      /**< Drive 1 on STOPCLOCK */
+#define CS_ELA_ACTION_TRACE             0x08      /**< Trace active */
+#define CS_ELA_ACTION_ELAOUTPUT_MASK    0xF0      /**< Values to drive on ELAOUTPUT[3:0] (mask) */
+#define CS_ELA_ACTION_ELAOUTPUT(x)  ((x)<<4)      /**< Values to drive on ELAOUTPUT[3:0] */
+#define CS_ELA_ALTNEXTSTATE(n) _ELATR(n,0x110)  /**< Alt next state (one-hot or zero) */
+#define CS_ELA_ALTACTION(n)    _ELATR(n,0x114)  /**< Alt action */
+#define CS_ELA_COMPCTRL(n)     _ELATR(n,0x118)  /**< Comparator control (ELA-600) */
+#define CS_ELA_ALTCOMPCTRL(n)  _ELATR(n,0x11C)  /**< Alt comparator control (ELA-600) */
+#define CS_ELA_COUNTCOMP(n)    _ELATR(n,0x120)  /**< Counter compare */
+#define CS_ELA_TWBSEL(n)       _ELATR(n,0x128)  /**< Trace write byte select (ELA-600) */
+#define CS_ELA_EXTMASK(n)      _ELATR(n,0x130)  /**< External mask */
+#define CS_ELA_EXTMASK_CTTRIGIN  0x03       /**< Mask CTTRIGIN[1:0] signals */
+#define CS_ELA_EXTMASK_EXTTRIG   0xFC       /**< Mask EXTTRIG[5:0] signals */
+#define CS_ELA_EXTCOMP(n)      _ELATR(n,0x134)  /**< External compare */
+#define CS_ELA_QUALMASK(n)     _ELATR(n,0x138)  /**< Qualifier mask (ELA-600) */
+#define CS_ELA_QUALCOMP(n)     _ELATR(n,0x13C)  /**< Qualifier compare (ELA-600) */
+#define CS_ELA_SIGMASK(n)      _ELATR(n,0x140)  /**< Signal mask (first word) */
+#define CS_ELA_SIGCOMP(n)      _ELATR(n,0x180)  /**< Signal compare (first word) */
 
-#define CS_ELA_DEVID 0xFC8
+#define CS_ELA_DEVID2    0xFC0
+#define CS_ELA_DEVID1    0xFC4
+#define CS_ELA_DEVID     0xFC8
 #define CS_ELA_DEVID_TRACETYPE        0x0f     /**< 1: ATB trace is implemented */
 
 /** @} */

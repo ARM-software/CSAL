@@ -114,6 +114,9 @@ CSSRC=  cs_init_manage.c \
 # add in the extra for halting debug - blank if not in use 
 CSSRC+=$(CSSRC_HALT)
 
+# Add in ELA support. Comment out if not wanted.
+CSSRC+=cs_ela.c
+
 #
 # For development use only, we can enable redirecting physical
 # memory references to a remote target over a network connection.

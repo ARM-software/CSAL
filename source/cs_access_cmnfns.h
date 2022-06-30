@@ -221,6 +221,14 @@ struct cs_device {
             int memap_LPAE:1;             /**< Large Physical Addresses implemented */
             unsigned long cached_TAR;     /**< Cached copy of the TAR */
         } memap;
+        struct ela_props {
+            unsigned char n_trigger_states;/**< Number of trigger states: 4, 5 or 8 */
+            unsigned short signal_width;  /**< Signal input group width, 64/128/256 */
+            unsigned short comp_width;    /**< Signal comparator width, <= signal_width */
+            unsigned int ram_size;        /**< Number of entries in static RAM, or zero */
+            unsigned int is_scrambled:1;  /**< RAM is scrambled */
+            unsigned int is_ela600:1;     /**< ELA-600 or later */
+        } ela;
     } v;
 };
 

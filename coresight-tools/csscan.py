@@ -1648,6 +1648,7 @@ class CSROM:
             print("  %s" % ["disabled (programming permitted)","enabled"][bit(ctrl,0)])
             def action_str(ac):
                 return "0x%08x (trace:%u stopclock:%u trigout:0x%x elaout:0x%x)" % (ac, bit(ac,3), bit(ac,2), bits(ac,0,2), bits(ac,4,4))
+            print("  timestamp: 0x%08x (%s)" % (timectrl, ["disabled","enabled"][bit(timectrl,16)]))
             print("  PTA: %s" % (action_str(pta)))
             n_comp_words = comp_width // 32
             def print_words(d, off, n):
