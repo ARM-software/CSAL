@@ -29,6 +29,7 @@ The following trace components are supported by the library:
 - CoreSight CTI.
 - Global Timestamp Generator.
 - CoreSight MEM-AP.
+- CoreSight ELA.
 
 The library also supports access to the v7 Arch or v8 Arch debug sampling registers,
 allowing non intrusive sampling of PC, VMID and ContextID on a running core.
@@ -231,6 +232,11 @@ Version 3.0
 - The API now uses types 'uint32_t' and 'uint64_t' for types representing target registers
 - Minor portability and languge conformance improvements
 - Added support for network connection (devmemd) - a development aid, not intended for production
+
+Version 3.1
+-----------
+- Added support for CoreSight ELA
+
 
 ------------------------------------
 
