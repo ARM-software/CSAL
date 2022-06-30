@@ -231,12 +231,22 @@ int cs_pmu_reset(cs_device_t dev, unsigned int flags)
 }
 
 
+/* Update PMCR.X. It may be RAZ/WI, in which case we return an error on enable. */
 int cs_pmu_bus_export(cs_device_t dev, int enable)
 {
+    uint32_t pmcr;
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_CPU_PMU);
     _cs_unlock(d);
-    return _cs_set_bit(d, CS_PMCR, CS_PMCR_X, enable);
+    pmcr = _cs_read(d, CS_PMCR);
+    if (!enable) {
+        return _cs_write(d, CS_PMCR, pmcr & ~CS_PMCR_X);
+    } else {
+        _cs_write_wo(d, CS_PMCR, pmcr | CS_PMCR_X);
+        pmcr = _cs_read(d, CS_PMCR);
+        /* Return 0 if PMCR.X now reports as set. */
+        return (pmcr & CS_PMCR_X) ? 0 : -1;
+    }
 }
 
 

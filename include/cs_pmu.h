@@ -112,6 +112,7 @@ int cs_pmu_write_status(cs_device_t, unsigned int flags,
 /**
  *  Control whether the CPU PMU event bus is exported to ETM etc.
  *  Does not affect interrupt generation.
+ *  Return non-zero if the PMU cannot export its events.
  *
  * \param  enable  Indicate whether to enable or disable export.
  */
