@@ -651,7 +651,7 @@ TMC specific registers - see ETB definitions for common register set between ETB
 #define CS_TMC_BUFWM         0x034  /**< Latched buffer water mark register */
 
 #define CS_TMC_RRPHI         0x038  /**< RAM read pointer High register [ETR config only] */
-#define CS_TMC_RWPHI         0x038  /**< RAM write pointer High register [ETR config only] */
+#define CS_TMC_RWPHI         0x03C  /**< RAM write pointer High register [ETR config only] */
 #define CS_TMC_AXICTL        0x110  /**< AXI control register [ETR config only]*/
 #define CS_TMC_DBALO         0x118  /**< Data buffer address low register [ETR config only]*/
 #define CS_TMC_DBAHI         0x11C  /**< Data buffer address high register [ETR config only]*/
