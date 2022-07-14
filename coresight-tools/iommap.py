@@ -23,7 +23,7 @@ limitations under the License.
 
 from __future__ import print_function
 
-import os, ctypes, struct
+import os, ctypes, struct, errno
 
 # We support going via the syscall directly, as an alternative to using libc mmap().
 # The rationale for this is now unclear, so disable it by default.
@@ -57,7 +57,7 @@ def get_syscall_numbers(fns):
 if use_syscall:
     [SYS_mmap, SYS_munmap] = get_syscall_numbers(["mmap", "munmap"])
 
-libc = ctypes.CDLL(None)
+libc = ctypes.CDLL(None, use_errno=True)
 syscall = libc.syscall
 libc_mmap = libc.mmap
 libc_mmap.restype = ctypes.c_void_p
@@ -83,6 +83,10 @@ class mmap:
         else:
             self.addr = libc_mmap(0, size, prot, flags, fno, offset)
         if (self.addr & 0xfff) == 0xfff:
+            # Mapping failed. Possible reasons:
+            #  - CONFIG_IO_STRICT_DEVMEM and area is forbidden
+            if ctypes.get_errno() == errno.EPERM:
+                raise PermissionError
             raise EnvironmentError
 
     def close(self):

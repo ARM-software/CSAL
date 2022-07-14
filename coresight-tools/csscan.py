@@ -740,6 +740,7 @@ class ROMTableEntry:
         self.width = width         # entry width in bytes
         self.descriptor = e        # the 4-byte or 8-byte table entry (device offset, power req)
         self.device = None         # may be populated later
+        self.is_inaccessible = False   # set to True if we can't create a device for it
 
     def __str__(self):
         s = "0x%x[0x%03x]: " % (self.table.base_address, self.offset)
@@ -837,6 +838,9 @@ class DevMem:
         sorting that out.
 
         The caller is also responsible for releasing the mapping when finished with.
+
+        If the kernel is built with CONFIG_IO_STRICT_DEVMEM, this mmap() may fail
+        with EPERM if the area is already registered to the kernel.
         """
         try:
             if write:
@@ -844,6 +848,8 @@ class DevMem:
             else:
                 prot = mmap.PROT_READ
             m = mmap.mmap(self.fno, self.page_size, mmap.MAP_SHARED, prot, offset=addr)
+        except PermissionError:
+            raise
         except EnvironmentError as e:
             print("** failed to map 0x%x size 0x%x on fileno %d (currently %u mappings): %s" % (addr, self.page_size, self.fno, self.n_mappings, e))
             raise
@@ -946,7 +952,7 @@ class CSROM:
     def list_table(self, td, include_empty=False, recurse=True):
         """
         Iterate (perhaps recursively) over a ROM Table, returning
-        table entries which contain device objects.
+        ROMTableEntry objects which contain device objects.
 
         We assume ROM tables all have the same format. They may have a
         vendor part number, and DEVARCH is not set, but the CIDR device class
@@ -988,6 +994,7 @@ class CSROM:
                     # ROM table points back to itself - shouldn't happen
                     continue
                 if e.device_address() in o_exclusions:
+                    e.is_inaccessible = True
                     yield e
                     continue
                 # We don't want to fault when we encounter the same device in multiple
@@ -1004,7 +1011,12 @@ class CSROM:
                 # we aren't otherwise interested in devices. A ROM Table entry doesn't
                 # indicate that it points to a sub-table as opposed to some other device -
                 # we have to map the device and find out if it's another table.
-                d = self.create_device_at(e.device_address(), rom_table_entry=e)
+                try:
+                    d = self.create_device_at(e.device_address(), rom_table_entry=e)
+                except PermissionError:
+                    e.is_inaccessible = True
+                    yield e
+                    continue
                 e.device = d
                 # Fix up device affinity - in the absence of anywhere better.
                 # We could either do this using DEVAFF or heuristically.
@@ -2431,7 +2443,7 @@ def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology
     devices = []
     ts = []
     for e in c.list_table(table, recurse=recurse):
-        assert e.device is not None or e.device_address() in o_exclusions
+        assert e.device is not None or e.is_inaccessible
         if e.device is not None:
             if e.device.is_coresight():
                 devices.append(e.device)
