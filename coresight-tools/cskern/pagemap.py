@@ -6,6 +6,9 @@ Read /proc/self/pagemap to get the VA-to-PA mapping.
 Since 4.2 this requires CAP_SYS_ADMIN. Users without this capability
 may see the PTE as zeroes.
 
+Note that if we're in a VM, we might only be seeing intermediate addresses.
+Memory might not be physically backed at all, or PAs may change at any time.
+
 Copyright (C) ARM Ltd. 2019.  All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,6 +24,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+from __future__ import print_function
+
 """
 Note that the "PA" is the physical address as seen by the OS.
 If running under virtualization it might be an IPA.
@@ -32,8 +37,6 @@ Further information about the physical page can be found in
 which is an array of 64-bit flags words indexed by PFN.
 """
 
-
-from __future__ import print_function
 
 import os, sys, struct
 
@@ -67,10 +70,16 @@ class PTE:
     def is_file_mapped(self):
         return self.bit(61)
 
+    def pa(self):
+        if self.is_present():
+            return self.pfn * self.page_size
+        else:
+            return None
+
     def __str__(self):
         s = "%03x  " % (self.raw >> 52)
         if self.is_present():
-            s += "%16x" % (self.pfn * self.page_size)
+            s += "PA:%16x" % self.pa()
         else:
             s += "-"
         if self.bit(61):
@@ -82,9 +91,47 @@ class PTE:
         return s
 
 
+class PageMapping:
+    """
+    Mapping of one VA range to a PA range (if mapped).
+    """
+    def __init__(self, va=None):
+        self.n_pages = 1
+        self.va = va
+        self.pte = None
+        self.size = None
+
+    def is_mapped(self):
+        return self.pte.is_present()
+
+    def pa(self):
+        if self.is_mapped():
+            return self.pte.pa()
+        else:
+            return None
+
+    def end_pa(self):
+        pa = self.pa()
+        if pa is not None:
+            return pa + self.size
+        else:
+            return None
+
+    def __str__(self):
+        s = "VA:0x%x -> " % (self.va)
+        if self.is_mapped():
+            s += "PA:0x%x" % self.pa()
+        else:
+            s += "<unmapped>"
+        if self.n_pages > 1:
+            s += " (%u)" % self.n_pages
+        return s
+
+
 class PAMap:
     """
     Get the complete VA-to-PA mapping from /proc/self/pagemap.
+    This allows VAs to be looked up to a PTE, and to a PA.
 
     We use OS file operations to avoid Python's buffering.
     """
@@ -95,6 +142,9 @@ class PAMap:
             pid = "self"
         self.fn = "/proc/" + str(pid) + "/pagemap"
         self.fd = os.open(self.fn, os.O_RDONLY)
+
+    def round_down(self, addr):
+        return addr - (addr % self.page_size)
 
     def entry(self, va):
         """
@@ -114,8 +164,21 @@ class PAMap:
         assert len(ebs) == PTE.entry_size
         return PTE(ebs)
 
+    def mapping(self, va):
+        """
+        Get a PageMapping object for a given virtual address
+        """
+        va = self.round_down(va)
+        m = PageMapping(va=va)
+        m.size = self.page_size
+        m.pte = self.entry(va)
+        return m
+
     def pa(self, va):
-        e = self.entry(va, size=self.page_size)
+        """
+        Translate a VA to a PA.
+        """
+        e = self.entry(va)
         if e.is_present():
             # if the PFN has been zeroed, we didn't have the right permissions
             assert e.pfn != 0, "PFN reads as zero: you don't have permissions for this operation"
@@ -123,32 +186,73 @@ class PAMap:
         else:
             return None
 
+    def pa_range(self, va, size):
+        """
+        Given a range of VAs, find all the physical pages spanning the range.
+        Return a list of PageMapping objects.
+        Currently we do this simplistically.
+        """
+        size += (va % self.page_size)
+        if (size % self.page_size) != 0:
+            size += (self.page_size - (size % self.page_size))
+        n_pages = size // self.page_size
+        va = self.round_down(va)
+        maps = []
+        for v in range(va, va+size, self.page_size):
+            m = self.mapping(v)
+            if m.is_mapped() and len(maps) >= 1 and m.pa() == maps[-1].end_pa():
+                maps[-1].n_pages += 1
+                maps[-1].size += self.page_size
+            elif not m.is_mapped() and len(maps) >= 1 and not maps[-1].is_mapped():
+                maps[-1].n_pages += 1
+                maps[-1].size += self.page_size
+            else:
+                maps.append(m)
+        return maps
+
     def __del__(self):
         os.close(self.fd)
 
 
 class SystemRAMRange:
+    """
+    A range of physical addresses known to the system and described in /proc/iomem.
+    """
     def __init__(self, start, size):
-        self.start = start
-        self.size = size
+        self.start = start    # Start PA
+        self.size = size      # Size in bytes
+        self.index = -1
 
     def contains(self, pa):
         return self.start <= pa and pa < (self.start + self.size)
 
+    def __str__(self):
+        return "#%d PA:0x%x (%uMb)" % (self.index, self.start, self.size/(1024*1024))
+
 
 def system_RAM_ranges():
-    # Get the ranges of System RAM known to the OS
+    """
+    Get the physical ranges of System RAM known to the OS, by reading /proc/iomem.
+    """
+    page_size = os.sysconf("SC_PAGE_SIZE")
+    assert page_size != 0, "cannot determine system page size"
     f = open("/proc/iomem")
     for ln in f:        
         ln = ln.strip('\n')      
         if ln.endswith("System RAM"):
-            addrs = ln.split()[0]
-            (a0, a1) = addrs.split('-')
+            toks = ln.split(None, 2)
+            print(toks)
+            (a0, a1) = toks[0].split('-')
             astart = int(a0, 16)
             aend = int(a1, 16)
-            assert aend > astart
+            if astart == 0 and aend == 0:
+                # Kernel reports range as 00000000-00000000. We're not privileged enough.
+                print("error: /proc/iomem is not disclosing memory addresses. Run with increased privilege.", file=sys.stderr)
+                sys.exit(1)
+            assert aend > astart, "invalid system memory range: %s" % ln
             size = aend+1 - astart
-            assert (size % os.sysconf("SC_PAGE_SIZE")) == 0
+            assert (astart % page_size) == 0, "error: /proc/iomem entry not %u-aligned" % (page_size, ln)
+            assert (size % page_size) == 0
             yield SystemRAMRange(astart, size)
     f.close()
 
@@ -164,6 +268,9 @@ class SystemRAMMap:
             r.index = i
         
     def addr_index(self, pa):
+        """
+        Given a PA, find the /proc/iomem range containing this PA.
+        """
         for r in self.ranges:
             if r.contains(pa):
                 return r
@@ -199,8 +306,16 @@ if __name__ == "__main__":
             yield (ln[:-1], int(addr, 16), int(aend, 16))
     m = PAMap(pid=opts.p)
     sysram = SystemRAMMap()
+    # Scan the virtual memory ranges allocated to the target process.
     for (ln, vaddr, vaend) in proc_maps("/proc/" + pidstr + "/maps"):
         printed = False
+        # Scan this range in page-sized chunks. Each page may have a different mapping.
+        assert (vaddr % m.page_size) == 0 and (vaend % m.page_size) == 0, "not 0x%x-aligned:" % (m.page_size, ln)
+        if True:
+            maps = m.pa_range(vaddr, vaend-vaddr)
+            for m in maps:
+                print("  %s" % m)
+            sys.exit()
         while vaddr < vaend:
             if (vaddr + m.page_size) <= opts.address:
                 # this entry is before the range we're interested in
@@ -214,13 +329,14 @@ if __name__ == "__main__":
                     print("%s:" % ln)
                     printed = True
                 if pte.pfn is not None:
+                    # virtual memory is physically backed
                     paddr = pte.pfn * m.page_size
-                    sram_range = sysram.addr_index(paddr)
+                    sram_range = sysram.addr_index(paddr)    # /proc/iomem entry containing this PA
                 else:
                     sram_range = None
-                print("  %16x  %s" % (vaddr, pte), end="")
+                print("  PA=%16x  PTE=%s" % (vaddr, pte), end="")
                 if sram_range is not None:
-                    print("  #%u: size=%uMb" % (sram_range.index, sram_range.size/(1024*1024)), end="")
+                    print("  from: %s" % (sram_range), end="")
                 print()
                 assert pte is not None
             vaddr += m.page_size

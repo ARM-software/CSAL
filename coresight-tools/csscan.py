@@ -192,6 +192,17 @@ def decode_one_hot(x,n):
         return "?%s" % str(bs)
 
 
+class DeviceTimeout(Exception):
+    def __init__(self, dev, off, mask):
+        self.device = dev
+        self.off = off
+        self.mask = mask
+
+    def __str__(self):
+        s = "device %s reg 0x%03x did not set 0x%08x" % (self.device, self.off, self.mask)
+        return s
+
+
 class DevicePhy:
     """
     Access a memory-mapped device
@@ -306,7 +317,7 @@ class Device:
     A single CoreSight device mapped by a ROM table (including ROM tables themselves).    
     """
 
-    def __init__(self, cs, addr, write=False, unlock=False):
+    def __init__(self, cs, addr, write=False, unlock=False, checking=False):
         """
         Construct a device object at the given address.
         'cs' is the device map (e.g. virtual memory via CSROM(), or a MEM-AP) through which we access the device.
@@ -333,9 +344,9 @@ class Device:
         self.part_number = self.PIDR & 0xfff
         self.devtype = None
         self.devarch = None
-        self.is_checking = (o_verbose >= 1)
+        self.is_checking = checking or (o_verbose >= 1)
         if self.is_coresight():            
-            arch = self.read32(0xFBC)
+            arch = self.read32(0xFBC)     # DEVARCH
             if (arch & 0x00100000) != 0:
                 self.devarch = arch
             self.devtype = self.read32(0xFCC)
@@ -372,7 +383,7 @@ class Device:
         A string describing how to locate this device.
         """
         s = "@0x%x" % self.base_address
-        if self.phy.memap is not None:
+        if self.phy is not None and self.phy.memap is not None:
             s = self.phy.memap.memap.address_string() + "." + s
         return s
 
@@ -412,6 +423,27 @@ class Device:
         if o_verbose >= 2:
             print("  = 0x%08x" % x)
         return x
+
+    def test32(self, off, mask):
+        return (self.read32(off) & mask) == mask
+
+    def wait(self, off, mask, timeout=0):
+        """
+        Wait for a bit to become set.
+        Raise an exception if it isn't set within the timeout.
+        Default timeout is "a few times".
+        """
+        default_iters = 10
+        for i in range(0, default_iters):
+            if self.test32(off, mask):
+                return
+        # Taking some time, switch to timeout mode
+        if timeout > 0:
+            t = time.time() + timeout
+            while time.time() < t:
+                if self.test32(off, mask):
+                    return
+        raise DeviceTimeout(self, off, mask)
 
     def do_check(self, check):
         # We can read-back to check that the write has taken effect.
@@ -460,6 +492,11 @@ class Device:
         # We assume that we're not dealing with volatile data (e.g. counters)
         # where special action is needed to return a consistent result.
         return (self.read32(hi) << 32) | self.read32(lo)
+
+    def write32x2(self, hi, lo, value):
+        # Write a 64-bit value to hi and lo registers, non-atomically.
+        self.write32(hi, value >> 32)
+        self.write32(lo, value & 0xffffffff)
 
     def read64(self, off):
         # assume little-endian
@@ -765,20 +802,26 @@ class DevMem:
     """
     Access physical memory via /dev/mem. This object creates mappings into
     page-aligned regions of physical address space.
+
+    Object construction will raise PermissionError if not privileged.
     """
 
     def __init__(self):
         self.page_size = os.sysconf("SC_PAGE_SIZE")
         self.fd = None
+        if os.path.isfile("/dev/csmem"):
+            devmem = "/dev/csmem"
+        else:
+            devmem = "/dev/mem"
         try:
             # This may fail because not present or access-restricted.
-            self.fd = open("/dev/mem", "r+b")
-        except:
-            try:
-                self.fd = open("/dev/csmem", "r+b")
-            except:
-                #print("Can't access /dev/mem or /dev/csmem - are you running as superuser?")
-                raise
+            self.fd = open(devmem, "r+b")
+        except FileNotFoundError:
+            print("physical memory %s not found - rebuild kernel" % devmem)
+            raise
+        except PermissionError:
+            print("can't access %s - try running as superuser" % devmem)
+            raise
         self.fno = self.fd.fileno()
         self.n_mappings = 0
 
@@ -1805,36 +1848,40 @@ class CSROM:
                 is_ETF = False
             # Mode is a programming choice: e.g. is it set up as a circular buffer or a draining FIFO
             mode = d.read32(0x028) & 3
-            print("  mode: %s" % ["circular buffer","software FIFO","hardware FIFO","?3"][mode])
+            print("  mode:           %s" % ["circular buffer","software FIFO","hardware FIFO","?3"][mode])
             if is_ETR:
                 axi_control = d.read32(0x110)
-                print("  AXI control: 0x%08x" % axi_control)
-                scatter_gather = bit(axi_control,7)
+                print("  AXI control:    0x%08x" % axi_control)
+                scatter_gather = bit(axi_control,7)     # n/a in SoC-600 TMC?
                 etr_memory = d.read64(0x118)    # DBALO, DBAHI
                 if not scatter_gather:
                     # base address of trace buffer in system memory
                     print("  buffer address: 0x%x" % etr_memory)
-                    print("  buffer size: 0x%x" % (d.read32(0x004)*4))
+                    print("  buffer size:    0x%x" % (d.read32(0x004)*4))
                 else:
                     # address of first page table entry in linked list
                     print("  scatter-gather table: 0x%x" % etr_memory)
                     # ideally we'd read the scatter-gather table from physical memory,
                     # to show where the ETR was actually writing the data
+            ctl = d.read32(0x020)
+            TraceCaptEn = bit(ctl, 0)
+            print("  control:        0x%08x  %s" % (ctl, bits_set(ctl,{0:"TraceCaptEn"})))
             ffcr = d.read32(0x304)
             ffcr_map = {0:"formatting",1:"format-triggers",4:"FOnFlIn",5:"flush-on-trigger",6:"FlushMan",12:"stop-on-flush",13:"stop-on-trigger"}
-            print("  flush control: %s" % bits_set(ffcr,ffcr_map))
+            print("  flush control:  0x%08x  %s" % (ffcr, bits_set(ffcr,ffcr_map)))
             # from here, report current status
-            TraceCaptEn = bit(d.read32(0x020), 0)
-            status = d.read32(0x00C)
+            ffsr = d.read32(0x300)
+            status = d.read32(0x00C)    # STS
+            print("  status:         0x%08x" % status, end="")
             if not is_TMC:
-                print("  status: %s" % bits_set(status,{0:"Full",1:"Triggered",2:"AcqComp",3:"FtEmpty"}))
-                print("  state: %s" % ["disabled","enabled"][TraceCaptEn])
+                print("  %s" % bits_set(status,{0:"Full",1:"Triggered",2:"AcqComp",3:"FtEmpty"}))
+                print("  state:         %s" % ["disabled","enabled"][TraceCaptEn])
             else:
-                print("  status: %s" % bits_set(status,{0:"Full",1:"Triggered",2:"TMCready",3:"FtEmpty",4:"Empty",5:"MemErr"}))
+                print("  %s" % bits_set(status,{0:"Full",1:"Triggered",2:"TMCready",3:"FtEmpty",4:"Empty",5:"MemErr"}))
                 TMCReady = bit(status,2)
                 if not TraceCaptEn:
                     if not TMCReady:
-                        tmcstate = "Disabling (CTL=0x%08x, STS=0x%08x, FFCR=0x%08x, FFSR=0x%08x, RRP=0x%08x, RWP=0x%08x)" % (d.read32(0x020), status, ffcr, d.read32(0x300), d.read32(0x014), d.read32(0x018))
+                        tmcstate = "Disabling (CTL=0x%08x, STS=0x%08x, FFCR=0x%08x, FFSR=0x%08x, RRP=0x%08x, RWP=0x%08x)" % (d.read32(0x020), status, ffcr, ffsr, d.read32(0x014), d.read32(0x018))
                     else:
                         tmcstate = "Disabled"
                 else:
@@ -1846,7 +1893,12 @@ class CSROM:
                             tmcstate = "Running/Stopping"
                     else:
                         tmcstate = "Stopped"
-                print("  state: %s" % tmcstate)
+                print("  state:          %s" % tmcstate)
+            if is_ETR:
+                rwp = d.read32x2(0x03C,0x018)
+            else:
+                rwp = d.read32(0x018)
+            print("  write pointer:  0x%x" % rwp)
             if TraceCaptEn:
                 print("  buffer fill level (current): 0x%08x" % d.read32(0x030))
             if False:
@@ -1895,7 +1947,14 @@ class CSROM:
                     print(" (all IDs enabled)", end="")
                 print()
             integration_regs = [0xEF8]
+        elif d.is_arm_part_number(0x912) or d.is_arm_part_number(0x9e7):
+            # CoreSight TPIU
+            ffcr = d.read32(0x304)
+            print("  FFCR:   0x%08x" % ffcr)
+            ffsr = d.read32(0x300)
+            print("  FFSR:   0x%08x" % ffsr)
         elif d.is_arm_part_number(0x9ee):
+            # CoreSight Address Translation Unit (CATU)
             catu_control = d.read(0x000)
             catu_mode = d.read(0x004)
             catu_status = d.read(0x100)
