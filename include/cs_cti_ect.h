@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_cti_ect_h
 #define _included_cs_cti_ect_h
 
@@ -395,3 +398,6 @@ int cs_ect_reset(void);
 #endif				/* _included_cs_cti_ect_h */
 
 /* end of  cs_cti_ect.h */
+#ifdef __cplusplus
+}
+#endif

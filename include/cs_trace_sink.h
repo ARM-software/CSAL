@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_trace_sink_h
 #define _included_cs_trace_sink_h
 
@@ -102,4 +105,7 @@ int cs_insert_trace_data(cs_device_t dev, void const *buf,
 
 #endif				/* _included_cs_trace_sink_h */
 
+#ifdef __cplusplus
+}
+#endif
 /* end of  cs_trace_sink.h */

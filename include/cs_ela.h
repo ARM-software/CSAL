@@ -48,6 +48,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_ela_h
 #define _included_cs_ela_h
 
@@ -302,3 +305,6 @@ int cs_ela_read_init(cs_device_t);
 int cs_ela_read_ram_entry(cs_device_t, cs_ela_record_t *);
 
 #endif /* end of cs_ela.h */
+#ifdef __cplusplus
+}
+#endif

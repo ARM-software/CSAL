@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_reg_access_h
 #define _included_cs_reg_access_h
 
@@ -170,4 +173,7 @@ void cs_device_set_wait_repeats(int n_wait_repeat_count);
 
 #endif				/* _included_cs_reg_access_h */
 
+#ifdef __cplusplus
+}
+#endif
 /* end of  cs_reg_access.h */

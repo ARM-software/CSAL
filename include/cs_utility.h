@@ -22,6 +22,9 @@
     limitations under the License.
 */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef CS_UTILITY_H
 #define CS_UTILITY_H
 
@@ -42,3 +45,6 @@
 
 /** @}*/
 #endif				/*CS_UTILITY_H */
+#ifdef __cplusplus
+}
+#endif

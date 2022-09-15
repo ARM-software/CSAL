@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_csaccess_h
 #define _included_csaccess_h
 
@@ -38,3 +41,6 @@
 #endif				/* included */
 
 /* end of csaccess.h */
+#ifdef __cplusplus
+}
+#endif

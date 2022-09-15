@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_trace_source_h
 #define _included_cs_trace_source_h
 
@@ -70,4 +73,7 @@ int cs_get_global_timestamp(uint64_t *ts);
 
 #endif				/* _included_cs_trace_source_h */
 
+#ifdef __cplusplus
+}
+#endif
 /* end of  cs_trace_source.h */

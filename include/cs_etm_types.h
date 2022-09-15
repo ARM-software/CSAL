@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_etm_types_h
 #define _included_cs_etm_types_h
 
@@ -355,3 +358,6 @@ typedef struct cs_etm_config {
 /** @} */
 
 #endif				/* _included_cs_etm_types_h */
+#ifdef __cplusplus
+}
+#endif

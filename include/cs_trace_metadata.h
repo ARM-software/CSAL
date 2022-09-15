@@ -20,6 +20,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_trace_metadata_h
 #define _included_cs_trace_metadata_h
 
@@ -53,4 +56,7 @@ int cs_get_trace_metadata(int mtype, cs_device_t dev, int trace_id,
 
 #endif /*_included_cs_trace_metadata_h*/
 
+#ifdef __cplusplus
+}
+#endif
 /* end of file cs_trace_metadata.h */

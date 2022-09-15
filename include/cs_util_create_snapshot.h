@@ -18,6 +18,9 @@
   limitations under the License.
 */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef CS_UTIL_CREATE_SNAPSHOT_H
 #define CS_UTIL_CREATE_SNAPSHOT_H
 
@@ -88,3 +91,6 @@ void do_fetch_trace(const struct cs_devices_t *devices,
 
 /** @}*/
 #endif				/* CS_UTIL_CREATE_SNAPSHOT_H */
+#ifdef __cplusplus
+}
+#endif

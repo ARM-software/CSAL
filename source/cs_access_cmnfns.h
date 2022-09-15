@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_access_cmnfns_h
 #define _included_cs_access_cmnfns_h
 
@@ -449,4 +452,7 @@ extern int _cs_tsgen_enable(struct cs_device *d, int enable);
 
 #endif				/* _included_cs_access_cmnfns_h */
 
+#ifdef __cplusplus
+}
+#endif
 /* end of  cs_access_cmnfns.h */
