@@ -59,6 +59,25 @@ uint32_t cs_memap_read32(cs_device_t device, cs_physaddr_t addr);
  */
 void cs_memap_write32(cs_device_t device, cs_physaddr_t addr, uint32_t data);
 
+/**
+ * Read a 64-bit value from a location in a MEM-AP's target address space
+ * This may update the MEM-AP's TAR and CSAL's locally cached copy.
+ *
+ * \param device  the MEM-AP device to read through
+ * \param addr    the physical address, in MEM-AP space, to read from
+ */
+uint64_t cs_memap_read64(cs_device_t device, cs_physaddr_t addr);
+
+/**
+ * Write a 64-bit value to memory location, via a MEM-AP.
+ * This may update the MEM-AP's TAR and CSAL's locally cached copy.
+ *
+ * \param device  the MEM-AP device to write through
+ * \param addr    the physical address, in MEM-AP space, to write to
+ * \param data    the 64-bit data to be written
+ */
+void cs_memap_write64(cs_device_t device, cs_physaddr_t addr, uint64_t data);
+
 
 /**
  * Check if the MEM-AP has logged a transfer error, and optionally reset the error.

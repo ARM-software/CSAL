@@ -782,6 +782,17 @@ Register definitions and bitfield values for the Architecture v7 Cortex Core deb
 #define CS_DBGDSCR_TXfull       0x20000000   /**< DBGDTRTX full */
 #define CS_DBGDSCR_RXfull       0x40000000   /**< DBGDTRRX full */
 /**@}*/
+/** @name EDSCR bit values for v8
+@{*/
+#define CS_EDSCR_ERR            0x00000040   /**< Sticky error */
+#define CS_EDSCR_ITE            0x01000000   /**< ITR empty and can accept another instruction */
+#define CS_EDSCR_TXU            0x04000000   /**< TX underrun */
+#define CS_EDSCR_RXO            0x08000000   /**< RX overrun */
+#define CS_EDSCR_ITO            0x10000000   /**< ITR overrun - debugger injected when PE not ready */
+#define CS_EDSCR_TXfull         0x20000000   /**< DBGDTRTX full */
+#define CS_EDSCR_RXfull         0x40000000   /**< DBGDTRRX full */
+/**@}*/
+
 #define CS_DBGDTRTX          0x08C     /**< Target to Host Data Transfer */
 #define CS_DBGDRCR           0x090     /**< WO: Debug Run Control */
 /** @name DBGDRCR Bit Values 
@@ -859,8 +870,7 @@ Register definitions and bitfield values for the Architecture v8 Cortex Core deb
 /** @defgroup cs_pmu CoreSight PMU registers 
     @ingroup reg_defs
 
-Register definitions and bitfield values for the Performance monitoring unit 
-on a cortex core.
+Register definitions and bitfield values for the Performance Monitoring Unit.
 @{
 */
 #define CS_PMEVCNTR(n,scale) (0x000 + ((n)<<(scale)))  /**< Event Count Register (n) */
@@ -871,6 +881,7 @@ on a cortex core.
 #define CS_PMCCNTRW(scale)   CS_PMEVCNTR(31,scale)   /**< Cycle Count Register */
 #define CS_PMXEVTYPER(n)     (0x400 + (n)*4)	/**< Event Type Register(n) */
 #define CS_PMXEVTYPER31      0x47C     /**< Event Type Select Register (filter register) for CCNT */
+#define CS_PMCCFILTR         0x47C     /**< Cycle Counter Filter Register (alias CS_PMXEVTYPER31) */
 #define CS_PMCNTENSET        0xC00     /**< Count Enable Set Register */
 #define CS_PMCNTENCLR        0xC20     /**< Count Enable Clear Register */
 #define CS_PMINTENSET        0xC40     /**< Interrupt Enable Set Register */
@@ -888,6 +899,7 @@ on a cortex core.
 #define CS_PMUSERENR         0xE08     /**< User Enable Register */
 #define CS_PMCEID0           0xE20     /**< Common Event Identification 0 */
 #define CS_PMCEID1           0xE24     /**< Common Event Identification 1 */
+#define CS_PMMIR             0xE40     /**< Machine Identification Register (PMUv3.4) */
 #define CS_PMAUTHSTATUS      0xFB8     /**< Authentication Status Register */
 /** @} */
 

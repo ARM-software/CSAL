@@ -188,9 +188,7 @@ static int cs_debug_exec_and_read(struct cs_device *d, unsigned int inst,
     } else if (dscr & (CS_DBGDSCR_SDABORT_l | CS_DBGDSCR_ADABORT_l)) {
         rc = CS_DEBUG_READ_DATA_ABORT;
     } else {
-        fprintf(stderr,
-                "** no response to debug data transfer, DBGDSCR=%08X\n",
-                dscr);
+        cs_report_error("no response to debug data transfer, DBGDSCR=%08X", dscr);
         rc = CS_DEBUG_READ_NO_RESPONSE;
     }
     return rc;

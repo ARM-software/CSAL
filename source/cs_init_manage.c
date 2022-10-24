@@ -81,6 +81,17 @@ int cs_diag_set(int n)
 }
 
 
+#ifdef __STDC_HOSTED__
+int cs_diag_set_fd(FILE *fd)
+{
+#ifdef DIAG
+    G.diag_fd = fd;
+#endif
+    return 0;
+}
+#endif
+
+
 #ifdef CSAL_MEMAP
 void cs_set_default_memap(cs_device_t dev)
 {

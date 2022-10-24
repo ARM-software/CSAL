@@ -205,6 +205,11 @@ int cs_ela_set_compare_value(cs_ela_trigconf_t *, unsigned int pos, unsigned int
 int cs_ela_signal_width(cs_device_t);
 
 /**
+   ELA static property: comparator width, in bits (may be less than signal width)
+ */
+int cs_ela_comparator_width(cs_device_t);
+
+/**
    ELA static property: number of trigger states (4, 5 or 8)
  */
 int cs_ela_n_trigger_states(cs_device_t);
@@ -248,6 +253,13 @@ int cs_ela_get_config(cs_device_t, cs_ela_config_t *);
  */
 int cs_ela_get_atb_config(cs_device_t, cs_ela_atb_config_t *);
 
+
+/**
+   Initialize a trigger configuration.
+   Optional, if it's initialized to zero, but does set the comparator widths
+   so that attempts to set out-of-range values will fault.
+*/
+int cs_ela_init_trigconf(cs_device_t, cs_ela_trigconf_t *);
 
 /**
    Set trigger #<n> configuration

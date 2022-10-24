@@ -65,7 +65,7 @@ int cs_register_romtable(cs_physaddr_t addr);
  *  If device is already registered then no change is made.
  *  \param addr Physical address of the device
  * 
- *  \return pointer to registered device.
+ *  \return pointer to registered device. Return NULL on error e.g. map failure, or not a CoreSight device.
  */
 cs_device_t cs_device_register(cs_physaddr_t addr);
 

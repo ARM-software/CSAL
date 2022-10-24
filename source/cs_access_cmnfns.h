@@ -133,7 +133,7 @@ struct cs_device {
     int is_permanently_unlocked:1;
 
 #if DIAG
-    int diag_tracing:1;		  /**< Diagnostic messages for actions on this device */
+    int diag_tracing:2;		  /**< Diagnostic messages for actions on this device */
 #endif				/* DIAG */
     unsigned int n_api_errors;
 
@@ -258,10 +258,13 @@ struct global {
 #ifdef CSAL_MEMAP
     cs_device_t memap_default;     /**< MEM-AP parent for new devices, or NULL */
 #endif
+#ifdef DIAG
+    FILE *diag_fd;                 /**< Output stream for diagnostics */
+#endif
     int init_called:1;
     int registration_open:1;
     int force_writes:1;
-    int diag_tracing_default:1;	   /**< Default trace setting for new devices */
+    int diag_tracing_default:2;    /**< Default trace setting for new devices */
     int diag_checking:1;	   /**< Default diag setting for new devices */
     unsigned int n_api_errors;
     unsigned int n_devices;
@@ -386,6 +389,8 @@ extern int _cs_write_wo(struct cs_device *d, unsigned int off,
                         uint32_t data);
 extern int _cs_write64_wo(struct cs_device *d, unsigned int off,
                           uint64_t data);
+extern int _cs_write_wo_traced(struct cs_device *d, unsigned int off,
+                               uint32_t data, char const *oname);
 extern int _cs_write_traced(struct cs_device *d, unsigned int off,
                             uint32_t data, char const *oname);
 extern int _cs_write64_traced(struct cs_device *d, unsigned int off,
@@ -419,8 +424,8 @@ extern int _cs_isclaimed(struct cs_device *d, uint32_t bit);
 
 extern int _cs_isunlocked(struct cs_device *d);
 extern int _cs_is_lockable(struct cs_device *d);
-extern void _cs_unlock(struct cs_device *d);
-extern void _cs_lock(struct cs_device *d);
+extern int _cs_unlock(struct cs_device *d);
+extern int _cs_lock(struct cs_device *d);
 
 extern void *io_map(cs_physaddr_t addr, unsigned int size, int writable);
 extern void io_unmap(void volatile *addr, unsigned int size);

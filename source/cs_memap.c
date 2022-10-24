@@ -69,6 +69,13 @@ uint32_t cs_memap_read32(cs_device_t dev, cs_physaddr_t addr)
     return _cs_read(d, reg);
 }
 
+
+uint64_t cs_memap_read64(cs_device_t dev, cs_physaddr_t addr)
+{
+    return ((uint64_t)cs_memap_read32(dev, addr+4) << 32) | cs_memap_read32(dev, addr);
+}
+
+
 /*
  * Write data to a memory location, via a MEM-AP.
  */
@@ -79,6 +86,12 @@ void cs_memap_write32(cs_device_t dev, cs_physaddr_t addr, uint32_t data)
     _cs_write(d, reg, data);
 }
 
+
+void cs_memap_write64(cs_device_t dev, cs_physaddr_t addr, uint64_t data)
+{
+    cs_memap_write32(dev, addr, (uint32_t)data);
+    cs_memap_write32(dev, addr+4, (uint32_t)(data >> 32));
+}
 
 
 /*

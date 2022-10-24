@@ -166,6 +166,35 @@ void cs_device_instruction_barrier(cs_device_t dev);
  */
 void cs_device_set_wait_repeats(int n_wait_repeat_count);
 
+
+/**
+ *   Set a flag in our device object to print all register accesses.
+ *   Return -1 if the library was not built with this feature enabled.
+ *   Default device tracing state is as set by cs_diag_set(), or disabled.
+ *   Note that ths is an internal library feature and unrelated to hardware tracing.
+ *
+ *   \param dev        device descriptor
+ *   \param tracing    set to 1 to trace register writes
+ */
+int cs_device_diag_set(cs_device_t dev, int tracing);
+
+
+/**
+ *   Unlock a device. Not normally necessary - library does it automatically.
+ *   May be necessary if another agent has locked the device.
+ *
+ *   \param dev     device descriptor
+ */
+int cs_device_unlock(cs_device_t dev);
+
+
+/**
+ *   Lock a device. May be done as a precaution after programming.
+ *
+ *   \param dev     device descriptor
+ */
+int cs_device_lock(cs_device_t dev);
+
 /** @} */
 
 #endif				/* _included_cs_reg_access_h */

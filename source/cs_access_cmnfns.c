@@ -25,6 +25,9 @@ struct global G;
 static int wait_iterations = 32;
 
 #ifdef DIAG
+
+#define diagfd (G.diag_fd ? G.diag_fd : stderr)
+
 /*
   Write a diagnostic message.
 
@@ -38,12 +41,12 @@ void _diagf(char const *s, ...)
     va_list args;
     va_start(args, s);
     if (s[0] == '!') {
-        fprintf(stderr, "** csaccess: ");
+        fprintf(diagfd, "** csaccess: ");
         ++s;
     }
-    vfprintf(stderr, s, args);
+    vfprintf(diagfd, s, args);
     va_end(args);
-    fflush(stderr);
+    fflush(diagfd);
 }
 #endif				/* DIAG */
 
@@ -107,10 +110,10 @@ int cs_report_error(char const *fmt, ...)
 #ifdef UNIX_KERNEL
     printk("** csaccess: %s\n", err_mesg);
 #else
-    fprintf(stderr, "** csaccess: ERROR: %s\n", err_mesg);
+    fprintf(diagfd, "** csaccess: ERROR: %s\n", err_mesg);
 #endif
 #ifndef UNIX_KERNEL
-    fflush(stderr);
+    fflush(diagfd);
 #endif
     return -1;
 }
@@ -127,11 +130,11 @@ int cs_report_device_error(struct cs_device *d, char const *fmt, ...)
 #ifdef UNIX_KERNEL
     printk("** csaccess(%" CS_PHYSFMT "): %s\n", d->phys_addr, err_mesg);
 #else
-    fprintf(stderr, "** csaccess(%" CS_PHYSFMT "): ERROR: %s\n",
+    fprintf(diagfd, "** csaccess(%" CS_PHYSFMT "): ERROR: %s\n",
 	    d->phys_addr, err_mesg);
 #endif
 #ifndef UNIX_KERNEL
-    fflush(stderr);
+    fflush(diagfd);
 #endif
     return -1;
 }
@@ -217,31 +220,52 @@ uint32_t volatile *_cs_get_register_address(struct cs_device *d,
 
 uint32_t _cs_read(struct cs_device *d, unsigned int off)
 {
+    uint32_t data;
     assert((off & 3) == 0);
     assert(off < 4096);
 #ifdef CSAL_MEMAP
     if (d->memap) {
-        return cs_memap_read32(d->memap, d->phys_addr+off);
+        data = cs_memap_read32(d->memap, d->phys_addr+off);
+        goto done;
     }
 #endif
 #ifndef USE_DEVMEMD
     assert(d->local_addr != NULL);
-    return *(uint32_t volatile const *)(d->local_addr + off);
+    data = *(uint32_t volatile const *)(d->local_addr + off);
 #else
-    return devmemd_read32(d->phys_addr + off);
+    data = devmemd_read32(d->phys_addr + off);
 #endif
+#ifdef CSAL_MEMAP
+done:
+#endif
+    if (DTRACE(d)) {
+	diagf("!%" CS_PHYSFMT ": read %03X = %08X\n",
+	      d->phys_addr, off, data);
+    }
+    return data;
 }
 
 uint64_t _cs_read64(struct cs_device *d, unsigned int off)
 {
+    uint64_t data;
     assert((off & 7) == 0);
     assert(off < 4096);
+#ifdef CSAL_MEMAP
+    if (d->memap) {
+        data = cs_memap_read64(d->memap, d->phys_addr+off);
+        goto done;
+    }
+#endif
 #ifndef USE_DEVMEMD
     assert(d->local_addr != NULL);
-    return *(uint64_t volatile const *) (d->local_addr + off);
+    data = *(uint64_t volatile const *)(d->local_addr + off);
 #else
-    return devmemd_read64(d->phys_addr + off);
+    data = devmemd_read64(d->phys_addr + off);
 #endif
+#ifdef CSAL_MEMAP
+done:
+#endif
+    return data;
 }
 
 
@@ -258,6 +282,11 @@ int _cs_write_wo(struct cs_device *d, unsigned int off, uint32_t data)
 {
     assert((off & 3) == 0);
     assert(off < 4096);
+#ifdef CSAL_MEMAP
+    if (d->memap) {
+        return cs_memap_write32(d->memap, d->phys_addr+off, data);
+    }
+#endif
 #ifndef USE_DEVMEMD
     assert(d->local_addr != NULL);
     *(uint32_t volatile *)(d->local_addr + off) = data;
@@ -271,6 +300,11 @@ int _cs_write64_wo(struct cs_device *d, unsigned int off, uint64_t data)
 {
     assert((off & 7) == 0);
     assert(off < 4096);
+#ifdef CSAL_MEMAP
+    if (d->memap) {
+        return cs_memap_write64(d->memap, d->phys_addr+off, data);
+    }
+#endif
 #ifndef USE_DEVMEMD
     assert(d->local_addr != NULL);
     *(uint64_t volatile *)(d->local_addr + off) = data;
@@ -280,10 +314,10 @@ int _cs_write64_wo(struct cs_device *d, unsigned int off, uint64_t data)
     return 0;
 }
 
-int _cs_write_traced(struct cs_device *d, unsigned int off,
-		     uint32_t data, char const *oname)
+
+int _cs_write_wo_traced(struct cs_device *d, unsigned int off,
+                        uint32_t data, char const *oname)
 {
-    unsigned int ndata;
     if (DTRACE(d)) {
 	diagf("!%" CS_PHYSFMT ": write %03X (%s) = %08X\n",
 	      d->phys_addr, off, oname, data);
@@ -294,17 +328,27 @@ int _cs_write_traced(struct cs_device *d, unsigned int off,
 		  d->phys_addr, off, oname);
 	}
     }
-    _cs_write_wo(d, off, data);
+    return _cs_write_wo(d, off, data);
+}
+
+
+int _cs_write_traced(struct cs_device *d, unsigned int off,
+		     uint32_t data, char const *oname)
+{
+    _cs_write_wo_traced(d, off, data, oname);
     if (DCHECK(d)) {
 	/* Read the data back */
+        unsigned int ndata;
 	ndata = _cs_read(d, off);
 	if (ndata != data) {
 	    diagf("!%" CS_PHYSFMT ": write %03X (%s) = %08X now %08X\n",
 		  d->phys_addr, off, oname, data, ndata);
+            return -1;
 	}
     }
     return 0;
 }
+
 
 int _cs_write64_traced(struct cs_device *d, unsigned int off,
 		       uint64_t data, char const *oname)
@@ -328,6 +372,7 @@ int _cs_write64_traced(struct cs_device *d, unsigned int off,
 	    diagf("!%" CS_PHYSFMT
 		  ": write %03X (%s) = %016llX now %016llX\n",
 		  d->phys_addr, off, oname, data, ndata);
+            return -1;
 	}
     }
     return 0;
@@ -562,10 +607,10 @@ int _cs_is_lockable(struct cs_device *d)
 }
 
 
-void _cs_unlock(struct cs_device *d)
+int _cs_unlock(struct cs_device *d)
 {
     if (!d->is_unlocked) {
-	_cs_write_wo(d, CS_LAR, CS_KEY);
+	_cs_write_wo_traced(d, CS_LAR, CS_KEY, "LAR");
 	d->is_unlocked = 1;
     }
     if (DCHECK(d)) {
@@ -574,15 +619,17 @@ void _cs_unlock(struct cs_device *d)
 	    /* Implemented (bit 0) and still locked (bit 1) */
 	    diagf("!%" CS_PHYSFMT ": after unlock, LSR=%08X\n",
 		  d->phys_addr, lsr);
+            return -1;
 	}
     }
+    return 0;
 }
 
 
-void _cs_lock(struct cs_device *d)
+int _cs_lock(struct cs_device *d)
 {
     if (d->is_unlocked) {
-	_cs_write_wo(d, CS_LAR, 0);
+	_cs_write_wo_traced(d, CS_LAR, 0, "LAR");
 	d->is_unlocked = 0;
     }
     if (DCHECK(d)) {
@@ -591,8 +638,10 @@ void _cs_lock(struct cs_device *d)
 	    /* Implemented (bit 0) but not locked (bit 1) */
 	    diagf("!%" CS_PHYSFMT ": after lock, LSR=%08X\n",
 		  d->phys_addr, lsr);
+            return -1;
 	}
     }
+    return 0;
 }
 
 

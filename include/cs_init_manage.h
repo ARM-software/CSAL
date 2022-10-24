@@ -20,6 +20,10 @@
 #ifndef _included_cs_init_manage_h
 #define _included_cs_init_manage_h
 
+#ifdef __STDC_HOSTED__
+#include <stdio.h>
+#endif
+
 /**
  * \defgroup init Library Management.
  * Library initialisation and management functions
@@ -33,6 +37,11 @@ int cs_init(void);
  *  \param n   set to 1 to produce diagnostic messages
  */
 int cs_diag_set(int n);
+
+#ifdef __STDC_HOSTED__
+/** Set the output file for diagnostics. */
+int cs_diag_set_fd(FILE *fd);
+#endif
 
 /** Lock all components (devices) */
 int cs_shutdown(void);

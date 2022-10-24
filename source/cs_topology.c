@@ -127,7 +127,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         return ERRDESC;
     }
     if (_cs_read(&protod, CS_CIDR3) != 0xB1) {
-        //cs_report_error("not a CoreSight component at %" CS_PHYSFMT "", addr);
+        cs_report_error("not a CoreSight component at %" CS_PHYSFMT "", addr);
         return ERRDESC;
     }
     cs_class = CS_CLASS_OF(_cs_read(&protod, CS_CIDR1));

@@ -26,6 +26,9 @@
 #define ela_has_atb(d) (d->v.ela.ram_size == 0)
 #define ela_is_600(d)  (d->v.ela.is_ela600)
 
+/*
+ * Initialize a signal vector to the signal width of the ELA. N.b. comparator width may be smaller.
+ */
 int cs_ela_clear_signals(cs_device_t dev, cs_ela_signals_t *sigs)
 {
     unsigned int i;
@@ -34,6 +37,7 @@ int cs_ela_clear_signals(cs_device_t dev, cs_ela_signals_t *sigs)
     for (i = 0; i < d->v.ela.signal_width/32; ++i) {
         sigs->v.words[i] = 0;
     }
+    /* Don't set sigs->n_bits, in case this is actually a (smaller) comparator vector */
     return 0;
 }
 
@@ -41,6 +45,10 @@ int cs_ela_clear_signals(cs_device_t dev, cs_ela_signals_t *sigs)
 /* Helper function - no device access */
 int cs_ela_set_signals(cs_ela_signals_t *sigs, unsigned int bit_offset, unsigned int n_bits, uint64_t value)
 {
+    if (sigs->n_bits != 0 && (bit_offset + n_bits > sigs->n_bits)) {
+        //fprintf(stderr, "trying to set bits [%u:%u] in %u-bit signal vector\n", bit_offset+n_bits-1, bit_offset, sigs->n_bits);
+        return 1;
+    }
     while (n_bits) {
         unsigned int wix = bit_offset / 32;
         unsigned int pos_in_word = bit_offset % 32;
@@ -65,9 +73,12 @@ int cs_ela_set_signals(cs_ela_signals_t *sigs, unsigned int bit_offset, unsigned
 
 int cs_ela_set_compare_value(cs_ela_trigconf_t *tc, unsigned int bit_offset, unsigned int n_bits, uint64_t value)
 {
-    cs_ela_set_signals(&tc->compare_value, bit_offset, n_bits, value);
-    cs_ela_set_signals(&tc->compare_mask, bit_offset, n_bits, ONES(n_bits));
-    return 0;
+    int rc;
+    rc = cs_ela_set_signals(&tc->compare_value, bit_offset, n_bits, value);
+    if (!rc) {
+        rc = cs_ela_set_signals(&tc->compare_mask, bit_offset, n_bits, ONES(n_bits));
+    }
+    return rc;
 }
 
 /* Helper function - no device access */
@@ -103,6 +114,7 @@ static int read_regs(struct cs_device *d, unsigned int off, unsigned int n_words
     return 0;
 }
 
+/* Read signal vector from device registers, e.g. comparator value or mask */
 static int read_signals(struct cs_device *d, unsigned int off, unsigned int n_bits, cs_ela_signals_t *sigs)
 {
     sigs->n_bits = n_bits;
@@ -222,15 +234,29 @@ int cs_ela_get_trigconf(cs_device_t dev, unsigned int ts, cs_ela_trigconf_t *tc)
     return 0;
 }
 
+/* True if word has one bit set, or is zero */
 static int __attribute__((unused)) is_zero_one_hot(uint32_t n)
 {
     return (n & -n) == n;
 }
 
+/* True if word has exactly one bit set */
 static int __attribute__((unused)) is_one_hot(uint32_t n)
 {
     return n != 0 && is_zero_one_hot(n);
 }
+
+
+
+int cs_ela_init_trigconf(cs_device_t dev, cs_ela_trigconf_t *tc)
+{
+    struct cs_device *d = DEV(dev);
+    assert(d->type == DEV_ELA);
+    tc->compare_mask.n_bits = d->v.ela.comp_width;
+    tc->compare_value.n_bits = d->v.ela.comp_width;
+    return 0;
+}
+
 
 int cs_ela_set_trigconf(cs_device_t dev, unsigned int ts, cs_ela_trigconf_t const *tc)
 {
@@ -246,7 +272,7 @@ int cs_ela_set_trigconf(cs_device_t dev, unsigned int ts, cs_ela_trigconf_t cons
     if (!is_zero_one_hot(tc->next_state)) {
         return -1;
     }
-    _cs_write(d, CS_ELA_NEXTSTATE(ts), tc->next_state);
+    _cs_write(d, CS_ELA_NEXTSTATE(ts), tc->next_state);   /* 0 means don't change, final state */
     _cs_write(d, CS_ELA_ACTION(ts), tc->action);
     _cs_write(d, CS_ELA_ALTNEXTSTATE(ts), tc->alt_next_state);
     _cs_write(d, CS_ELA_ALTACTION(ts), tc->alt_action);
@@ -282,6 +308,13 @@ int cs_ela_signal_width(cs_device_t dev)
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_ELA);
     return d->v.ela.signal_width;
+}
+
+int cs_ela_comparator_width(cs_device_t dev)
+{
+    struct cs_device *d = DEV(dev);
+    assert(d->type == DEV_ELA);
+    return d->v.ela.comp_width;
 }
 
 int cs_ela_n_trigger_states(cs_device_t dev)

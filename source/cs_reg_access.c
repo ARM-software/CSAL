@@ -96,6 +96,28 @@ unsigned short cs_device_part_number(cs_device_t dev)
 }
 
 
+int cs_device_unlock(cs_device_t dev)
+{
+    return _cs_unlock(DEV(dev));
+}
+
+
+int cs_device_lock(cs_device_t dev)
+{
+    return _cs_lock(DEV(dev));
+}
+
+
+int cs_device_diag_set(cs_device_t dev, int tracing)
+{
+#if DIAG
+    DEV(dev)->diag_tracing = tracing;
+    return 0;
+#else
+    return -1;
+#endif
+}
+
 /*
  * Barriers.
  *
