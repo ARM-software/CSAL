@@ -20,6 +20,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_debug_halt_h
 #define _included_cs_debug_halt_h
 
@@ -180,3 +183,6 @@ int cs_debug_read_registers(cs_device_t dev, unsigned int mask,
 #endif				/* _included_cs_debug_halt_h */
 
 /* end of  cs_debug_halt.h */
+#ifdef __cplusplus
+}
+#endif

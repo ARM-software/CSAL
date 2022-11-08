@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_topology_h
 #define _included_cs_topology_h
 
@@ -247,4 +250,7 @@ cs_device_t cs_cpu_get_device(cs_cpu_t cpu, unsigned int classes);
 
 #endif				/* _included_cs_topology_h */
 
+#ifdef __cplusplus
+}
+#endif
 /* end of  cs_topology.h */

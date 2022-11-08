@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_types_h
 #define _included_cs_types_h
 
@@ -196,4 +199,7 @@ typedef enum {
 
 #endif				/* _included_cs_types_h */
 
+#ifdef __cplusplus
+}
+#endif
 /* end of  cs_types.h */

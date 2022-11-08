@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_reg_access_h
 #define _included_cs_reg_access_h
 
@@ -199,4 +202,7 @@ int cs_device_lock(cs_device_t dev);
 
 #endif				/* _included_cs_reg_access_h */
 
+#ifdef __cplusplus
+}
+#endif
 /* end of  cs_reg_access.h */

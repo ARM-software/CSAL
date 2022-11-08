@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_sw_stim_h
 #define _included_cs_sw_stim_h
 
@@ -221,4 +224,7 @@ int cs_stm_config_put(cs_device_t dev, stm_config_t * dyn_config);
 
 #endif				/* _included_cs_sw_stim_h */
 
+#ifdef __cplusplus
+}
+#endif
 /* end of  cs_sw_stim.h */

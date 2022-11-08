@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_stub_devmemd_h
 #define _included_cs_stub_devmemd_h
 
@@ -33,3 +36,6 @@ extern void devmemd_write64(unsigned long addr, uint64_t data);
 extern void devmemd_close();
 
 #endif /* included */
+#ifdef __cplusplus
+}
+#endif

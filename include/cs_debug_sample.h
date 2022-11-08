@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_debug_sample_h
 #define _included_cs_debug_sample_h
 
@@ -61,3 +64,6 @@ int cs_debug_get_pc_sample(cs_device_t dev, cs_virtaddr_t * pc,
 #endif				/* _included_cs_debug_sample_h */
 
 /* end of  cs_debug_sample.h */
+#ifdef __cplusplus
+}
+#endif

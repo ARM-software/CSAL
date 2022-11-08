@@ -22,6 +22,9 @@
  * SVN $Id: $
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef ARM_CS_STM_TYPES_H_INCLUDED
 #define ARM_CS_STM_TYPES_H_INCLUDED
 
@@ -202,4 +205,7 @@ typedef struct stm_config {
 
 #endif				// ARM_CS_STM_TYPES_H_INCLUDED
 
+#ifdef __cplusplus
+}
+#endif
 /* End of File cs_stm_types.h */

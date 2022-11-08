@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_ts_gen_h
 #define _included_cs_ts_gen_h
 
@@ -176,3 +179,6 @@ int cs_tsgen_config_as_ro(cs_device_t dev);
 /** @}*/
 
 #endif				/* _included_cs_ts_gen_h */
+#ifdef __cplusplus
+}
+#endif

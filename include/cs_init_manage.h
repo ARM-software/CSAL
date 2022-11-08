@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_init_manage_h
 #define _included_cs_init_manage_h
 
@@ -73,3 +76,6 @@ unsigned short cs_library_version();
 #endif				/* _included_cs_init_manage_h */
 
 /* end of  cs_init_manage.h */
+#ifdef __cplusplus
+}
+#endif

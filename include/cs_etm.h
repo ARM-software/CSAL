@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_etm_h
 #define _included_cs_etm_h
 
@@ -164,3 +167,6 @@ int cs_etm_static_config_init(struct cs_etm_static_config *);
 #endif				/* _included_cs_etm_h */
 
 /* end of  cs_etm.h */
+#ifdef __cplusplus
+}
+#endif

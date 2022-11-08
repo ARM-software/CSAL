@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_etm_v4_h
 #define _included_cs_etm_v4_h
 
@@ -37,4 +40,7 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t * c);
 
 #endif				/* _included_cs_etm_v4_h */
 
+#ifdef __cplusplus
+}
+#endif
 /* end of  cs_etm_v4.h */

@@ -19,6 +19,9 @@
   limitations under the License.
 */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef CS_REGISTRATION_H
 #define CS_REGISTRATION_H
 
@@ -148,4 +151,7 @@ int setup_named_board(const char *board_name, const struct board **board,
 
 /** @}*/
 
+#endif
+#ifdef __cplusplus
+}
 #endif

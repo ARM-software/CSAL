@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_pmu_h
 #define _included_cs_pmu_h
 
@@ -137,4 +140,7 @@ int cs_pmu_is_enabled(cs_device_t);
 
 #endif				/* _included_cs_pmu_h */
 
+#ifdef __cplusplus
+}
+#endif
 /* end of  cs_pmu.h */

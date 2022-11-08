@@ -20,6 +20,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _included_cs_memap_h
 #define _included_cs_memap_h
 
@@ -118,3 +121,6 @@ void cs_memap_invalidate_TAR(cs_device_t device);
 #endif /* _included_cs_memap_h */
 
 /* end of cs_memap.h */
+#ifdef __cplusplus
+}
+#endif

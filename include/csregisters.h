@@ -19,6 +19,9 @@
  * limitations under the License.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef _included_csregisters_h
 #define _included_csregisters_h
@@ -1026,3 +1029,6 @@ Register definitions and bitfield values for ELA devices.
 
 
 /* end of csregisters.h */
+#ifdef __cplusplus
+}
+#endif
