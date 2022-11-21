@@ -53,6 +53,7 @@ o_show_integration = False
 o_show_authstatus = False
 o_show_sample = False        # Destructive sampling
 o_exclusions = []
+o_assume_powered_on = False
 
 g_devmem = None              # Physical memory provider
 
@@ -404,6 +405,7 @@ class Device:
     def close(self):
         if self.we_claimed:
             self.unclaim(self.we_claimed)
+            self.we_claimed = False
         if self.we_unlocked and self.cs.restore_locks:
             self.lock()
         self.unmap()
@@ -414,7 +416,7 @@ class Device:
         care to only read it once.
         """
         self.n_reads += 1
-        self.map()
+        self.map()             # Ensure that the device has a path to memory
         if o_verbose >= 2:
             print("  0x%x[%03x] R4" % (self.base_address, off), end="")
             if o_verbose >= 3:
@@ -720,8 +722,10 @@ class Device:
             self.we_unlocked = True
 
     def lock(self):
+        # Assume we've write-enabled
         if self.is_unlocked():
             self.write32(0xFB0, 0x00000000, check=False)
+            self.we_unlocked = False
 
     def set_integration_mode(self, flag):
         if flag:
@@ -851,7 +855,7 @@ class DevMem:
         except PermissionError:
             raise
         except EnvironmentError as e:
-            print("** failed to map 0x%x size 0x%x on fileno %d (currently %u mappings): %s" % (addr, self.page_size, self.fno, self.n_mappings, e))
+            print("** failed to map 0x%x size 0x%x prot 0x%x on fileno %d (currently %u mappings): %s" % (addr, self.page_size, prot, self.fno, self.n_mappings, e))
             raise
         self.n_mappings += 1
         return m
@@ -1179,11 +1183,12 @@ class CSROM:
                     print(" DoPD", end="")
         elif d.is_arm_architecture(ARM_ARCHID_PMU):
             # PMU doesn't have a register of its own to indicate power state - you have to find the affine core.
-            if not d.is_affine_to_core():
-                core_powered_off = True
-            else:
-                edprsr = d.affine_core.read32(0x314)
-                core_powered_off = ((edprsr & 0x1) == 0)
+            if not o_assume_powered_on:
+                if not d.is_affine_to_core():
+                    core_powered_off = True
+                else:
+                    edprsr = d.affine_core.read32(0x314)
+                    core_powered_off = ((edprsr & 0x1) == 0)
             if not core_powered_off:
                 config = d.read32(0xE00)
                 n_counters = config & 0xff
@@ -1201,6 +1206,8 @@ class CSROM:
                 if bit(config,19):
                     print(" user-enable", end="")
                 pmmir = d.read32(0xE40)
+                if pmmir != 0:
+                    print(" pmmir:0x%08x" % (pmmir), end="")
                 n_slots = bits(pmmir,0,8)
                 if n_slots:
                     print(" slots:%u" % (n_slots), end="")
@@ -1324,9 +1331,11 @@ class CSROM:
             if bits(devid,25,4) == 1:
                 print(" scrambler", end="")
             print(" groupwidth=%u" % ((bits(devid1,8,8)+1)*8), end="")
-            print(" trigstates=%u" % bits(devid1,16,8), end="")
             if bits(devid2,8,8):
                 print(" compwidth=%u" % ((bits(devid2,8,8)+1)*8), end="")
+            else:
+                pass    # COMP_WIDTH == GRP_WIDTH
+            print(" trigstates=%u" % bits(devid1,16,8), end="")
         elif d.is_cti():
             # CoreSight CTI (SoC400) or CoreSight CTI (SoC600) or core CTI
             # n.b. SoC600 CTI is fixed at 4 channels
@@ -1352,14 +1361,19 @@ class CSROM:
             # CoreSight SWO
             print(" SWO", end="")
         elif d.is_arm_part_number(0x907):
-            # CoreSight ETB
+            # CoreSight ETB - predating the TMC-ETB
             print(" ETB size:%u" % (d.read32(0x004)*4), end="")
         elif d.arm_part_number() in [0x961, 0x9e8, 0x9e9, 0x9ea]:
             # CoreSight TMC (SoC400 generation, or SoC600)
+            # TMC Configuration (ETB/ETR/ETF) is selected at RTL build time, and is indicated in DEVID.
+            # For pre-SoC600 TMC, the part number is 0x961 irrespective of configuration.
+            # For SoC600 TMC, the part number reflects the configuration.
             configtype = (devid >> 6) & 3
             print(" TMC:%s" % ["ETB","ETR","ETF","?3"][configtype], end="")
             if configtype != 1:
-                print(" size:%u" % (d.read32(0x004)*4), end="")   # for ETB/ETF this is fixed, for ETR it's the buffer size
+                # For ETB/ETF, show the internal RAM size, fixed at compile time.
+                # For ETR, this register shows the memory buffer size set up dynamically.
+                print(" size:%u" % (d.read32(0x004)*4), end="")
             memwidth = (devid >> 8) & 7
             print(" memwidth:%u" % (8<<memwidth), end="")
             if configtype == 1:
@@ -1434,23 +1448,49 @@ class CSROM:
                     print("  Secure")
                 if bit(dscr,24):
                     print("  ITR empty")
+            # Show breakpoint/watchpoint programming
+            n_bkpt = bits(dfr,12,4)+1
+            n_wpt = bits(dfr,20,4)+1
+            for n in range(0,n_bkpt):
+                bcr = d.read32(0x408+(n*16))
+                bvr = d.read64(0x400+(n*16))
+                if bcr != 0 or bvr != 0:
+                    is_enabled = bit(bcr,0)
+                    print("  BP #%u: value=0x%016x control=0x%08x" % (n, bvr, bcr), end="")
+                    print(" type=0x%x" % (bits(bcr,20,4)), end="")
+                    if bit(bcr,20):
+                        print(" linked=BP#%u" % (bits(bcr,16,4)), end="")
+                    # TBD: interpret SSC, HMC and PMC
+                    print(" PMC=EL%u" % (bits(bcr,1,2)), end="")
+                    print([" disabled"," enabled"][is_enabled], end="")
+                    print()
+            for n in range(0,n_wpt):
+                wcr = d.read32(0x808+(n*16))
+                wvr = d.read64(0x800+(n*16))
+                if wcr != 0 or wvr != 0:
+                    is_enabled = bit(wcr,0)
+                    print("  WP #%u: value=0x%016x control=0x%08x" % (n, wvr, wcr), end="")
+                    if bit(wcr,20):
+                        print(" linked=WP#%u" % (bits(wcr,16,4)), end="")
+                    print([" disabled"," enabled"][is_enabled], end="")
+                    print()
         elif d.is_arm_architecture(ARM_ARCHID_PMU):
             # Show dynamic configuration and current state for PMU
             pmcr = d.read32(0xE04)
-            print("  pmcr: 0x%08x" % pmcr)
+            print("  pmcr: 0x%08x" % pmcr, end="")
+            if bit(pmcr,4):
+                print(" exported", end="")
+            print()
             ovs = d.read32(0xC80)
             cen = d.read32(0xC00)
-            ccntr = d.read64(0x0F8)
-            print("  ccntr: 0x%016x" % ccntr, end="")
-            if bit(cen,31):
-                print(" enabled", end="")
-            if bit(ovs,31):
-                print(" overflowed", end="")
-            print()
-            for i in range(0,n_counters):
+            for i in [31] + list(range(0,n_counters)):
+                if i < 31:
+                    cname = "#" + str(i)
+                else:
+                    cname = "cc"
                 evcnt = d.read64(0x000+i*8)
                 evtyp = d.read32(0x400+i*4)
-                print("  #%u: 0x%08x 0x%016x" % (i, evtyp, evcnt), end="")
+                print(" %5s: 0x%08x 0x%016x" % (cname, evtyp, evcnt), end="")
                 if bit(cen,i):
                     print(" enabled", end="")
                 if bit(ovs,i):
@@ -1849,7 +1889,7 @@ class CSROM:
             #     - is trace formatting enabled
             #   4. State: the state the buffer is currently in
             #     - e.g. Running, Stopped, Disabled
-            is_TMC = d.is_arm_part_number(0x961)
+            is_TMC = not d.is_arm_part_number(0x907)
             if is_TMC:
                 # Check whether ETR, ETB or ETF
                 configtype = (devid >> 6) & 3
@@ -1886,6 +1926,7 @@ class CSROM:
             status = d.read32(0x00C)    # STS
             print("  status:         0x%08x" % status, end="")
             if not is_TMC:
+                # SoC-400 ETB
                 print("  %s" % bits_set(status,{0:"Full",1:"Triggered",2:"AcqComp",3:"FtEmpty"}))
                 print("  state:         %s" % ["disabled","enabled"][TraceCaptEn])
             else:
@@ -1907,15 +1948,19 @@ class CSROM:
                         tmcstate = "Stopped"
                 print("  state:          %s" % tmcstate)
             if is_ETR:
+                rrp = d.read32x2(0x038,0x014)
                 rwp = d.read32x2(0x03C,0x018)
             else:
+                rrp = d.read32(0x014)
                 rwp = d.read32(0x018)
+            print("  read pointer:   0x%x" % rrp)
             print("  write pointer:  0x%x" % rwp)
             if TraceCaptEn:
                 print("  buffer fill level (current): 0x%08x" % d.read32(0x030))
             if False:
                 # Reading the latched fill level returns the max fill level since
-                # it was last read, and also updates with the current fill level.
+                # it was last read, and also updates it with the current fill level.
+                # Avoid destructive operations when showing status.
                 print("  buffer fill level (latched): 0x%08x" % d.read32(0x02C))
             integration_regs = [0xEF0, 0xEF4, 0xEF8]
             if is_ETF:
@@ -2580,6 +2625,8 @@ if __name__ == "__main__":
             o_force_memap = True
         elif arg == "--authstatus":
             o_show_authstatus = True
+        elif arg == "--assume-powered-on":
+            o_assume_powered_on = True
         elif arg.startswith("--limit="):
             o_max_devices = int(arg[8:])
         elif arg.startswith("--memap="):
