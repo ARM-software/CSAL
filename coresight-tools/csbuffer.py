@@ -4,6 +4,26 @@
 Helper functions to read the buffer of a trace sink (ETR/ETF/ETB).
 Readout in general needs write access to the device, and affects its current state
 (notably the read pointer).
+
+---
+Copyright (C) ARM Ltd. 2018-2022.  All rights reserved.
+
+SPDX-License-Identifer: Apache 2.0
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+---
+
+
 """
 
 from __future__ import print_function

@@ -5,7 +5,7 @@ Scan the ROM table and report on CoreSight devices.
 Also do ATB and CTI topology detection.
 
 ---
-Copyright (C) ARM Ltd. 2018-2021.  All rights reserved.
+Copyright (C) ARM Ltd. 2018-2022.  All rights reserved.
 
 SPDX-License-Identifer: Apache 2.0
 
