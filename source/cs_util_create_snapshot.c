@@ -80,6 +80,7 @@ static const char *get_core_name(unsigned int cpu_id)
 }
 
 
+#ifdef UNIX_USERSPACE
 static unsigned long kernel_virtual_address(void)
 {
     static unsigned long addr = 0;
@@ -99,6 +100,8 @@ static unsigned long kernel_virtual_address(void)
     }
     return addr;
 }
+#endif /* UNIX_USERSPACE */
+
 
 static void create_dump_ini(int index, cs_device_t device, bool zeroindex,
                             char *name_buf, size_t name_buf_size)
@@ -126,6 +129,7 @@ static void create_dump_ini(int index, cs_device_t device, bool zeroindex,
 }
 
 
+#ifdef UNIX_USERSPACE
 /* Returns the physical base address of the "Kernel code" entry in "/proc/iomem".  A return value of 1 indicates failure */
 #define IOMEM_BUF_SIZE 128
 static unsigned long physical_kernel_code_base_address(void)
@@ -160,6 +164,7 @@ static unsigned long physical_kernel_code_base_address(void)
 
     return start;
 }
+#endif /* UNIX_USERSPACE */
 
 
 int dump_kernel_memory(char const *fn, unsigned long start,

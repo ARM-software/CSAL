@@ -46,7 +46,11 @@ lib:
 
 .PHONY: demos
 demos:
+ifeq ($(BAREMETAL),1)
+	@echo "** Not building demos in BAREMETAL configuration"
+else
 	cd ./demos && make
+endif
 
 .PHONY: experimental
 experimental:
