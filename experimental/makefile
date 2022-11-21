@@ -30,6 +30,9 @@
 # to build the csprofile example with halting debug sampling option active (v7 cores only),
 # add DBG_HALT=1 to the command line.
 
+# Set up architecture
+include ../makefile-arch.inc
+
 # default settings
 CC=gcc
 CFLAGS=-Wall -Werror=implicit-function-declaration -Wno-switch -fno-omit-frame-pointer
@@ -38,17 +41,17 @@ CFLAGS=-Wall -Werror=implicit-function-declaration -Wno-switch -fno-omit-frame-p
 CFLAGS_EX=
 
 # directories
-CS_LIB_DIR = ../lib/rel
-BUILD_DIR=./rel
-BIN_DIR=../bin/rel
+CS_LIB_DIR = ../lib/$(ARCH)/rel
+BUILD_DIR=./rel-$(ARCH)
+BIN_DIR=../bin/$(ARCH)/rel
 
 
 # build options
 ifeq ($(DEBUG),1)
 CFLAGS+= -O0 -DDEBUG -g
-CS_LIB_DIR = ../lib/dbg
-BUILD_DIR=./dbg
-BIN_DIR=../bin/dbg
+CS_LIB_DIR = ../lib/$(ARCH)/dbg
+BUILD_DIR=./dbg-$(ARCH)
+BIN_DIR=../bin/$(ARCH)/dbg
 else
 CFLAGS+= -O2 -g
 endif
@@ -65,8 +68,7 @@ endif
 
 
 # set the include paths - for the CS Access library API
-INCS=   -I. \
-		-I../include
+INCS=   -I. -I../demos -I../include
 
 
 # build rules for the executables
@@ -96,19 +98,28 @@ $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a:
 	@$(MAKE) -C ../build
 
 # **** the known boards source
-CSBOARDS_SRC=../demo/cs_demo_known_boards.c
+CSBOARDS_SRC=../demos/cs_demo_known_boards.c
 
 #  **** build the topology generator utility
 TOPOGEN_SRC=topogen.c $(CSBOARDS_SRC) cs_topology_detect.c cs_topology_print.c
 
-topogen: $(TOPOGEN_SRC) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/Makefile
+topogen: $(TOPOGEN_SRC) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/makefile
 	$(CC) $(CFLAGS) $(INCS) -o $@ $(TOPOGEN_SRC) $(CS_LIB_DIR)/lib$(LIB_NAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a
 
 #  **** build the traceprofile program
-CSTP_SRC=   csprofile.c tns.c \
-			 $(CSBOARDS_SRC)
+CSTP_SRC=   csprofile.c tns.c
 
-CSTP_OBJS=$(addprefix $(BUILD_DIR)/,$(CSTP_SRC:%.c=%.o))
+CSTP_OBJS=$(addprefix $(BUILD_DIR)/,csprofile.o tns.o cs_demo_known_boards.o)
+
+$(BUILD_DIR)/cs_demo_known_boards.o: ../demos/cs_demo_known_boards.c
+	$(CC) $(CFLAGS) $(INCS) -o $@ -c $<
+
+$(BUILD_DIR)/csprofile.o: csprofile.c
+	$(CC) $(CFLAGS) $(INCS) -o $@ -c $<
+
+$(BUILD_DIR)/tns.o: tns.c
+	$(CC) $(CFLAGS) $(INCS) -o $@ -c $<
+
 
 # build with risky halting debug sampling options...
 ifeq ($(DBG_HALT),1)
@@ -120,7 +131,7 @@ PROF_CFLAGS=
 endif
 
 csprofile: CFLAGS_EX=$(PROF_CFLAGS) -UNDEBUG
-csprofile: bin_dir $(CSTP_OBJS) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/Makefile
+csprofile: bin_dir $(CSTP_OBJS) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a $(BIN_DIR)/makefile
 	$(CC) -o $(BIN_DIR)/$@ $(CSTP_OBJS) $(CS_LIB_DIR)/lib$(PROF_LIBNAME).a $(CS_LIB_DIR)/lib$(LIB_NAME_UTIL).a -lrt -lpthread
 
 # clean all object files and libraries

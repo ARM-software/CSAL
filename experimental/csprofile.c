@@ -392,8 +392,11 @@ static int etm_configure_trace(cs_device_t dev, etm_trace_options_t const *cfg)
     config.flags |= CS_ETMC_ADDR_COMP;
     /* Program the first address comparator pair. */
     config.addr_comp_mask |= 0x03;
-    config.addr_comp[0].access_type = 0x00003c01;  /* User only */
-    config.addr_comp[0].access_type = 0x00003001;  /* Kernel only */
+    if (!cfg->kernel) {
+      config.addr_comp[0].access_type = 0x00003c01;  /* User only */
+    } else {
+      config.addr_comp[0].access_type = 0x00003001;  /* Kernel only */
+    }
     config.addr_comp[0].address = 0x00000000;
     config.addr_comp[1].access_type = config.addr_comp[0].access_type;
     config.addr_comp[1].address = 0xffffffff;
