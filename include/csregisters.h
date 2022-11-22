@@ -663,8 +663,9 @@ TMC specific registers - see ETB definitions for common register set between ETB
      were configured in at design time.  These values match bits [7:6] in DEVID.
 */
 #define CS_TMC_CONFIG_TYPE_ETB  0   /**< TMC ETB configuration - internal static buffer. */
-#define CS_TMC_CONFIG_TYPE_ETR  1   /**< TMC ETR configuration - external bus master. */
+#define CS_TMC_CONFIG_TYPE_ETR  1   /**< TMC ETR configuration - external AXI bus master. */
 #define CS_TMC_CONFIG_TYPE_ETF  2   /**< TMC ETF configuration - internal buffer and ATB output. */
+#define CS_TMC_CONFIG_TYPE_ETS  3   /**< TMC ETS configuration - external streaming AXI bus master. */
 
 /**@}*/
 

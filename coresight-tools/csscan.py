@@ -1365,19 +1365,22 @@ class CSROM:
             print(" ETB size:%u" % (d.read32(0x004)*4), end="")
         elif d.arm_part_number() in [0x961, 0x9e8, 0x9e9, 0x9ea]:
             # CoreSight TMC (SoC400 generation, or SoC600)
-            # TMC Configuration (ETB/ETR/ETF) is selected at RTL build time, and is indicated in DEVID.
+            # TMC Configuration (ETB/ETR/ETF/ETS) is selected at RTL build time, and is indicated in DEVID.
             # For pre-SoC600 TMC, the part number is 0x961 irrespective of configuration.
-            # For SoC600 TMC, the part number reflects the configuration.
-            configtype = (devid >> 6) & 3
-            print(" TMC:%s" % ["ETB","ETR","ETF","?3"][configtype], end="")
-            if configtype != 1:
-                # For ETB/ETF, show the internal RAM size, fixed at compile time.
-                # For ETR, this register shows the memory buffer size set up dynamically.
+            # For SoC600 TMC, the part number (PIDR) reflects the configuration, although TMC-ETR and TMC-ETS
+            # have the same part number. ETS can be regarded as a limited form of ETR.
+            tmcconfigtype = bits(devid,6,2)
+            tmcconfigname = ["ETB","ETR","ETF","ETS"][tmcconfigtype]
+            print(" TMC:%s" % tmcconfigname, end="")
+            if tmcconfigtype != 1:
+                # For ETB/ETF, show the internal RAM size, fixed at compile time, from RSZ.
+                # For ETR, this register shows the memory buffer size set up dynamically, so don't show it here.
+                # For ETS, it is "fixed as one AXI Stream data word".
                 print(" size:%u" % (d.read32(0x004)*4), end="")
-            memwidth = (devid >> 8) & 7
+            memwidth = bits(devid,8,3)
             print(" memwidth:%u" % (8<<memwidth), end="")
-            if configtype == 1:
-                wbdepth = (devid >> 11) & 7
+            if tmcconfigtype == 1:
+                wbdepth = bits(devid,11,3)
                 print(" wb:%u" % (1<<wbdepth), end="")
         else:
             # No more information for this part
@@ -1891,13 +1894,15 @@ class CSROM:
             #     - e.g. Running, Stopped, Disabled
             is_TMC = not d.is_arm_part_number(0x907)
             if is_TMC:
-                # Check whether ETR, ETB or ETF
-                configtype = (devid >> 6) & 3
-                is_ETR = (configtype == 1)
-                is_ETF = (configtype == 2)
+                # Check whether ETR, ETB, ETF or ETS
+                tmcconfigtype = bits(devid,6,2)
+                is_ETR = (tmcconfigtype == 1)
+                is_ETF = (tmcconfigtype == 2)
+                is_ETS = (tmcconfigtype == 3)
             else:
                 is_ETR = False
                 is_ETF = False
+                is_ETS = False
             # Mode is a programming choice: e.g. is it set up as a circular buffer or a draining FIFO
             mode = d.read32(0x028) & 3
             print("  mode:           %s" % ["circular buffer","software FIFO","hardware FIFO","?3"][mode])

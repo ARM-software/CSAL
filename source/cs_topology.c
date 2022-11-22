@@ -205,7 +205,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 if (d->part_number == 0x961 || d->part_number == 0x9e8 || d->part_number == 0x9e9 || d->part_number == 0x9ea) {	/* TMC */
                     d->v.etb.is_tmc_device = 1;
                     /* The TMC configuration type is a static property of the way the RTL was configured:
-                       0 for ETB, 1 for ETR, 2 for ETF. */
+                       0 for ETB, 1 for ETR, 2 for ETF, 3 for ETS. */
                     d->v.etb.tmc.config_type = ((devid >> 6) & 0x3);
                     d->v.etb.buffer_size_bytes =
                         _cs_read(d, CS_ETB_RAM_DEPTH) << 2;
@@ -524,8 +524,8 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 if (d->v.etb.is_tmc_device) {
                     /* can't be ETF as this is filtered out earlier */
                     diagf(" [TMC: %s configuration]",
-                          (d->v.etb.tmc.config_type ==
-                           CS_TMC_CONFIG_TYPE_ETR) ? "ETR" : "ETB");
+                          (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETR) ? "ETR" :
+                          (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETS) ? "ETS" : "ETB");
                 } else {
                     diagf(" [ETB]");
                 }
