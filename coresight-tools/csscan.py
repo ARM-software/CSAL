@@ -587,6 +587,9 @@ class Device:
     def is_cti(self):
         return self.is_arm_architecture(ARM_ARCHID_CTI) or self.is_arm_part_number(0x906) or self.is_arm_part_number(0x9ED)
 
+    def is_tmc(self):
+        return self.arm_part_number() in [0x961, 0x9e8, 0x9e9, 0x9ea]
+
     def cs_device_type_name(self):
         devtype = self.coresight_device_type()
         (major, minor) = devtype
@@ -1332,6 +1335,7 @@ class CSROM:
                 print(" scrambler", end="")
             print(" groupwidth=%u" % ((bits(devid1,8,8)+1)*8), end="")
             if bits(devid2,8,8):
+                # comparator width may be smaller than group width
                 print(" compwidth=%u" % ((bits(devid2,8,8)+1)*8), end="")
             else:
                 pass    # COMP_WIDTH == GRP_WIDTH
@@ -1363,7 +1367,7 @@ class CSROM:
         elif d.is_arm_part_number(0x907):
             # CoreSight ETB - predating the TMC-ETB
             print(" ETB size:%u" % (d.read32(0x004)*4), end="")
-        elif d.arm_part_number() in [0x961, 0x9e8, 0x9e9, 0x9ea]:
+        elif d.is_tmc():
             # CoreSight TMC (SoC400 generation, or SoC600)
             # TMC Configuration (ETB/ETR/ETF/ETS) is selected at RTL build time, and is indicated in DEVID.
             # For pre-SoC600 TMC, the part number is 0x961 irrespective of configuration.
@@ -2480,6 +2484,24 @@ def topology_detection_cti(devices, topo):
     d.detect()
 
 
+def device_ram_bytes(d):
+    if d.is_arm_part_number(0x907):
+        # ETB
+        return d.read32(0x004) * 4
+    elif d.is_tmc():
+        devid = d.read32(0xFC8)
+        tmcconfigtype = bits(devid,6,2)
+        if tmcconfigtype != 1:
+            return d.read32(0x004) * 4
+    elif d.is_arm_architecture(ARM_ARCHID_ELA):
+        devid = d.read32(0xFC8)
+        devid1 = d.read32(0xFC4)
+        ram_addr_width = bits(devid,8,8)    # SRAM address width in bits, e.g. 6 bits => 64 entries
+        groupwidth_bytes = (bits(devid1,8,8)+1)
+        return (1 << ram_addr_width) * groupwidth_bytes
+    return None
+
+
 def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology_cti=False, enable_timestamps=False):
     """
     Scan a ROM Table recursively, showing devices as we go.
@@ -2543,6 +2565,11 @@ def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology
         elif d.is_arm_architecture(ARM_ARCHID_STM):
             # STM: we should add the memory-mapped stimulus base address and size.
             pass
+        if d.is_arm_part_number():
+            dd["part_number"] = ("0x%03x" % d.part_number)
+        ram_size = device_ram_bytes(d)
+        if ram_size is not None:
+            dd["ram_size"] = ram_size
         topo["devices"].append(dd)
     if detect_topology:
         topology_detection_atb(atb_devices, topo)
@@ -2650,6 +2677,9 @@ if __name__ == "__main__":
             enable_devmemd(arg[9:])
         elif arg == "--top-only":
             o_top_only = True
+        elif arg == "--help":
+            help()
+            sys.exit()
         else:
             if o_verbose >= 2:
                 disable_stdout_buffering()

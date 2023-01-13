@@ -21,6 +21,16 @@ limitations under the License.
 from __future__ import print_function
 
 import cs_topology
+import sys
+
+
+def memory_size_str(sz):
+    if sz >= 1024*1024:
+        return "%uM" % (sz // (1024*1024))
+    elif sz >= 1024:
+        return "%uK" % (sz // 1024)
+    else:
+        return "%u" % sz
 
 
 def generate_dot(p):
@@ -33,7 +43,9 @@ def generate_dot(p):
     for d in p:
         seq += 1
         d.dotid = "D%u" % seq
-        d.dotshow = False
+        d.dotshow = False     # set when device is connected to a link
+        if d.name is None:
+            d.name = "%s_%u" % (d.type_str(), seq)
     for ln in p.links:
         if ln.linktype == cs_topology.CS_LINK_CTI:
             continue
@@ -47,9 +59,8 @@ def generate_dot(p):
         ln.slave.dotshow = True
     for d in p:
         if not d.dotshow:
+            print("ignoring unconnected device: %s" % (d), file=sys.stderr)
             continue
-        if d.name is None:
-            d.name = "d_%u" % seq
         # The type of the device is in most cases obvious from the name it was given in the SDF file.
         if d.type == cs_topology.CS_DEVTYPE_FUNNEL:
             shape = "invtrapezium"
@@ -62,7 +73,7 @@ def generate_dot(p):
             # ETF and ETB
             try:
                 name += "\\n%uK" % (d.ram_size_bytes / 1024)
-            except:
+            except (AttributeError, TypeError):
                 pass
             if d.type == cs_topology.CS_DEVTYPE_BUFFER:
                 name += "\\nbuffer"
@@ -71,17 +82,25 @@ def generate_dot(p):
             # Funnels
             try:
                 name += "\\n%u ports" % (d.port_count)
-            except:
+            except (AttributeError, TypeError):
                 pass
             # ETMs
             try:
                 name += "\\n%s" % (d.version_string)
-            except:
+            except (AttributeError, TypeError):
                 pass
             # All devices should have a part number
             try:
                 name += "\\n%03X" % (d.part_number)
-            except:
+            except (AttributeError, TypeError):
+                pass
+            try:
+                name += "\\n%s" % (memory_size_str(d.ram_size))
+            except (AttributeError, TypeError):
+                pass
+            try:
+                name += "\\n%s" % (d.address_str())
+            except (AttributeError, TypeError):
                 pass
         else:
             name = ""
@@ -90,14 +109,14 @@ def generate_dot(p):
             print("  %sAXI [label=\"AXI\" shape=\"circle\"];" % (d.dotid))
             try:
                 lab = "%u bits" % d.mem_width_bits
-            except:
+            except AttributeError:
                 lab = ""
             print("  %s -> %sAXI [label=\"%s\"];" % (d.dotid, d.dotid, lab))
         elif d.type == cs_topology.CS_DEVTYPE_PORT:
             lab = "port"
             try:
                 lab += "\\n%s bits" % d.port_sizes
-            except:
+            except (AttributeError, TypeError):
                 pass
             print("  %sPORT [label=\"%s\"];" % (d.dotid, lab))
             print("  %s -> %sPORT;" % (d.dotid, d.dotid))
@@ -117,7 +136,7 @@ def generate_dot(p):
     rank_all([d for d in p if d.type[0] == 1])
 
 
-def generate_digraph(p, size="8,11", label="None"):
+def generate_digraph(p, size="7,10", label="None"):
     """
     Generate a complete digraph to standard output.
     The caller can concatenate these to form a multipage document.
@@ -130,3 +149,7 @@ def generate_digraph(p, size="8,11", label="None"):
     generate_dot(p)
     print("}")
 
+
+if __name__ == "__main__":
+    p = cs_topology.load("topology.json")
+    generate_digraph(p)

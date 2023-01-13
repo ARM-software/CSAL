@@ -26,13 +26,16 @@ import sys, os, json
 
 # CoreSight Device Type indicates the generic function of the device.
 # It does not indicate the specific programming model of the device.
+# Defined in CoreSight Architecture, under DEVTYPE.
+# This is only a rough guide. For example, a TMC configured as a router
+# is (1,2), "buffer", not either of the codes listed as "router".
 CS_DEVTYPE_MISC = (0,0)
 CS_DEVTYPE_PORT = (1,1)
 CS_DEVTYPE_BUFFER = (1,2)
-CS_DEVTYPE_ROUTER = (1,3)
-CS_DEVTYPE_FUNNEL = (2,1)
-CS_DEVTYPE_REPLICATOR = (2,2)
-CS_DEVTYPE_FIFO = (2,3)
+CS_DEVTYPE_ROUTER = (1,3)        # "Basic trace router"
+CS_DEVTYPE_FUNNEL = (2,1)        # "Trace Funnel, Router"
+CS_DEVTYPE_REPLICATOR = (2,2)    # "Filter" - includes replicators whether filtering or not
+CS_DEVTYPE_FIFO = (2,3)          # "FIFO, Large Buffer"
 CS_DEVTYPE_TRACE_CORE = (3,1)
 CS_DEVTYPE_TRACE_BUS = (3,4)
 CS_DEVTYPE_TRACE_SW = (3,6)
@@ -116,6 +119,8 @@ class Device:
         assert (not is_hidden) or (device_type in [CS_DEVTYPE_FUNNEL, CS_DEVTYPE_REPLICATOR])
         if name is not None:
             self.set_name(name)
+        else:
+            self.name = None
         self.type_name = type_name
         self.part_vendor = None
         self.part_number = None     # e.g. 0x906
@@ -144,14 +149,18 @@ class Device:
             platform.check()
         self.sysfs_path = None      # Device path in Linux sysfs or equivalent
 
+    def type_str(self):
+        if self.type in devtype_str:
+            return devtype_str[self.type]
+        else:
+            return str(self.type)
+
     def __str__(self):
         s = ""
         if self.name is not None:
             s = self.name
-        elif self.type in devtype_str:
-            s += "<%s>" % devtype_str[self.type]
         else:
-            s += "<%s>" % str(self.type) 
+            s += "<%s>" % self.type_str()
         if self.is_memory_mapped():
             s += "@" + self.address_str()
         return s
@@ -541,11 +550,7 @@ class Platform:
                 name = None
             print("%20s  " % d.address_str(), end="")
             print("  %20s" % name, end="")
-            if d.type in devtype_str:
-                tstr = devtype_str[d.type]
-            else:
-                tstr = str(d.type)            
-            print("  %12s" % (tstr), end="")
+            print("  %12s" % (d.type_str()), end="")
             if d.is_affine_to_cpu():
                 if d.affine_cpu is not None:
                     print("%5s" % str(d.affine_cpu), end="")
@@ -597,6 +602,8 @@ def load(fn):
             arch = jd["architecture"]
             if arch[0] == "ETM":
                 d.etm_architecture = int(arch[1])
+        if "ram_size" in jd:
+            d.ram_size = jd["ram_size"]
     for jl in jp["links"]:
         def jport(p, port):
             if isinstance(port, list):
