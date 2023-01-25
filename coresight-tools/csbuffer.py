@@ -62,6 +62,7 @@ def sink_show_status(etf, title=None):
     print("  ETF state: %s" % etfstate)
     mode = etf.read32(0x028)
     status = etf.read32(0x00C)
+    flushstatus = etf.read32(0x300)
     print("  ETF     028  mode:   0x%08x %s" % (mode, ["CB","SWF1","?","SWF2"][mode]))
     print("  ETF 11C/118  DBA:    0x%08x" % etf.read32x2(0x11C,0x118))
     print("  ETF     004  size:   0x%08x words" % etf.read32(0x004))
@@ -70,7 +71,10 @@ def sink_show_status(etf, title=None):
     if status & 0x01:
         print(" wrapped", end="")
     print()
-    print("  ETF     300  ffstat: 0x%08x" % etf.read32(0x300))
+    print("  ETF     300  ffstat: 0x%08x" % flushstatus, end="")
+    if flushstatus & 0x01:
+        print(" flush-in-progress", end="")
+    print()
     print("  ETF     02C  latch:  0x%08x" % (etf.read32(0x02C)*4))        # LBUFLEVEL
     print("  ETF     030  cfill:  0x%08x" % (etf.read32(0x030)*4))        # CBUFLEVEL
     print("  ETF 038/014  read:   0x%016x" % (etf.read32x2(0x038,0x014))) # RRP

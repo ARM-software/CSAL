@@ -264,7 +264,7 @@ if __name__ == "__main__":
         show_huge_page_config()
     if opts.set_huge is not None:
         with open("/proc/sys/vm/nr_hugepages", "w") as f:
-            f.write("%u" % opts.set_huge)
+            f.write("%u\n" % opts.set_huge)
         with open("/proc/sys/vm/nr_hugepages") as f:
             print("Huge pages set to %s" % f.read().strip())
         sys.exit()

@@ -1956,6 +1956,7 @@ class CSROM:
                     else:
                         tmcstate = "Stopped"
                 print("  state:          %s" % tmcstate)
+            print("  flush status:   0x%08x  %s" % (ffsr, bits_set(ffsr,{0:"FlInProg",1:"FtStopped"})))
             if is_ETR:
                 rrp = d.read32x2(0x038,0x014)
                 rwp = d.read32x2(0x03C,0x018)
@@ -2001,6 +2002,9 @@ class CSROM:
             ctrl = d.read32(0x000)
             print("  ports enabled: %s" % (binstr((ctrl & 0xff),in_ports)))
             print("  hold time: %u" % bits(ctrl,8,4))
+            # Read the flush-requested integration bit.
+            # "You must only use these registers when the Integration Mode Control Register bit 0 is set to 1"
+            # But in practice it appears to be possible to read them.
             if bit(d.read32(0xEF0), 1):
                 print("  downstream requested flush")
             integration_regs = [0xEF0, 0xEF4, 0xEF8]
@@ -2062,6 +2066,11 @@ class CSROM:
                 print("  VMID: 0x%08x" % vmid)
 
         if o_show_integration:
+            # In the scan above, some device types may have described integration registers.
+            # (For other devices the list will be empty either because they don't have them or they are unknown.)
+            # Officially we cannot "use" registers when outside integration mode, but in practice we can read them.
+            # We could temporarily put the device into integration mode (as we do for topology detection elsewhere),
+            # but this may have worse consequences than reading them outside integration mode.
             for r in integration_regs:
                 print("  r%X = 0x%x" % (r, d.read32(r)))
 
