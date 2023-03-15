@@ -194,13 +194,13 @@ def decode_one_hot(x,n):
 
 
 class DeviceTimeout(Exception):
-    def __init__(self, dev, off, mask):
+    def __init__(self, dev, off, mask, sense=True):
         self.device = dev
         self.off = off
         self.mask = mask
 
     def __str__(self):
-        s = "device %s reg 0x%03x did not set 0x%08x" % (self.device, self.off, self.mask)
+        s = "device %s reg 0x%03x did not %s 0x%08x" % (self.device, self.off, ["clear","set"][sense], self.mask)
         return s
 
 
@@ -318,7 +318,7 @@ class Device:
     A single CoreSight device mapped by a ROM table (including ROM tables themselves).    
     """
 
-    def __init__(self, cs, addr, write=False, unlock=False, checking=False):
+    def __init__(self, cs, addr, write=False, unlock=False, checking=None):
         """
         Construct a device object at the given address.
         'cs' is the device map (e.g. virtual memory via CSROM(), or a MEM-AP) through which we access the device.
@@ -345,7 +345,7 @@ class Device:
         self.part_number = self.PIDR & 0xfff
         self.devtype = None
         self.devarch = None
-        self.is_checking = checking or (o_verbose >= 1)
+        self.device_is_checking = checking    # if None, will inherit from CSROM
         if self.is_coresight():            
             arch = self.read32(0xFBC)     # DEVARCH
             if (arch & 0x00100000) != 0:
@@ -427,30 +427,38 @@ class Device:
         return x
 
     def test32(self, off, mask):
+        """
+        Return true if all the required mask bits are set
+        """
         return (self.read32(off) & mask) == mask
 
-    def wait(self, off, mask, timeout=0):
+    def wait(self, off, mask, timeout=0, sense=True):
         """
-        Wait for a bit to become set.
+        Wait for all bits to become set (or any bit to clear, if sense=False).
         Raise an exception if it isn't set within the timeout.
         Default timeout is "a few times".
         """
         default_iters = 10
         for i in range(0, default_iters):
-            if self.test32(off, mask):
+            if self.test32(off, mask) == sense:
                 return
         # Taking some time, switch to timeout mode
         if timeout > 0:
             t = time.time() + timeout
             while time.time() < t:
-                if self.test32(off, mask):
+                if self.test32(off, mask) == sense:
                     return
         raise DeviceTimeout(self, off, mask)
 
-    def do_check(self, check):
+    def do_readback_check(self, check):
+        # Test whether read-back checks are to be used with this device.
         # We can read-back to check that the write has taken effect.
         # But not when the caller has indicated that the register is volatile.
-        return (check is None and self.is_checking) or check == True
+        if check is not None:
+            return check
+        if self.device_is_checking is not None:
+            return self.device_is_checking
+        return self.cs.checking
 
     def write32(self, off, value, check=None, mask=None):
         assert self.map_is_write, "0x%x: device should have been write-enabled" % self.base_address
@@ -466,7 +474,7 @@ class Device:
                 time.sleep(0.1)
         self.n_writes += 1
         self.phy.write32(off, value)
-        if self.do_check(check):
+        if self.do_readback_check(check):
             readback = self.read32(off)
             if readback != value:
                 print("  0x%x[%03x] wrote 0x%08x but read back 0x%08x" % (self.base_address, off, value, readback))
@@ -474,12 +482,12 @@ class Device:
 
     def set32(self, off, value, check=None):
         self.write32(off, self.read32(off) | value, check=False)
-        if self.do_check(check):
+        if self.do_readback_check(check):
             return (self.read32(off) & value) == value
 
     def clr32(self, off, value, check=None):
         self.write32(off, self.read32(off) & ~value, check=False)
-        if self.do_check(check):
+        if self.do_readback_check(check):
             return (self.read32(off) & value) == 0
 
     def write64(self, off, value):
@@ -495,10 +503,10 @@ class Device:
         # where special action is needed to return a consistent result.
         return (self.read32(hi) << 32) | self.read32(lo)
 
-    def write32x2(self, hi, lo, value):
+    def write32x2(self, hi, lo, value, check=None):
         # Write a 64-bit value to hi and lo registers, non-atomically.
-        self.write32(hi, value >> 32)
-        self.write32(lo, value & 0xffffffff)
+        self.write32(hi, value >> 32, check=check)
+        self.write32(lo, value & 0xffffffff, check=check)
 
     def read64(self, off):
         # assume little-endian
@@ -896,12 +904,13 @@ class CSROM:
     mapping on to /dev/mem. Individual device mappings are owned by the
     device objects.
     """
-    def __init__(self, memap=None):
+    def __init__(self, memap=None, checking=False):
         self.fd = None
         self.memap = memap
         self.device_by_base_address = {}
         self.affinity_group_map = {}
         self.restore_locks = True
+        self.checking = checking
         if memap is None:
             if g_devmem is not None:
                 self.devmem = g_devmem
@@ -1217,6 +1226,11 @@ class CSROM:
                 if bits(devid,0,4):
                     # ARMv8.2 moves PC sampling from core debug into PMU
                     print(" pc-sampling:%u" % bits(devid,0,4), end="")
+                print(" id:", end="")
+                for r in [0xE20,0xE24,0xE28,0xE2C]:
+                    print(" %08x" % (d.read32(r)), end="")
+            else:
+                print(" not acessing", end="")
         elif d.is_core_trace_etm():
             # Test if the registers are invalid/unreadable, either because the core power domain
             # is powered off or because the ETM hasn't been initialized since reset.
@@ -1413,6 +1427,8 @@ class CSROM:
         if core_powered_off:
             return
 
+        # Some components have integration registers that we can optionally show.
+        # For some components these are RAZ outside of integration mode.
         integration_regs = []
 
         if d.is_arm_architecture_core():
@@ -1723,7 +1739,7 @@ class CSROM:
                         if sb:
                             print("  seq%u <- seq%u: %s" % (sr, sr+1, esel_str(sb)))
                     print("  seqstate: %u" % d.read32(0x11C))    # current status
-                # probe for integration regs
+                # probe for ETM integration regs
                 if True:
                     any_integration_reg = False
                     for a in range(0xE80,0xFA0,4):                        
@@ -1912,8 +1928,13 @@ class CSROM:
             print("  mode:           %s" % ["circular buffer","software FIFO","hardware FIFO","?3"][mode])
             if is_ETR:
                 axi_control = d.read32(0x110)
-                print("  AXI control:    0x%08x" % axi_control)
+                # Cache control bits are (msb first): write-allocate, read-alocate, cacheable, bufferable
+                # Protection bits are (msb first): non-secure, privileged
+                print("  AXI control:    0x%08x  prot=%u cache=%u burst=%u" % (axi_control,bits(axi_control,0,2),bits(axi_control,2,4),1+bits(axi_control,8,4)), end="")
                 scatter_gather = bit(axi_control,7)     # n/a in SoC-600 TMC?
+                if scatter_gather:
+                    print(" scatter-gather", end="")
+                print()
                 etr_memory = d.read64(0x118)    # DBALO, DBAHI
                 if not scatter_gather:
                     # base address of trace buffer in system memory
@@ -1983,13 +2004,14 @@ class CSROM:
             # value from the integration-test input register, but that's destructive.
             print("  CTI %s" % (["disabled","enabled"][bit(d.read32(0x000),0)]))
             # Show the channel-to-trigger connections and the system gate
-            for c in range(0,n_channels):
-                cin = d.read32(0x020 + c*4)
-                cout = d.read32(0x0A0 + c*4)
-                if cin:
-                    print("  channel #%u <- %s" % (c, binstr(cin,n_trigs)))
-                if cout:
-                    print("  channel #%u -> %s" % (c, binstr(cout,n_trigs)))
+            for t in range(0,n_trigs):
+                tin = d.read32(0x020 + t*4)
+                if tin:
+                    print("  input #%u -> channel %s" % (t, binstr(tin,n_channels)))
+            for t in range(0,n_trigs):
+                tout = d.read32(0x0A0 + t*4)
+                if tout:
+                    print("  output #%u <- channel %s" % (t, binstr(tout,n_channels)))
             print("  channel gate:    %s" % (binstr(d.read32(0x140),n_channels)))
             print("  trigger inputs:  %s" % (binstr(d.read32(0x130),n_trigs)))
             if o_show_sample:
@@ -1997,6 +2019,7 @@ class CSROM:
             print("  trigger outputs: %s" % (binstr(d.read32(0x134),n_trigs)))
             print("  channel inputs:  %s" % (binstr(d.read32(0x138),n_channels)))
             print("  channel outputs: %s" % (binstr(d.read32(0x13C),n_channels)))
+            integration_regs = [0xEEC,0xEF0,0xEF4,0xEF8]
         elif d.arm_part_number() in [0x908, 0x9eb]:
             # CoreSight funnel
             ctrl = d.read32(0x000)
@@ -2023,6 +2046,7 @@ class CSROM:
             print("  FFCR:   0x%08x" % ffcr)
             ffsr = d.read32(0x300)
             print("  FFSR:   0x%08x" % ffsr)
+            integration_regs = [0xEE8,0xEEC,0xEF0,0xEF4,0xEF8]
         elif d.is_arm_part_number(0x9ee):
             # CoreSight Address Translation Unit (CATU)
             catu_control = d.read(0x000)
@@ -2068,11 +2092,16 @@ class CSROM:
         if o_show_integration:
             # In the scan above, some device types may have described integration registers.
             # (For other devices the list will be empty either because they don't have them or they are unknown.)
-            # Officially we cannot "use" registers when outside integration mode, but in practice we can read them.
+            # Officially we cannot "use" registers when outside integration mode, but in practice we can read them,
+            # although they might RAZ outside of integration mode.
             # We could temporarily put the device into integration mode (as we do for topology detection elsewhere),
             # but this may have worse consequences than reading them outside integration mode.
-            for r in integration_regs:
-                print("  r%X = 0x%x" % (r, d.read32(r)))
+            # Components whose integration registers are readable outside of integration mode:
+            #   CoreSight TMC 961
+            if integration_regs:
+                print("  integration registers:")
+                for r in integration_regs:
+                    print("    r%X = 0x%x" % (r, d.read32(r)))
 
     @staticmethod
     def show_device(d):
@@ -2621,6 +2650,7 @@ if __name__ == "__main__":
         print("  --topology-cti       detect CTI topology")
         print("  --enable-timestamps  enable global CoreSight timestamps")
         print("  --remote=<net>       access remote device via devmemd")
+        print("  --assume-powered-on  assume device is powered on")
         print("  -v/--verbose         increase verbosity level")
         sys.exit(1)
     c = None

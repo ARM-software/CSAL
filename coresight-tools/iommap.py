@@ -115,9 +115,13 @@ class mmap:
 
     def __getslice__(self, start, end):
         nbytes = end - start
+        assert nbytes in [1,2,4,8], "invalid length for read: %u" % nbytes
         if nbytes == 1:
             x = ctypes.c_ubyte.from_address(self.addr + start)
             x = struct.pack("B", x.value)
+        elif nbytes == 2:
+            x = ctypes.c_ushort.from_address(self.addr + start)
+            x = struct.pack("H", x.value)
         elif nbytes == 4:
             x = ctypes.c_uint.from_address(self.addr + start)
             x = struct.pack("I", x.value)
@@ -138,10 +142,14 @@ class mmap:
     def __setslice__(self, start, end, value):
         nbytes = end - start
         assert len(value) == nbytes
+        assert nbytes in [1,2,4,8], "invalid length for write: %u" % nbytes
         if nbytes == 1:
             x = ctypes.c_ubyte.from_address(self.addr + start)
             n = struct.unpack("B", value)[0]
-        if nbytes == 4:
+        elif nbytes == 2:
+            x = ctypes.c_ushort.from_address(self.addr + start)
+            n = struct.unpack("H", value)[0]
+        elif nbytes == 4:
             x = ctypes.c_uint.from_address(self.addr + start)
             n = struct.unpack("I", value)[0]
         elif nbytes == 8:

@@ -60,3 +60,4 @@ bin/
 *.VC.VC.opendb
 *.iobj
 *.ipdb
+*.pyc
