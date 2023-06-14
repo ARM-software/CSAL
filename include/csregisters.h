@@ -95,9 +95,33 @@ Common register definitions in the management group of all CoreSight devices
 
 #define CS_CLAIMSET  0xFA0  /**< CS component claim tag set register */
 #define CS_CLAIMCLR  0xFA4  /**< CS component claim tag clear register */
-/* For claim tag conventions, see e.g. ADI 6.0 C1.4.3 */
-#define CS_CLAIM_INTERNAL  0x01  /**< Device is in use by self-hosted software */
-#define CS_CLAIM_EXTERNAL  0x02  /**< Device is in use by external debugger */
+/*
+Define some masks for internal/external claim tags.
+There are conflicting claim tag recommendations in Arm documentation.
+
+  IHI0074B ADI 6.0 C1.4.3, in the section on APs:
+    bit 0 self-hosted and bit 1 external.
+ 
+  DEN0034A Debug and Trace Configuration and Usage Models 3.2.1:
+    bit 0 external and bit 1 self-hosted.
+
+The second convention is observed to be in use in debug tools and
+self-hosted software, for devices such as CTI and ETM.
+We suggest that the ADI convention be used for APs and the other
+convention continue to be used for all other devices.
+
+It is up to the CSAL user to decide whether the internal or external
+claim tag should be used, depending on whether conflict is more likely
+with a JTAG debugger or OS device drivers.
+*/
+#define CS_CLAIM_INTERNAL  0x01  /**< Device is in use by self-hosted software (deprecated) */
+#define CS_CLAIM_EXTERNAL  0x02  /**< Device is in use by external debugger (deprecated) */
+
+#define CS_CLAIM_AP_INTERNAL  0x01  /**< AP is in use by self-hosted software */
+#define CS_CLAIM_AP_EXTERNAL  0x02  /**< AP is in use by external debugger */
+
+#define CS_CLAIM_DEV_EXTERNAL 0x01  /**< Non-AP device is in use by self-hosted software */
+#define CS_CLAIM_DEV_INTERNAL 0x02  /**< Non-AP device is in use by external debugger */
 
 #define CS_LAR  0xFB0	    /**< CS component Software Lock access register */
 #define CS_LSR  0xFB4	    /**< CS component Software Lock status register */
@@ -788,17 +812,29 @@ Register definitions and bitfield values for the Architecture v7 Cortex Core deb
 /**@}*/
 /** @name EDSCR bit values for v8
 @{*/
+#define CS_EDSCR_STATUS         0x0000003F   /**< Debug status */
+#define CS_EDSCR_STATUS_RESTARTING   0x01
+#define CS_EDSCR_STATUS_NON_DEBUG    0x02
 #define CS_EDSCR_ERR            0x00000040   /**< Sticky error */
+#define CS_EDSCR_A              0x00000080   /**< SError interrupt pending */
+#define CS_EDSCR_EL             0x00000300   /**< Exception level (Debug state only) */
+#define CS_EDSCR_RW             0x00003C00   /**< Exception level execution state status (Debug state only) */
+#define CS_EDSCR_HDE            0x00004000   /**< Halting Debug enabled */
+#define CS_EDSCR_SDD            0x00010000   /**< Secure Debug disabled */
+#define CS_EDSCR_SC2            0x00080000   /**< Sample CONTEXTIDR_EL2 rather than VTTBR_EL2 */
+#define CS_EDSCR_MA             0x00100000   /**< Memory access mode */
+#define CS_EDSCR_INTdis         0x00C00000   /**< Disable interrupts in non-debug state (n.b. field is 2 bits) */
 #define CS_EDSCR_ITE            0x01000000   /**< ITR empty and can accept another instruction */
 #define CS_EDSCR_TXU            0x04000000   /**< TX underrun */
 #define CS_EDSCR_RXO            0x08000000   /**< RX overrun */
 #define CS_EDSCR_ITO            0x10000000   /**< ITR overrun - debugger injected when PE not ready */
 #define CS_EDSCR_TXfull         0x20000000   /**< DBGDTRTX full */
 #define CS_EDSCR_RXfull         0x40000000   /**< DBGDTRRX full */
+#define CS_EDSCR_TFO            0x80000000   /**< Trace Filter Override (FEAT_TRF) */
 /**@}*/
 
 #define CS_DBGDTRTX          0x08C     /**< Target to Host Data Transfer */
-#define CS_DBGDRCR           0x090     /**< WO: Debug Run Control */
+#define CS_DBGDRCR           0x090     /**< WO: Debug Run Control (EDRCR in v8) */
 /** @name DBGDRCR Bit Values 
  see #CS_DBGDRCR
 @{*/

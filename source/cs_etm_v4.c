@@ -594,7 +594,7 @@ int _cs_etm_v4_enable_programming(struct cs_device *d)
     }
 
     if (rc == 0) {
-        _cs_claim(d, CS_CLAIM_INTERNAL);
+        _cs_claim(d, CS_CLAIM_DEV_INTERNAL);
         rc = _cs_write(d, CS_ETMV4_PRGCTLR, 0);	/* disable trace */
     }
     if (rc == 0)

@@ -100,7 +100,7 @@ void cs_set_default_memap(cs_device_t dev)
         if (DTRACEG) {
             diagf("!Set default MEM-AP\n");
         }
-        _cs_claim(DEV(dev), CS_CLAIM_INTERNAL);
+        _cs_claim(DEV(dev), CS_CLAIM_AP_INTERNAL);
     }
     G.memap_default = dev;
 }
@@ -140,6 +140,17 @@ int cs_shutdown(void)
     return 0;
 }
 
+
+/* There are conflicting claim tag conventions in use - see csregisters.h.
+   Return the appropriate internal claim tag for the given device. */
+uint32_t _cs_device_internal_claim_tag(struct cs_device *d)
+{
+    return cs_device_has_class(d, CS_DEVCLASS_MEMAP) ?
+           CS_CLAIM_AP_INTERNAL :
+           CS_CLAIM_DEV_INTERNAL;
+}
+
+
 int cs_release(void)
 {
     /* Release all CoreSight devices.  The system is now in a state where
@@ -147,12 +158,13 @@ int cs_release(void)
        and cross-triggering, not necessarily CPU hardware breakpoints). */
     struct cs_device *d;
     for (d = G.device_top; d != NULL; d = d->next) {
-        if (_cs_isclaimed(d, CS_CLAIM_INTERNAL)) {
+        uint32_t const tag = _cs_device_internal_claim_tag(d);
+        if (_cs_isclaimed(d, tag)) {
             if (DTRACE(d)) {
-                diagf("!unclaiming device at %" CS_PHYSFMT "",
-                      d->phys_addr);
+                diagf("!unclaiming device tag 0x%x at %" CS_PHYSFMT "",
+                      (unsigned int)tag, d->phys_addr);
             }
-            _cs_unclaim(d, CS_CLAIM_INTERNAL);
+            _cs_unclaim(d, tag);
         }
     }
     return 0;

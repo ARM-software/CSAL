@@ -100,7 +100,7 @@ int _cs_etm_enable_programming(struct cs_device *d)
            made through the memory mapped interface, this bit is not cleared." */
         if ((oslsr & 2) != 0) {
             diagf
-                ("ETM trace registers are locked. Any access to these registers returns a slave-generated error response.\n");
+                ("ETM trace registers are locked. Any access to these registers returns a subordinate-generated error response.\n");
             /* OS lock is implemented and locked */
             /* ETMOSLSR[3] and ETMOSLSR[0] are specified in [ETM] Table 3-94:
                3.3, 3.4: 0 0   Single Power
@@ -127,7 +127,7 @@ int _cs_etm_enable_programming(struct cs_device *d)
     /* Set ETMCLAIM[1] to indicate the ETM is claimed by software.
        This follows the protocol described in the (not yet released)
        document on external/internal debug coordination. */
-    _cs_claim(d, CS_CLAIM_INTERNAL);
+    _cs_claim(d, CS_CLAIM_DEV_INTERNAL);
 
     /* [ETM] "When setting the Programming bit, you must not change any other
        bits of the ETM Control Register.  You must only change the value
