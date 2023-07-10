@@ -26,6 +26,7 @@ extern "C" {
 #include "cs_types.h"
 /* Now one of UNIX_USERSPACE, UNIX_KERNEL or BAREMETAL will have been defined. */
 
+#include "cs_init_manage.h"
 #include "cs_etm_types.h"
 #include "cs_etmv4_types.h"
 #include "cs_stm_types.h"
@@ -102,6 +103,8 @@ extern "C" {
 
 
 
+typedef unsigned short cs_diag_level_t;    /**< Internal diagnostic level */
+
 struct cs_device;
 
 struct cs_device_ops {
@@ -136,7 +139,7 @@ struct cs_device {
     int is_permanently_unlocked:1;
 
 #if DIAG
-    int diag_tracing:2;		  /**< Diagnostic messages for actions on this device */
+    cs_diag_level_t diag_tracing;     /**< Diagnostic messages for actions on this device */
 #endif				/* DIAG */
     unsigned int n_api_errors;
 
@@ -264,19 +267,19 @@ struct global {
 #ifdef DIAG
     FILE *diag_fd;                 /**< Output stream for diagnostics */
 #endif
-    int init_called:1;
-    int registration_open:1;
-    int force_writes:1;
-    int diag_tracing_default:2;    /**< Default trace setting for new devices */
+    int init_called:1;             /**< cs_init() has been called */
+    int registration_open:1;       /**< cs_registration_complete() not yet called */
+    int force_writes:1;            /**< Always write back on RMW operations even when unchanged */
     int diag_checking:1;	   /**< Default diag setting for new devices */
+    int phys_addr_lpae:1;	   /**< 1 if built with LPAE */
+    int virt_addr_64bit:1;         /**< 1 if built with 64 bit virtual addresses */
+    int devaff0_used:1;            /**< Non-zero DEVAFF0 has been seen */
+    cs_diag_level_t diag_tracing_default;    /**< Default trace setting for new devices */
     unsigned int n_api_errors;
     unsigned int n_devices;
     cs_power_domain_t power_domain_default;
     struct cs_device *timestamp_device;
     struct addr_exclude *exclusions;
-    int phys_addr_lpae:1;	/* 1 if built with LPAE */
-    int virt_addr_64bit:1;	/* 1 if built with 64 bit virtual addresses */
-    int devaff0_used:1;		/* Non-zero DEVAFF0 has been seen */
 };
 
 /**
@@ -295,13 +298,23 @@ struct global {
 #define ERRDESC ((void *)0)
 
 
+/**
+ * Diagnostics are provided to aid in debugging CSAL.
+ * Diagnostic levels can be configured globally and per-device.
+ * Diagnostic levels are encoded as a power-of-2, so that
+ * a max() function is a simple OR of global and device settings.
+ */
+
 #ifdef DIAG
-#define DTRACE(d) ((d)->diag_tracing || G.diag_tracing_default)
+#define DTRACE(d) ((d)->diag_tracing | G.diag_tracing_default)
 #define DTRACEG   (G.diag_tracing_default)
 #else				/* !DIAG */
 #define DTRACE(d) 0
 #define DTRACEG   0
 #endif				/* DIAG */
+
+/* Diagnostic levels */
+#define DIAG_TRACE_REGISTERS  2
 
 /*
   DCHECK() defines whether extra checks are done on the device.
@@ -333,14 +346,11 @@ typedef int check_mmap_offset_is_big_enough[1 /
 #ifdef UNIX_KERNEL
 #define diagf printk
 #else
-#define diagf _diagf
-extern void _diagf(char const *s, ...);
+#define diagf cs_diagf
 #endif
 
 #else				/* !DIAG */
-void diagf(char const *s, ...)
-{
-}
+#define diagf cs_diagf
 #endif				/* DIAG */
 /*
   This is the "physical address" value for a non-memory-mapped device, e.g.

@@ -146,7 +146,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         assert(d != NULL);
 
         if (DTRACEG) {
-            diagf("%" CS_PHYSFMT ":", addr);
+            diagf("%" CS_PHYSFMT ":", d->phys_addr);
         }
 
         d->devtype_from_id = cs_device_read(d, CS_DEVTYPE);
@@ -176,10 +176,10 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         if (DTRACEG) {
             /* Show basic information for the device. The first two numbers
                indicate the CoreSight device class. */
-            diagf(" %u.%u %03X", major, minor, d->part_number);
-            if (0)
-                diagf(" %08X %08X %08X", devaff0, devaff1,
-                      cs_device_read(d, CS_DEVARCH));
+            diagf(" %u.%u %03X %08X", major, minor, d->part_number, devarch);
+            if (0) {
+                diagf(" %08X %08X", devaff0, devaff1);
+            }
             diagf(" %08X", devid);
             diagf(" %02X/%02X", _cs_read(d, CS_CLAIMCLR) & 0xFF,
                   _cs_read(d, CS_CLAIMSET) & 0xFF);
@@ -187,7 +187,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
 
         /* Arm internal: see http://wiki.arm.com/Eng/PerphIDRegs */
         if (major == 1) {
-            /* Trace sinks */
+            /* Trace sinks e.g. ETR, TPIU */
             d->devclass |= CS_DEVCLASS_SINK;
             d->n_in_ports = 1;
             if (minor == 1) {
@@ -221,7 +221,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 }
             }
         } else if (major == 2) {
-            /* Trace links */
+            /* Trace links e.g. funnel, replicator, ETF */
             d->devclass |= CS_DEVCLASS_LINK;
             /* Default for a link is to have one in and one out */
             d->n_in_ports = 1;
@@ -258,7 +258,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 /* TBD: future components? */
             }
         } else if (major == 3) {
-            /* Trace sources */
+            /* Trace sources e.g. ETM, STM (but not ELA-600 even wehn ATB-configured) */
             d->devclass |= CS_DEVCLASS_SOURCE;
             d->n_out_ports = 1;	/* ETMv4 might have two */
             if (minor == 1) {
@@ -326,7 +326,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 }
             }
         } else if (major == 4) {
-            /* Debug control */
+            /* Debug control, e.g. CTI */
             if (minor == 1) {
                 d->devclass |= CS_DEVCLASS_CTI;
                 d->type = DEV_CTI;
@@ -345,7 +345,11 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 if ((d->part_number & 0xF00) == (0xD00)) {
                     /* v8 Arch core */
                     d->v.debug.debug_arch = 0x8;
-                    d->v.debug.didr = _cs_read(d, CS_V8EDDFR_l);	/* bottom half of EDDFR contains similar stuff to v7 DIDR. */
+                    /* Bottom half of EDDFR contains similar data to v7 DIDR. */
+                    d->v.debug.didr = _cs_read(d, CS_V8EDDFR_l);
+                    if ((devarch & 0xFFFF0FFF) == 0x47700A15) {
+                        d->v.debug.didr = (d->v.debug.didr & 0xFFFFFFF0) | ((devarch >> 12) & 0xF);
+                    }
                     d->v.debug.devid = _cs_read(d, CS_V8EDDEVID);
                     d->v.debug.pcsamplereg = CS_DBGPCSR_40;
                 } else {
@@ -463,8 +467,18 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
               cs_class, addr);
         return ERRDESC;
     }
-
     if (d != NULL && DTRACEG) {
+        cs_device_diag_summary(d);
+    }
+    return DEVDESC(d);
+}
+
+
+void
+cs_device_diag_summary(cs_device_t dev)
+{
+    struct cs_device *d = DEV(dev);
+    if (d != NULL) {
         diagf(" type=%2d", d->type);
         diagf(" %c", (d->is_unlocked ? 'O' : '-'));
         if (d->devclass & CS_DEVCLASS_CPU) {
@@ -548,11 +562,25 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         }
         if (d->devclass & CS_DEVCLASS_DEBUG) {
             diagf(" DEBUG");
-            if (d->v.debug.debug_arch == 0x8) {	/* v8 debug */
-                if ((d->v.debug.didr & 0xF) == 0x6)
-                    diagf(" v8");
-                else
-                    diagf(" unknown");
+            if (d->v.debug.debug_arch == 0x8) {   /* v8 debug */
+                /* Report features from EDDFR */
+                /* "Debuggers must use EDDEVARCH to determine the Debug architecture version" */
+                switch (d->v.debug.didr & 0xF) {
+                case 0x6:
+                    diagf(" v8.0");
+                    break;
+                case 0x7:
+                    diagf(" v8.0+VHE");
+                    break;
+                case 0x8:
+                    diagf(" v8.2");
+                    break;
+                case 0x9:
+                    diagf(" v8.4");
+                    break;
+                default:
+                    diagf(" unknown:%u", (d->v.debug.didr & 0xF));
+                }
                 diagf(" (%u bkpt)", ((d->v.debug.didr >> 12) & 0xF) + 1);
                 diagf(" (%u wpt)", ((d->v.debug.didr >> 20) & 0xF) + 1);
                 diagf(" (%u ctx_cmp)",
@@ -650,10 +678,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
             break;
         }
         diagf("\n");
-        /* Keep it mapped */
     }
-
-    return DEVDESC(d);
 }
 
 

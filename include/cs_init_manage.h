@@ -41,6 +41,10 @@ int cs_init(void);
  */
 int cs_diag_set(int n);
 
+/** Write diagnostic output the same way the library does.
+ */
+void cs_diagf(char const *, ...);
+
 #ifdef __STDC_HOSTED__
 /** Set the output file for diagnostics. */
 int cs_diag_set_fd(FILE *fd);

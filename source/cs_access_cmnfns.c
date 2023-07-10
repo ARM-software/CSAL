@@ -36,7 +36,7 @@ static int wait_iterations = 32;
   Caller is expected to supply newline.
 */
 
-void _diagf(char const *s, ...)
+void cs_diagf(char const *s, ...)
 {
     va_list args;
     va_start(args, s);
@@ -47,6 +47,10 @@ void _diagf(char const *s, ...)
     vfprintf(diagfd, s, args);
     va_end(args);
     fflush(diagfd);
+}
+#else
+void cs_diagf(char const *, ...)
+{
 }
 #endif				/* DIAG */
 
@@ -238,9 +242,9 @@ uint32_t _cs_read(struct cs_device *d, unsigned int off)
 #ifdef CSAL_MEMAP
 done:
 #endif
-    if (DTRACE(d)) {
-	diagf("!%" CS_PHYSFMT ": read %03X = %08X\n",
-	      d->phys_addr, off, data);
+    if (DTRACE(d) >= DIAG_TRACE_REGISTERS) {
+	diagf("!%" CS_PHYSFMT ": read %03X = %08X %d\n",
+	      d->phys_addr, off, data, DTRACE(d));
     }
     return data;
 }
@@ -318,7 +322,7 @@ int _cs_write64_wo(struct cs_device *d, unsigned int off, uint64_t data)
 int _cs_write_wo_traced(struct cs_device *d, unsigned int off,
                         uint32_t data, char const *oname)
 {
-    if (DTRACE(d)) {
+    if (DTRACE(d) >= DIAG_TRACE_REGISTERS) {
 	diagf("!%" CS_PHYSFMT ": write %03X (%s) = %08X\n",
 	      d->phys_addr, off, oname, data);
     }

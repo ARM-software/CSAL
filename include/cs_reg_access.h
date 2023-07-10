@@ -183,6 +183,12 @@ int cs_device_diag_set(cs_device_t dev, int tracing);
 
 
 /**
+ *   Print out a summary of the device.
+ */
+void cs_device_diag_summary(cs_device_t dev);
+
+
+/**
  *   Unlock a device. Not normally necessary - library does it automatically.
  *   May be necessary if another agent has locked the device.
  *
