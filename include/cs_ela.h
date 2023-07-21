@@ -145,11 +145,12 @@ typedef struct {
 
 /**
    ELA current state - can be read while ELA is active.
+   The registers are sampled synchronously.
  */
 typedef struct {
     unsigned int active:1;   /**< True if ELA is active */
-    uint32_t trigger_state;  /**< Current trigger state */
-    uint32_t counter;        /**< Current value of the counter */
+    uint32_t trigger_state;  /**< Current trigger state (one-hot encoded) */
+    uint32_t counter;        /**< Current value of the counter for this trigger state */
     uint32_t action;         /**< Current action */
 } cs_ela_state_t;
 
@@ -178,6 +179,12 @@ unsigned int cs_ela_record_type(cs_ela_record_t const *);
    For a timestamp record, extract the timestamp as an integer value.
  */
 uint64_t cs_ela_record_timestamp(cs_ela_record_t const *);
+
+
+/**
+   Get the log2 of a one-hot value. Return -1 if zero or other not one-hot value.
+ */
+int cs_ela_log2(uint32_t);
 
 
 /**

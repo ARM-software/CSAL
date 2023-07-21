@@ -216,6 +216,7 @@ int cs_ela_get_trigconf(cs_device_t dev, unsigned int ts, cs_ela_trigconf_t *tc)
     }
     tc->external_mask = _cs_read(d, CS_ELA_EXTMASK(ts));
     tc->external_value = _cs_read(d, CS_ELA_EXTCOMP(ts));
+    tc->counter_compare = _cs_read(d, CS_ELA_COUNTCOMP(ts));
     if (ela_is_600(d)) {
         tc->comp_control = _cs_read(d, CS_ELA_COMPCTRL(ts));
         tc->alt_comp_control = _cs_read(d, CS_ELA_ALTCOMPCTRL(ts));
@@ -246,6 +247,19 @@ static int __attribute__((unused)) is_one_hot(uint32_t n)
     return n != 0 && is_zero_one_hot(n);
 }
 
+
+int cs_ela_log2(uint32_t x)
+{
+    int p = 0;
+    if (!is_one_hot(x)) {
+        return -1;
+    }
+    while (x != 1) {
+        ++p;
+        x >>= 1;
+    }
+    return p;
+}
 
 
 int cs_ela_init_trigconf(cs_device_t dev, cs_ela_trigconf_t *tc)
@@ -297,6 +311,7 @@ int cs_ela_set_trigconf(cs_device_t dev, unsigned int ts, cs_ela_trigconf_t cons
     }
     _cs_write(d, CS_ELA_EXTMASK(ts), tc->external_mask);
     _cs_write(d, CS_ELA_EXTCOMP(ts), tc->external_value);
+    _cs_write(d, CS_ELA_COUNTCOMP(ts), tc->counter_compare);
     write_regs(d, CS_ELA_SIGMASK(ts), d->v.ela.comp_width/32, tc->compare_mask.v.words);
     write_regs(d, CS_ELA_SIGCOMP(ts), d->v.ela.comp_width/32, tc->compare_value.v.words);
     return 0;
