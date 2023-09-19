@@ -37,7 +37,21 @@
         { "part": "0x9d3", "name": "Cortex-A53 PMU" },
         { "part": "0x9a8", "name": "Cortex-A53 CTI" },
         { "part": "0x95d", "name": "Cortex-A53 ETM" },
+        { "part": "0x4e3", "name": "DSU" },
         { "part": "0x4e4", "name": "DSU" },
-        { "part": "0xd0c", "name": "Neoverse N1" }
+        { "part": "0x4e7", "name": "DSU-110 debug" },
+        { "part": "0x4e8", "name": "DSU-110 cluster" },
+        { "part": "0x4e9", "name": "DSU-120 debug" },
+        { "part": "0x4ea", "name": "DSU-120 cluster" },
+        { "part": "0xd0b", "name": "Cortex-A76" },
+        { "part": "0xd0c", "name": "Neoverse N1" },
+        { "part": "0xd40", "name": "Neoverse V1" },
+        { "part": "0xd44", "name": "Cortex-X1" },
+        { "part": "0xd46", "name": "Cortex-A510" },
+        { "part": "0xd47", "name": "Cortex-A710" },
+        { "part": "0xd48", "name": "Cortex-X2" },
+        { "part": "0xd49", "name": "Neoverse N2" },
+        { "part": "0xd4d", "name": "Cortex-A715" },
+        { "part": "0x7b0", "name": "N1SDP" }
     ]
 }       

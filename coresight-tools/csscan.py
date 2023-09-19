@@ -90,6 +90,7 @@ jedec_designers = {
 #   DEVARCH[19:16]  REVISION  minor-rev
 
 ARM_ARCHID_ETM      = 0x4a13
+ARM_ARCHID_ETE      = 0x5a13
 ARM_ARCHID_CTI      = 0x1a14
 ARM_ARCHID_PMU      = 0x2a16
 ARM_ARCHID_MEMAP    = 0x0a17
@@ -109,6 +110,7 @@ arm_archids = {
     0x6a05:"v8-R",
     0x0a11:"ETR",
     0x4a13:"ETMv4",      # REVISION indicates the ETMv4 minor version
+    0x5a13:"ETEv1",      # REVISION indicates the ETE minor version
     0x1a14:"CTI",
     0x6a15:"v8.0-A",
     0x7a15:"v8.1-A",
@@ -318,7 +320,7 @@ class Device:
     A single CoreSight device mapped by a ROM table (including ROM tables themselves).    
     """
 
-    def __init__(self, cs, addr, write=False, unlock=False, checking=None):
+    def __init__(self, cs, addr, write=False, unlock=False, checking=None, verbose=None):
         """
         Construct a device object at the given address.
         'cs' is the device map (e.g. virtual memory via CSROM(), or a MEM-AP) through which we access the device.
@@ -337,6 +339,7 @@ class Device:
         self.affinity_group = None   # AffinityGroup containing related devices
         self.map_is_write = write
         self.map(write=write)
+        self.verbose = verbose if verbose is not None else o_verbose
         # For convenience, CIDR is formed from CIDR3..CIDR0.
         self.CIDR = self.idbytes([0xFFC, 0xFF8, 0xFF4, 0xFF0])
         self.PIDR = self.idbytes([0xFD0, 0xFEC, 0xFE8, 0xFE4, 0xFE0])
@@ -353,6 +356,9 @@ class Device:
             self.devtype = self.read32(0xFCC)
         if unlock:
             self.unlock()
+
+    def verbosity(self, n):
+        return (self.verbose if self.verbose is not None else o_verbose) >= n
 
     def map(self, write=False):
         # The mmap() base address must be a multiple of the OS page size.
@@ -373,7 +379,7 @@ class Device:
 
     def write_enable(self):
         if not self.map_is_write:
-            if o_verbose:
+            if self.verbosity(1):
                 print("%s: enabling for write" % str(self))
             self.unmap()
             self.map(write=True)
@@ -417,12 +423,12 @@ class Device:
         """
         self.n_reads += 1
         self.map()             # Ensure that the device has a path to memory
-        if o_verbose >= 2:
+        if self.verbosity(2):
             print("  0x%x[%03x] R4" % (self.base_address, off), end="")
-            if o_verbose >= 3:
+            if self.verbosity(3):
                 time.sleep(0.1)
         x = self.phy.read32(off)
-        if o_verbose >= 2:
+        if self.verbosity(2):
             print("  = 0x%08x" % x)
         return x
 
@@ -468,9 +474,9 @@ class Device:
             assert (value | mask) == mask, "trying to write value 0x%x outside mask 0x%x" % (value, mask)
             ovalue = self.read32(off)
             value = (ovalue & ~mask) | value
-        if o_verbose >= 2:
+        if self.verbosity(2):
             print("  0x%x[%03x] W4 := 0x%08x" % (self.base_address, off, value))
-            if o_verbose >= 3:
+            if self.verbosity(3):
                 time.sleep(0.1)
         self.n_writes += 1
         self.phy.write32(off, value)
@@ -492,7 +498,7 @@ class Device:
 
     def write64(self, off, value):
         # Write an aligned 64-bit value, atomically. Cannot do with MEM-AP?
-        if o_verbose >= 2:
+        if self.verbosity(2):
             print("  0x%x[%03x] W8 := 0x%016x" % (self.base_address, off, value))
         self.phy.write64(off, value)
 
@@ -581,7 +587,7 @@ class Device:
         below test is slightly redundant. If we ever encountered non-ETM trace we
         might need to include/exclude on the basis of part number.
         """
-        return self.is_core_trace() or self.is_arm_architecture(ARM_ARCHID_ETM)
+        return self.is_core_trace() or self.is_arm_architecture(ARM_ARCHID_ETM) or self.is_arm_architecture(ARM_ARCHID_ETE)
 
     def is_core_debug(self):
         return self.is_coresight_device_type(5,1)
@@ -619,8 +625,14 @@ class Device:
             archpart = archid & 0xfff
             archrev = (self.devarch >> 16) & 15
             if archid in arm_archids:
-                archdesc = "Arm %s rev%u" % (arm_archids[archid], archrev)
+                # The 16-bit ARCHID is known
+                archdesc = "Arm %s" % (arm_archids[archid])
+                if archdesc[-1] in "0123456789":
+                    archdesc += ".%u" % archrev
+                elif archrev:
+                    archdesc += " rev%u" % archrev
             elif archpart in arm_archparts:
+                # The 12-bit ARCHPART is known
                 archdesc = "?Arm %s rev%u.%u" % (arm_archparts[archpart], (archid >> 12), archrev)
             else:
                 archdesc = "?Arm:0x%04x rev %u" % (archid, archrev)
@@ -727,7 +739,7 @@ class Device:
     def unlock(self):
         self.write_enable()
         if not self.is_unlocked():
-            if o_verbose >= 2:
+            if self.verbosity(2):
                 print("%s: unlocking" % self)
             self.write32(0xFB0, 0xC5ACCE55, check=False)
             self.we_unlocked = True
@@ -895,6 +907,33 @@ class DevMemRemote:
 
     def unmap(self, m):
         pass
+
+
+def authstatus_str(authstatus):
+    """
+    Generate a string describing an authstatus value.
+    AUTHSTATUS is described in CoreSight Architecture v3.0, B2.3.1.
+    """
+    # Authorization status works in three dimensions:
+    #   functionality: invasive debug / non-invasive debug
+    #   accessor: nonsecure, secure, hypervisor
+    #   status: unsupported, supported and disabled, supported and enabled
+    # Invasive, NonInvasive are considered independent functionality
+    s = ""
+    for (iix, inv) in enumerate(["I","NI"]):
+        # NonSecure, Secure, HypervisorNonSecure: only some combinations make sense?
+        # SID implies NSID etc. But we might have SID supported but disabled, NSID enabled
+        for (dix, dom) in zip([1,2,0],["S","HN","NS"]):
+            stat = bits(authstatus, dix*4+iix*2, 2)
+            dtype = "%s%sD" % (dom, inv)
+            if stat != 0:
+                if stat == 2:
+                    # functionality disabled - indicate by putting it into lower case
+                    dtype = dtype.lower()
+                s += "%-5s " % (dtype)
+            else:
+                s += "      "
+    return s
 
 
 class CSROM:
@@ -1100,26 +1139,9 @@ class CSROM:
 
         authstatus = d.read32(0xFB8)
         if o_show_authstatus:
-            # Authorization status works in three dimensions:
-            #   functionality: invasive debug / non-invasive debug
-            #   accessor: nonsecure, secure, hypervisor
-            #   status: unsupported, supported and disabled, supported and enabled
             print("", end=" ")
-            #print("auth=%04x" % authstatus, end=" ")
-            # Invasive, NonInvasive are considered independent functionality
-            for (iix, inv) in enumerate(["I","NI"]):
-                # NonSecure, Secure, HypervisorNonSecure: only some combinations make sense?
-                # SID implies NSID etc. But we might have SID supported but disabled, NSID enabled
-                for (dix, dom) in zip([1,2,0],["S","HN","NS"]):
-                    stat = bits(authstatus, dix*4+iix*2, 2)
-                    dtype = "%s%sD" % (dom, inv)
-                    if stat != 0:
-                        if stat == 2:
-                            # functionality disabled
-                            dtype = dtype.lower()
-                        print("%-5s" % (dtype), end=" ")
-                    else:
-                        print("     ", end=" ")
+            print("auth=%04x" % authstatus, end=" ")
+            print("%s " % authstatus_str(authstatus), end="")
             print("", end=" ")
 
         print("%-14s %-16s" % (desc, archdesc), end="")
@@ -1230,7 +1252,7 @@ class CSROM:
                 for r in [0xE20,0xE24,0xE28,0xE2C]:
                     print(" %08x" % (d.read32(r)), end="")
             else:
-                print(" not acessing", end="")
+                print(" not accessing (use --assume-powered-on to force)", end="")
         elif d.is_core_trace_etm():
             # Test if the registers are invalid/unreadable, either because the core power domain
             # is powered off or because the ETM hasn't been initialized since reset.
@@ -1247,15 +1269,27 @@ class CSROM:
                 print(" etmid1=0x%08x" % etmid1, end="")
             emajor = bits(etmid1,8,4)
             eminor = bits(etmid1,4,4)
-            if emajor < 3:             
-                earch = "ETMv%u" % (emajor+1)
-            elif emajor == 3:
-                earch = "PFTv1"
+            is_ETE = False
+            if emajor != 15:
+                if emajor < 3:
+                    earch = "ETMv%u" % (emajor+1)
+                elif emajor == 3:
+                    earch = "PFTv1"
+                else:
+                    earch = "ETMv%u" % (emajor)
+                earch += ".%u" % eminor
+                print(" %s" % (earch), end="")
             else:
-                earch = "ETMv%u" % (emajor)
-            earch += ".%u" % eminor
-            print(" %s" % (earch), end="")
-            if emajor >= 4:
+                # refer to TRCDEVARCH for architecture: probably ETE
+                eminor = (d.devarch >> 16) & 15
+                if d.is_arm_architecture(ETM_ARCHID_ETM):
+                    emajor = 4
+                elif d.is_arm_architecture(ETM_ARCHID_ETE):
+                    emajor = 1
+                    is_ETE = True
+                else:
+                    emajor = None
+            if emajor >= 4 or is_ETE:
                 etmid0 = d.read32(0x1E0)
                 etmid3 = d.read32(0x1EC)
                 etmid4 = d.read32(0x1F0)
@@ -1354,6 +1388,8 @@ class CSROM:
             else:
                 pass    # COMP_WIDTH == GRP_WIDTH
             print(" trigstates=%u" % bits(devid1,16,8), end="")
+            if bits(devid2,16,4) == 1:
+                print(" ext-edge", end="")
         elif d.is_cti():
             # CoreSight CTI (SoC400) or CoreSight CTI (SoC600) or core CTI
             # n.b. SoC600 CTI is fixed at 4 channels
@@ -1501,8 +1537,14 @@ class CSROM:
             # Show dynamic configuration and current state for PMU
             pmcr = d.read32(0xE04)
             print("  pmcr: 0x%08x" % pmcr, end="")
+            if bit(pmcr,0):
+                print(" enabled", end="")
             if bit(pmcr,4):
                 print(" exported", end="")
+            if bit(pmcr,5):
+                print(" DP", end="")
+            if bit(pmcr,6):
+                print(" LC", end="")
             print()
             ovs = d.read32(0xC80)
             cen = d.read32(0xC00)
@@ -1522,6 +1564,7 @@ class CSROM:
         elif d.is_core_trace_etm():
             # Show dynamic configuration and current state for ETM-like core trace
             if emajor >= 4:
+                res_def = {}
                 def res_str(rn):
                     # ETMv4 4.4.2
                     if rn == 0:
@@ -1529,13 +1572,23 @@ class CSROM:
                     elif rn == 1:
                         return "TRUE"
                     else:
-                        return "R%u" % rn
+                        s = "R%u" % rn
+                        if rn in res_def:
+                            s += " (%s)" % res_def[rn]
+                        return s
                 def esel_str(e):
-                    if not bit(e,7):
+                    # ETMv4 4.4.3
+                    # A trace unit event can be selected by a trace unit resource or a pair
+                    # of trace unit resources
+                    # in uninitialized regs, the resource number(s) can be greater than the
+                    # number of resources in the ETM.
+                    TYPE = bit(e,7)
+                    if not TYPE:   # TYPE=0: single resource 0-31
                         return res_str(bits(e,0,5))
-                    else:                        
+                    else:          # TYPE=1: resource selection pair
+                        # The pair has a boolean function applied to it
                         pair = bits(e,0,4)*2
-                        if bit(e,4) or (bit(e,7) and pair == 0):
+                        if bit(e,4) or (TYPE and pair == 0):
                             return "?%x" % e
                         return res_str(pair) + "/" + res_str(pair+1)
                 def blist(pfx,bs,n=32,inv=False):
@@ -1579,8 +1632,7 @@ class CSROM:
                 if bit(config,4):
                     print(" cycle-count:%u" % (d.read32(0x038)), end="")
                 if bit(config,11):
-                    tsctl = d.read32(0x030)
-                    print(" timestamp-event: %s" % (esel_str(bits(tsctl,0,8))), end="")
+                    print(" timestamps", end="")
                 if bit(config,12):
                     print(" return-stack", end="")
                 if bit(config,6):
@@ -1588,15 +1640,6 @@ class CSROM:
                 if bit(config,7):
                     print(" vmid", end="")
                 print()
-                # TRCVICTLR: ViewInst Control. Controls instruction trace filtering.
-                vic = d.read32(0x080)
-                event = bits(vic,0,8)
-                print("  instruction trace-enable: 0x%08x %s %s" % (vic, esel_str(event), '|'.join(blist("EL",bits(vic,20,3),n=3,inv=True))))
-                if n_address_comparator_pairs > 0 or n_pe_comparators > 0:
-                    if bit(vic,9):
-                        print("  start/stop logic is started")
-                    else:
-                        print("  start/stop logic is stopped")
                 if n_address_comparator_pairs > 0:
                     # TRCVIIECTLR: ViewInst Include-Exclude Control Register
                     vie = d.read32(0x084)
@@ -1632,16 +1675,15 @@ class CSROM:
                             print(" stop PEC%u" % (i), end="")
                     print()
                 # show resources
+                print("  resources:")
                 for rn in range(2,n_resource_selectors):
+                    # Show trace unit resources
+                    # ETM 4.4.1
                     rs = d.read32(0x200+4*rn)
                     if rs == 0:
                         # no external inputs: never true
                         continue
-                    print("  resource #%u: 0x%08x" % (rn,rs), end="")
-                    if bit(rs,20):
-                        print(" INV", end="")
-                    if bit(rs,21):
-                        print(" PAIRINV", end="")
+                    print("    R%u: 0x%08x" % (rn,rs), end="")
                     group = bits(rs,16,4)
                     sel = bits(rs,0,16)
                     bl = []
@@ -1670,7 +1712,26 @@ class CSROM:
                         bl = blist("VCXID",sel)
                     else:
                         bl = blist("?",sel)
-                    print(" %s" % "|".join(bl))
+                    rd = "|".join(bl)
+                    if bit(rs,20):
+                        rd = "INV " + rd
+                    if bit(rs,21):
+                        rd = "PAIRINV " + rd
+                    res_def[rn] = rd
+                    print(" %s" % rd)
+                # Show things controlled by resources
+                # TRCVICTLR: ViewInst Control. Controls instruction trace filtering.
+                vic = d.read32(0x080)
+                event = bits(vic,0,8)
+                print("  instruction trace-enable: 0x%08x %s %s" % (vic, esel_str(event), '|'.join(blist("EL",bits(vic,20,3),n=3,inv=True))))
+                if n_address_comparator_pairs > 0 or n_pe_comparators > 0:
+                    if bit(vic,9):
+                        print("  start/stop logic is started")
+                    else:
+                        print("  start/stop logic is stopped")
+                if bit(config,11):
+                    tsctl = d.read32(0x030)
+                    print("  timestamp-event: %s" % (esel_str(bits(tsctl,0,8))))
                 # Show external inputs.
                 if n_extinsel:
                     eis = d.read32(0x120)
@@ -1682,6 +1743,8 @@ class CSROM:
                     ectl1 = d.read32(0x024)
                     for en in range(0,n_events):
                         SEL = bits(ectl0,en*8,8)
+                        if SEL == 0:
+                            continue
                         print("  trace-event #%u: %s" % (en, esel_str(SEL)), end="")
                         if bit(ectl1,en):
                             print(" enabled", end="")
@@ -1739,13 +1802,15 @@ class CSROM:
                         if sb:
                             print("  seq%u <- seq%u: %s" % (sr, sr+1, esel_str(sb)))
                     print("  seqstate: %u" % d.read32(0x11C))    # current status
-                # probe for ETM integration regs
-                if True:
+                if o_show_integration:
+                    # probe for ETM integration regs: not at consistent addresses
                     any_integration_reg = False
                     for a in range(0xE80,0xFA0,4):                        
                         r = d.read32(a)
                         if r != 0:
-                            print("  @%03x: 0x%08x" % (a,r))
+                            if not any_integration_reg:
+                                print("  integration registers:")
+                            print("    @%03x: 0x%08x" % (a,r))
                             any_integration_reg = True
                     if not any_integration_reg:
                         print("  no integration registers set")
@@ -2101,7 +2166,7 @@ class CSROM:
             if integration_regs:
                 print("  integration registers:")
                 for r in integration_regs:
-                    print("    r%X = 0x%x" % (r, d.read32(r)))
+                    print("    @%X = 0x%x" % (r, d.read32(r)))
 
     @staticmethod
     def show_device(d):
@@ -2232,6 +2297,7 @@ def topology_detection_atb(atb_devices, topo):
         if d.is_funnel():
             enable_funnel_input(d, n)
         if d.is_arm_part_number(0x9eb):
+            # CSSoC-600 funnel
             (reg, mask) = (0xEF4, 0x01)
         elif d.is_replicator():
             (reg, mask) = (0xEFC, 0x10)
@@ -2257,6 +2323,7 @@ def topology_detection_atb(atb_devices, topo):
         def clear_integration_regs(d):
             d.write32(0xEF0, 0, check=False)
             if d.is_arm_part_number(0x9eb):
+                # CSSoC-600 funnel
                 d.write32(0xEF4, 0, check=False)
             d.write32(0xEF8, 0, check=False)
             d.write32(0xEFC, 0, check=False)
@@ -2269,6 +2336,12 @@ def topology_detection_atb(atb_devices, topo):
             d.clr32(0x000, 0xFF)
         else:
             clear_integration_regs(d)
+    # Do a preliminary check to see if anything is asserting ATVALIDM on any of our input ports.
+    # That might indicate an unknown trace source that didn't appear in the ROM table.
+    for d in atb_devices:
+        for i in range(0, d.atb_in_ports()):
+            if get_ATVALIDS(d, i):
+                print("** %s port %u: seeing ATVALID asserted" % (d, i))
     # For each ATB output port, assert its ATVALIDM and look for it to
     # be observed as ATVALIDS on an input port on one or more downstream devices.
     # Where there is a non-programmable funnel in between, we might have several
