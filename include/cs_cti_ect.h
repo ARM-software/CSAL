@@ -376,6 +376,22 @@ int cs_ect_reset(void);
     6: EXTOUT[2]             |    6: EXTIN[2]
     7: EXTOUT[3]             |    7: EXTIN[3]
 
+    DSU (DynamIQ Shared Unit) - see DSU TRM C1.6:
+    ---------------------------------------------
+
+    CTI input triggers:     |     CTI output triggers:
+    ------------------------|-------------------------
+    0: DBGTRIGGER           |     0: DBGRQ
+    1: !nPMUIRQ             |     1: DBGRESTART
+    2: profiling sample     |     2: CTIIRQ
+    3: .                    |     3: .
+    4: EXTOUT[0]            |     4: EXTIN[0]
+    5: EXTOUT[1]            |     5: EXTIN[1]
+    6: EXTOUT[2]            |     6: EXTIN[2]
+    7: EXTOUT[3]            |     7: EXTIN[3]
+    8: ELA CTTRIGOUT[0]     |     8: ELA CTTRIGIN[0]
+    9: ELA CTTRIGOUT[1]     |     9: ELA CTTRIGIN[1]
+
     For CSSYS CTI on TC2:
     ---------------------
 

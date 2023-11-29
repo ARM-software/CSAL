@@ -813,8 +813,10 @@ Register definitions and bitfield values for the Architecture v7 Cortex Core deb
 /** @name EDSCR bit values for v8
 @{*/
 #define CS_EDSCR_STATUS         0x0000003F   /**< Debug status */
-#define CS_EDSCR_STATUS_RESTARTING   0x01
-#define CS_EDSCR_STATUS_NON_DEBUG    0x02
+#define CS_EDSCR_STATUS_RESTARTING     0x01    /**< Restarting, exiting Debug state (transient) */
+#define CS_EDSCR_STATUS_NON_DEBUG      0x02    /**< Non-Debug state */
+#define CS_EDSCR_STATUS_EXTERNAL_DBG   0x13    /**< External debug request */
+#define CS_EDSCR_STATUS_HALTING_STEP   0x1b    /**< Halting step, normal */
 #define CS_EDSCR_ERR            0x00000040   /**< Sticky error */
 #define CS_EDSCR_A              0x00000080   /**< SError interrupt pending */
 #define CS_EDSCR_EL             0x00000300   /**< Exception level (Debug state only) */
@@ -871,6 +873,16 @@ Register definitions and bitfield values for the Architecture v7 Cortex Core deb
 Register definitions and bitfield values for the Architecture v8 Cortex Core debug registers.
 @{
 */
+
+#define CS_V8EDESR      0x020       /**< External Debug Event Status register */
+#define CS_V8EDESR_SS      0x04       /**< Halting step debug event pending */
+#define CS_V8EDECR      0x024       /**< External Debug Execution Control register */
+#define CS_V8EDECR_SS      0x04       /**< Halting step debug event enabled */
+#define CS_V8EDITR      0x084       /**< External Debug Instruction Transfer register */
+#define CS_V8EDSCR      0x088       /**< External Debug Status and Control Register */
+#define CS_V8EDRCR      0x090       /**< External Debug Reserve Control register */
+#define CS_V8EDACR      0x094       /**< External Debug Auxiliary Control Register */
+#define CS_V8EDECCR     0x098       /**< External Debug Exception Catch Control Register */
 
 #define CS_V8EDPCSR_l   0x0A0	    /**< Program Counter Sample register (low 32 bits) */
 #define CS_V8EDCIDSR    0x0A4	    /**< Context ID Sample register */

@@ -35,6 +35,13 @@ static cs_pmu_mask_t cs_pmu_mask(struct cs_device const *d)
 }
 
 
+uint32_t cs_pmu_read_counter(cs_device_t dev, unsigned int n)
+{
+    struct cs_device *d = DEV(dev);
+    return _cs_read(d, CS_PMEVCNTR(n, d->v.pmu.map_scale));
+}
+
+
 int cs_pmu_get_counts(cs_device_t dev, unsigned int mask,
                       unsigned int *cycles, unsigned int *counts,
                       unsigned int *overflow)

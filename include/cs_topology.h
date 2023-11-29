@@ -118,6 +118,13 @@ int cs_atid_is_valid(cs_atid_t id);
  */
 cs_device_t cs_atb_add_replicator(unsigned int n_out_ports);
 
+
+/** Register a non-programmable (non-memory-mapped) funnel.
+ *  \param n_in_ports  Number of input ports of the replicator.
+ */
+cs_device_t cs_atb_add_funnel(unsigned int n_in_ports);
+
+
 /**
  *  Set the default MEM-AP for devices (needs CSAL_MEMAP)
  *

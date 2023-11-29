@@ -922,6 +922,18 @@ cs_device_t cs_atb_add_replicator(unsigned int n_outports)
     return DEVDESC(d);
 }
 
+
+cs_device_t cs_atb_add_funnel(unsigned int n_inports)
+{
+    struct cs_device *d = cs_device_new(CS_NO_PHYS_ADDR, NULL);
+    assert(n_inports > 1 && n_inports <= CS_MAX_IN_PORTS);
+    d->devclass |= CS_DEVCLASS_LINK;
+    d->n_in_ports = n_inports;
+    d->n_out_ports = 1;
+    return DEVDESC(d);
+}
+
+
 int cs_registration_complete(void)
 {
     G.registration_open = 0;

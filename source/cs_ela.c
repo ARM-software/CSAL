@@ -205,6 +205,9 @@ int cs_ela_get_trigconf(cs_device_t dev, unsigned int ts, cs_ela_trigconf_t *tc)
 {
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_ELA);
+    if (ts >= d->v.ela.n_trigger_states) {
+        return -1;
+    }
     tc->signal_group = _cs_read(d, CS_ELA_SIGSEL(ts));
     tc->trigger_control = _cs_read(d, CS_ELA_TRIGCTRL(ts));
     tc->next_state = _cs_read(d, CS_ELA_NEXTSTATE(ts));
@@ -278,6 +281,9 @@ int cs_ela_set_trigconf(cs_device_t dev, unsigned int ts, cs_ela_trigconf_t cons
     assert(d->type == DEV_ELA);
     assert(is_one_hot(tc->signal_group));
     if (!is_one_hot(tc->signal_group)) {
+        return -1;
+    }
+    if (ts >= d->v.ela.n_trigger_states) {
         return -1;
     }
     _cs_write(d, CS_ELA_SIGSEL(ts), tc->signal_group);

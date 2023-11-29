@@ -37,21 +37,23 @@ int _cs_path_enable(struct cs_device *d, int enabled)
             if (cs_device_is_funnel(od)) {
                 unsigned int od_in_port = d->to_in_port[n];
                 /* Recursively enable this funnel's output path */
-                _cs_path_enable(od, enabled);
                 if (DTRACE(d)) {
                     diagf("!%sable input port %u of funnel %" CS_PHYSFMT
                           "\n", (enabled ? "en" : "dis"), od_in_port,
                           od->phys_addr);
                 }
-                _cs_unlock(od);
-                rc = _cs_set_mask(od, CS_FUNNEL_CTRL, (1U << od_in_port),
-                                  (enabled << od_in_port));
-                if (DTRACE(od)) {
-                    diagf("!funnel inputs now %08X\n",
-                          _cs_read(od, CS_FUNNEL_CTRL));
-                }
-                if (rc != 0) {
-                    break;
+                _cs_path_enable(od, enabled);
+                if (!cs_device_is_non_mmio(od)) {
+                    _cs_unlock(od);
+                    rc = _cs_set_mask(od, CS_FUNNEL_CTRL, (1U << od_in_port),
+                                      (enabled << od_in_port));
+                    if (DTRACE(od)) {
+                        diagf("!funnel inputs now %08X\n",
+                            _cs_read(od, CS_FUNNEL_CTRL));
+                    }
+                    if (rc != 0) {
+                        break;
+                    }
                 }
             } else if (cs_device_is_replicator(od)) {
                 if (DTRACE(od)) {
