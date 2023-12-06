@@ -23,8 +23,8 @@ nanosecond-resolution timestamps as scalars.
 It allows application code to avoid dealing with 'struct timespec'.
 */
 
-#ifndef __included_tns_h
-#define __included_tns_h
+#ifndef _included_tns_h
+#define _included_tns_h
 
 /*
 Nanoseconds since the epoch (1 Jan 1970).

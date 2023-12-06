@@ -19,8 +19,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef __included_devmemd_h
-#define __included_devmemd_h
+#ifndef _included_devmemd_h
+#define _included_devmemd_h
 
 #include <stdint.h>
 
