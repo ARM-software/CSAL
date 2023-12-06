@@ -54,6 +54,8 @@ o_show_authstatus = False
 o_show_sample = False        # Destructive sampling
 o_exclusions = []
 o_assume_powered_on = False
+o_lock = False
+o_unlock = False
 
 g_devmem = None              # Physical memory provider
 
@@ -409,10 +411,13 @@ class Device:
         self.close()
 
     def close(self):
+        """
+        Stop accessing this CoreSight device. Possibly re-lock it.
+        """
         if self.we_claimed:
             self.unclaim(self.we_claimed)
             self.we_claimed = False
-        if self.we_unlocked and self.cs.restore_locks:
+        if self.we_unlocked and self.cs.restore_locks and not o_unlock:
             self.lock()
         self.unmap()
 
@@ -704,10 +709,17 @@ class Device:
         # Return true if the device is (the debug interface to) an Arm-architecture core
         return self.is_arm_architecture() and (self.architecture() & 0x0fff) == 0x0a15
 
+    def is_lockable(self):
+        """
+        Return True if this device implements memory-mapped Software Lock (LSR.SLI).
+        """
+        return (self.read32(0xFB4) & 0x01) != 0
+
     def is_unlocked(self):
         """
         Return True if the device is unlocked and writeable. This is only
-        valid for CoreSight devices.
+        valid for CoreSight devices. For {CPU,CTI,PMU} this is {EDLSR,CTILSR,PMLSR}.SLK
+        and corresponds to SoftwareLockStatus().
         """
         return (self.read32(0xFB4) & 0x02) == 0
 
@@ -1183,10 +1195,13 @@ class CSROM:
             # Arm v8 debug architecture: core debug, external view (ED... registers)
             edprsr = d.read32(0x314)
             core_powered_off = ((edprsr & 0x1) == 0)
-            if (edprsr & 0x1) == 0:        
+            if core_powered_off:
                 print(" powered-down", end="")
-            if (edprsr & 0x4) == 1:
+            if bit(edprsr,4):
                 print(" halted", end="")
+            if bit(edprsr,5):
+                print(" locked", end="")
+            # SoftwareLockStatus() = EDLSR.SLK i.e. EDLSR bit 1. EDLSR is 0xFB4.
             if not core_powered_off:
                 midr = d.read32(0xD00)
                 print(" midr=0x%08x" % midr, end="")
@@ -1199,7 +1214,14 @@ class CSROM:
                 if True or o_verbose:
                     print(" dfr=0x%x" % (dfr), end="")
                 pmuver = bits(dfr,8,4)
-                print(" bkpt:%u wpt:%u" % (bits(dfr,12,4)+1, bits(dfr,20,4)+1), end="")
+                n_bkpt = bits(dfr,12,4) + 1
+                n_ctx = bits(dfr,28,4) + 1     # number of context-aware breakpoints
+                n_wpt = bits(dfr,20,4) + 1
+                print(" bkpt:%u" % n_bkpt, end="")
+                if n_ctx != n_bkpt:
+                    # If N context-aware breakpoints are implemented, they are the last N breakpoints (e.g. last 2 of 6).
+                    print("(%u)" % n_ctx, end="")
+                print(" wpt:%u" % n_wpt, end="")
                 pmuvers = {
                     0x1: "PMUv3",
                     0x4: "PMUv3-v8.1",
@@ -1441,8 +1463,16 @@ class CSROM:
             print(" -", end="")
 
         # dynamic information, but generic for all CoreSight devices
-        if d.is_unlocked():
+        if not d.is_lockable():
+            print(" no-lock", end="")
+            if not d.is_unlocked():
+                # If SLI=0 indicating s/w lock is not implemented, SLK should be 0
+                # indicating that writes are permitted.
+                print(" (but locked?)", end="")
+        elif d.is_unlocked():
             print(" unlocked", end="")
+        else:
+            print(" locked", end="")
         if not core_powered_off:
             claimed = d.read32(0xFA4)
             if claimed:
@@ -1450,6 +1480,14 @@ class CSROM:
         if d.is_in_integration_mode():
             print(" integration", end="")
         print()
+        if d.is_lockable():
+            if o_unlock:
+                d.unlock()
+            if o_lock:
+                d.write_enable()
+                d.lock()
+                if d.is_unlocked():
+                    print("%s is still unlocked" % (d))
 
         """
         Show the device programming and current state.
@@ -1494,6 +1532,8 @@ class CSROM:
             print("  halting debug for bkpt/wpt/hlt (HDE): %s" % ["disabled","enabled"][bit(dscr,14)])
             print("  secure debug (SDD): %s" % ["enabled","disabled"][bit(dscr,16)])
             print("  access mode: %s" % ["normal","memory"][bit(dscr,20)])
+            if bit(dscr,6):
+                print("  cumulative error")
             if bit(dscr,25):
                 print("  pipeline advanced")
             if bit(dscr,29):
@@ -1511,9 +1551,14 @@ class CSROM:
             n_bkpt = bits(dfr,12,4)+1
             n_wpt = bits(dfr,20,4)+1
             for n in range(0,n_bkpt):
-                bcr = d.read32(0x408+(n*16))
-                bvr = d.read64(0x400+(n*16))
-                if bcr != 0 or bvr != 0:
+                d.write_enable()
+                d.write32(0x408+(n*16), 0x00000000)
+                C1 = 0x0123456789ABCDEF
+                C1 = 0xEEEEEEEEEEEEEEEE
+                d.write64(0x400+(n*16), C1)
+                bcr = d.read32(0x408+(n*16))    # Breakpoint control
+                bvr = d.read64(0x400+(n*16))    # Breakpoint value
+                if o_verbose or bcr != 0 or bvr != 0:
                     is_enabled = bit(bcr,0)
                     print("  BP #%u: value=0x%016x control=0x%08x" % (n, bvr, bcr), end="")
                     print(" type=0x%x" % (bits(bcr,20,4)), end="")
@@ -1526,7 +1571,7 @@ class CSROM:
             for n in range(0,n_wpt):
                 wcr = d.read32(0x808+(n*16))
                 wvr = d.read64(0x800+(n*16))
-                if wcr != 0 or wvr != 0:
+                if o_verbose or wcr != 0 or wvr != 0:
                     is_enabled = bit(wcr,0)
                     print("  WP #%u: value=0x%016x control=0x%08x" % (n, wvr, wcr), end="")
                     if bit(wcr,20):
@@ -1564,7 +1609,9 @@ class CSROM:
         elif d.is_core_trace_etm():
             # Show dynamic configuration and current state for ETM-like core trace
             if emajor >= 4:
-                res_def = {}
+                res_val = {}      # Resource definition, register value
+                res_bas = {}      # Resource definition, as a string
+                res_def = {}      # Resource definition, as a string with INV/INVPAIR
                 def res_str(rn):
                     # ETMv4 4.4.2
                     if rn == 0:
@@ -1590,7 +1637,26 @@ class CSROM:
                         pair = bits(e,0,4)*2
                         if bit(e,4) or (TYPE and pair == 0):
                             return "?%x" % e
-                        return res_str(pair) + "/" + res_str(pair+1)
+                        A = res_bas[pair]
+                        B = res_bas[pair+1]
+                        A_PAIRINV = bit(res_val[pair],21)
+                        A_INV = bit(res_val[pair],20)
+                        B_INV = bit(res_val[pair+1],20)
+                        comb = (A_PAIRINV << 2) | (A_INV << 1) | B_INV
+                        if comb == 0:
+                            return "%s and %s" % (A, B)
+                        elif comb == 2:
+                            return "not(%s) and %s" % (A, B)
+                        elif comb == 3:
+                            return "not(%s) and not(%s)" % (A, B)
+                        elif comb == 4:
+                            return "not(%s) or not(%s)" % (A, B)
+                        elif comb == 5:
+                            return "not(%s) or %s" % (A, B)
+                        elif comb == 7:
+                            return "%s or %s" % (A, B)
+                        else:
+                            return "? " + res_str(pair) + "/" + res_str(pair+1)
                 def blist(pfx,bs,n=32,inv=False):
                     bl = []
                     for i in range(0,n):
@@ -1614,9 +1680,10 @@ class CSROM:
                     print("  unstable")
                 if bit(status,0):
                     print("  idle")
+                # Look at the state of the OS lock (not the Software Lock in 0xFB4)
                 oslsr = d.read32(0x304)
                 print("  oslsr: 0x%08x" % oslsr)
-                # show main configuration: branch-broadcasting etc.
+                # show main ETM configuration: branch-broadcasting etc.
                 enabled = bit(d.read32(0x004),0)
                 if enabled:
                     print("  enabled")
@@ -1677,9 +1744,11 @@ class CSROM:
                 # show resources
                 print("  resources:")
                 for rn in range(2,n_resource_selectors):
-                    # Show trace unit resources
+                    # Show trace unit resources from TRCRSCTLR<n>
                     # ETM 4.4.1
+                    # Also populate a couple of local dictionaries for when we later show event selectors
                     rs = d.read32(0x200+4*rn)
+                    res_val[rn] = rs
                     if rs == 0:
                         # no external inputs: never true
                         continue
@@ -1687,35 +1756,41 @@ class CSROM:
                     group = bits(rs,16,4)
                     sel = bits(rs,0,16)
                     bl = []
-                    if group == 0:
+                    if group == 0:               # External Input Selectors
                         bl = blist("EXTSEL",sel)
-                    elif group == 1:
+                    elif group == 1:             # PE Comparator Inputs
                         bl = blist("PECOMP",sel)
                         pec_used |= sel
-                    elif group == 2:
-                        bl = blist("SEQ==",sel>>4) + blist("ZERO:C",sel&15)
-                        ctr_used |= (sel & 15)
-                    elif group == 3:
+                    elif group == 2:             # Counters and Sequencer
+                        selseq = sel >> 4
+                        selctr = sel & 0xf
+                        bl = blist("SEQ==",selseq)
+                        bl += blist("ZERO:C",selctr)
+                        ctr_used |= selctr
+                    elif group == 3:             # Single-shot Comparator Controls
                         bl = blist("SSC",sel)
                         ssc_used |= sel
-                    elif group == 4:
+                    elif group == 4:             # Single Address Comparators
                         bl = blist("SAC",sel)
                         ac_used |= sel
-                    elif group == 5:
+                    elif group == 5:             # Address Range Comparators
                         bl = blist("AR",sel)
                         for i in range(0,8):
                             if bit(sel, i):
                                 ac_used |= (3 << (i*2))
-                    elif group == 6:
+                    elif group == 6:             # Context Identifier Comparators
                         bl = blist("CXID",sel)
-                    elif group == 7:
+                    elif group == 7:             # Virtual Context Identifier Comparators
                         bl = blist("VCXID",sel)
                     else:
                         bl = blist("?",sel)
                     rd = "|".join(bl)
+                    res_bas[rn] = rd
                     if bit(rs,20):
+                        # Invert the output of this selector
                         rd = "INV " + rd
                     if bit(rs,21):
+                        # Invert the combined output of the 2 resource selectors
                         rd = "PAIRINV " + rd
                     res_def[rn] = rd
                     print(" %s" % rd)
@@ -2724,6 +2799,8 @@ if __name__ == "__main__":
         print("  --enable-timestamps  enable global CoreSight timestamps")
         print("  --remote=<net>       access remote device via devmemd")
         print("  --assume-powered-on  assume device is powered on")
+        print("  --unlock             leave device(s) unlocked")
+        print("  --lock               leave device(s) locked")
         print("  -v/--verbose         increase verbosity level")
         sys.exit(1)
     c = None
@@ -2769,6 +2846,10 @@ if __name__ == "__main__":
             o_force_memap = True
         elif arg == "--authstatus":
             o_show_authstatus = True
+        elif arg == "--lock":
+            o_lock = True
+        elif arg == "--unlock":
+            o_unlock = True
         elif arg == "--assume-powered-on":
             o_assume_powered_on = True
         elif arg.startswith("--limit="):

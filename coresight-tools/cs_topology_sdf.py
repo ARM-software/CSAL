@@ -29,6 +29,7 @@ import sys
 sdf_map = {
     "CSETM":           cs_topology.CS_DEVTYPE_TRACE_CORE,
     "CSPTM":           cs_topology.CS_DEVTYPE_TRACE_CORE,
+    "ETE":             cs_topology.CS_DEVTYPE_TRACE_CORE,
     "CSATBReplicator": cs_topology.CS_DEVTYPE_REPLICATOR,
     "CSTFunnel":       cs_topology.CS_DEVTYPE_FUNNEL,
     "CSTPIU":          cs_topology.CS_DEVTYPE_PORT,
@@ -58,13 +59,34 @@ class SDFDeviceInfo:
         self.xd = xd
         self.type = xd.attributes["type"].value
         self.name = xd.attributes["name"].value
+        self.base_address = None
+        self.ap_index = None
+        self.cti_base_address = None         # for CPUs only
+        for xci in xd.getElementsByTagName("config_item"):
+            cname = xci.attributes["name"].value
+            cvalue = xci.firstChild.nodeValue
+            if cname == "CORESIGHT_BASE_ADDRESS":
+                assert self.base_address is None
+                self.base_address = int(cvalue,16)
+            elif cname == "CORESIGHT_AP_INDEX":
+                assert self.ap_index is None
+                self.ap_index = int(cvalue)
+            elif cname == "CTI_CORESIGHT_BASE_ADDRESS":
+                # The device type will be a CPU product name
+                self.cti_base_address = int(cvalue,16)
+            elif cname == "CORESIGHT_AP_ADDRESS":
+                assert self.base_address is None
+                assert self.type == "CSMEMAP"
+                self.base_address = int(cvalue,16)
+            else:
+                print("%s:%s: unexpected config_item: %s" % (self.type, self.name, cname))
         self.info = {}
         xdis = xd.getElementsByTagName("device_info_item")
         for xdi in xdis:
             iname = xdi.attributes["name"].value
             try:
                 self.info[iname] = xdi.firstChild.nodeValue
-            except:
+            except Exception:
                 pass
 
 
@@ -78,11 +100,11 @@ class SDFLinkInfo:
         self.slave = xl.attributes["slave"].value
         try:
             self.master_interface = int(xl.attributes["master_interface"].value)
-        except:
+        except Exception:
             self.master_interface = 0
         try:
             self.slave_interface = int(xl.attributes["slave_interface"].value)
-        except:
+        except Exception:
             self.slave_interface = 0
 
 
@@ -184,4 +206,13 @@ def load(fn):
             print("%s: %s topology connects unhandled devices: '%s' -> '%s'" % (fn, li.type, li.master, li.slave), file=sys.stderr)
     return p.check()
 
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="read SDF system description files (Arm DS)")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="increase verbosity")
+    parser.add_argument("files", type=str, nargs="+", help="SDF files to open")
+    opts = parser.parse_args()
+    for fn in opts.files:
+        S = load(fn)
 
