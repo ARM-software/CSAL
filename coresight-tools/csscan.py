@@ -1414,10 +1414,20 @@ class CSROM:
                 print(" ext-edge", end="")
         elif d.is_cti():
             # CoreSight CTI (SoC400) or CoreSight CTI (SoC600) or core CTI
-            # n.b. SoC600 CTI is fixed at 4 channels
+            # n.b. S0C400 and SoC600 CTIs are fixed at 4 channels
             print(" channels:%u triggers:%u" % (((devid>>16)&0xf), ((devid>>8)&0xff)), end="")
-            if bits(devid,24,2):
-                print(" gate", end="")
+            # CTIGATE prevents channels from propagating to other CTIs.
+            # SoC600 defines DEVID[24](=INOUT) to mean CTIGATE also masks channel inputs,
+            # and states that it is always 1.
+            # DSU defines DEVID[25:24] to be 0b00 if CTIGATE does not mask external inputs,
+            # and 0b01 if it does.
+            if d.is_arm_part_number(0x906):
+                # SoC400 CTI does not define DEVID.INOUT; it does not gate inputs?
+                cti_gates_inputs = False
+            else:
+                cti_gates_inputs = bit(devid,24)
+            if cti_gates_inputs:
+                print(" gate-inputs", end="")
         elif d.is_arm_part_number(0x908) or d.is_arm_part_number(0x9eb):
             # CoreSight trace funnel (SoC400 or SoC600)
             in_ports = devid & 15
