@@ -1304,9 +1304,9 @@ class CSROM:
             else:
                 # refer to TRCDEVARCH for architecture: probably ETE
                 eminor = (d.devarch >> 16) & 15
-                if d.is_arm_architecture(ETM_ARCHID_ETM):
+                if d.is_arm_architecture(ARM_ARCHID_ETM):
                     emajor = 4
-                elif d.is_arm_architecture(ETM_ARCHID_ETE):
+                elif d.is_arm_architecture(ARM_ARCHID_ETE):
                     emajor = 1
                     is_ETE = True
                 else:
