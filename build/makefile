@@ -100,6 +100,7 @@ CSSRC=  cs_init_manage.c \
 		cs_debug_sample.c \
 		cs_pmu.c \
 		cs_access_cmnfns.c \
+		cs_map_local.c \
 		cs_cti_ect.c \
 		cs_etm.c \
 		cs_etm_v4.c \
