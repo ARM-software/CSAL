@@ -24,11 +24,17 @@
 /* Include all the common internal types and function declarations */
 #include "cs_access_cmnfns.h"
 
+#ifdef UNIX_USERSPACE
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+#endif /* UNIX_USERSPACE */
+
 
 /* *** init and management API *** */
 int cs_init(void)
 {
-    memset(&G, 0, sizeof(struct global));
+    memset(&G, 0, sizeof(struct cs_global));
 
 #ifdef UNIX_USERSPACE
 #ifndef USE_DEVMEMD
@@ -198,4 +204,4 @@ unsigned short cs_library_version()
 
 /* *** ==================== *** */
 
-/* end of csaccess.c */
+/* end of cs_init_manage.c */

@@ -19,6 +19,7 @@
 #include "cs_access_cmnfns.h"
 #include "cs_topology.h"
 #include "cs_reg_access.h"
+#include "cs_map_local.h"
 #include "cs_etm.h"
 #include "cs_sw_stim.h"
 #include "cs_trace_sink.h"

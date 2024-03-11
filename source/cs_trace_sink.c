@@ -216,7 +216,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     unsigned int *op;
     int bytes_read = 0;
     int unread;
-    unsigned int volatile *etb_read_reg;
+    uint32_t volatile *etb_read_reg;
     unsigned int to_read, words_left_to_read;
 
     assert(cs_device_has_class(dev, CS_DEVCLASS_BUFFER));
@@ -293,7 +293,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     etb_read_reg = _cs_get_register_address(d, CS_ETB_RAM_DATA);
     if (0) {
         fprintf(stderr,
-                "TraceCaptEn=%u TMCReady=%u Empty=%u CBUFLEVEL=0x%x\n",
+                "TraceCaptEn=%u TMCReady=%u Empty=%u CBUFLEVEL=0x%" PRIx32 "\n",
                 _cs_isset(d, CS_ETB_CTRL, CS_ETB_CTRL_TraceCaptEn),
                 _cs_isset(d, CS_ETB_STATUS, CS_TMC_STATUS_TMCReady),
                 _cs_isset(d, CS_ETB_STATUS, CS_TMC_STATUS_Empty),

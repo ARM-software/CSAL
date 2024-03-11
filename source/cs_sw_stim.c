@@ -19,6 +19,7 @@
 #include "cs_access_cmnfns.h"
 #include "cs_sw_stim.h"
 #include "cs_topology.h"
+#include "cs_map_local.h"
 
 /* ---------- Local functions ------------- */
 unsigned int cs_stm_get_ext_ports_size(struct cs_device *d)

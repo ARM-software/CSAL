@@ -19,7 +19,7 @@
 #include "cs_access_cmnfns.h"
 
 /* Declare the global library information structure */
-struct global G;
+struct cs_global G;
 
 /* iterations for waiting for bits */
 static int wait_iterations = 32;
@@ -143,12 +143,6 @@ int cs_report_device_error(struct cs_device *d, char const *fmt, ...)
     return -1;
 }
 
-struct cs_device *cs_get_device_struct(cs_device_t dev)
-{
-    assert(dev != ERRDESC);
-    return (struct cs_device *) (dev);
-}
-
 
 /*
  * Initialize a device object.
@@ -156,6 +150,7 @@ struct cs_device *cs_get_device_struct(cs_device_t dev)
 void cs_device_init(struct cs_device *d, cs_physaddr_t addr)
 {
     memset(d, 0, sizeof(struct cs_device));
+    d->glob = &G;     /* Back-pointer to global state */
     /* N.b. phys addr may be CS_NO_PHYS_ADDR, e.g. for non-programmable replicators */
     d->phys_addr = addr;
     d->affine_cpu = CS_CPU_UNKNOWN;
@@ -437,38 +432,36 @@ int _cs_isset(struct cs_device *d, unsigned int off, uint32_t bits)
     return (_cs_read(d, off) & bits) == bits;
 }
 
-int _cs_wait(struct cs_device *d, unsigned int off, uint32_t bit)
+int _cs_wait(struct cs_device *d, unsigned int off, uint32_t bits)
 {
     int i;
     for (i = 0; i < wait_iterations; ++i) {
-	if (_cs_isset(d, off, bit)) {
-	    if (DTRACE(d)) {
-		diagf("!%" CS_PHYSFMT
-		      ": bit %03X.%08X set after %d iterations\n",
-		      d->phys_addr, off, bit, i);
-	    }
-	    return 0;
-	}
+        if (_cs_isset(d, off, bits)) {
+            if (DTRACE(d)) {
+                diagf("!%" CS_PHYSFMT ": bit %03X.%08" PRIX32 " set after %d iterations\n",
+                    d->phys_addr, off, bits, i);
+            }
+            return 0;
+        }
     }
-    return cs_report_device_error(d, "bit %03X.%08X did not set",
-				  off, bit);
+    return cs_report_device_error(d, "bit %03X.%08" PRIX32 " did not set",
+				  off, bits);
 }
 
-int _cs_waitnot(struct cs_device *d, unsigned int off, unsigned int bit)
+int _cs_waitnot(struct cs_device *d, unsigned int off, uint32_t bits)
 {
     int i;
     for (i = 0; i < wait_iterations; ++i) {
-	if (!_cs_isset(d, off, bit)) {
-	    if (DTRACE(d)) {
-		diagf("!%" CS_PHYSFMT
-		      ": bit %03X.%08X clear after %d iterations\n",
-		      d->phys_addr, off, bit, i);
-	    }
-	    return 0;
-	}
+        if (!_cs_isset(d, off, bits)) {
+            if (DTRACE(d)) {
+                diagf("!%" CS_PHYSFMT ": bit %03X.%08" PRIX32 " clear after %d iterations\n",
+                    d->phys_addr, off, bits, i);
+            }
+            return 0;
+        }
     }
-    return cs_report_device_error(d, "bit %03X.%08X did not clear",
-				  off, bit);
+    return cs_report_device_error(d, "bit %03X.%08" PRIX32 " did not clear",
+				  off, bits);
 }
 
 void _cs_set_wait_iterations(int iterations)
@@ -646,75 +639,6 @@ int _cs_lock(struct cs_device *d)
 	}
     }
     return 0;
-}
-
-
-/*
-  Map a region (generally 4K) of physical memory.
-  Return NULL if unsuccessful.
-*/
-void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
-{
-    void *localv;
-    assert(size > 0);
-    assert((addr % 4096) == 0);
-#ifdef UNIX_USERSPACE
-#ifndef USE_DEVMEMD
-    cs_physaddr_t addr_to_map = addr;	/* may be rounded down to phys page size */
-    {
-	unsigned int pagesize = sysconf(_SC_PAGESIZE);
-	if (size < pagesize) {
-	    size = pagesize;
-	}
-	if ((addr % pagesize) != 0) {
-	    addr_to_map -= (addr % pagesize);
-	}
-    }
-    localv =
-	mmap(0, size, (writable ? (PROT_READ | PROT_WRITE) : PROT_READ),
-	     MAP_SHARED, G.mem_fd, addr_to_map);
-    if (localv == MAP_FAILED) {
-	return NULL;
-    }
-    localv = (unsigned char *) localv + (addr - addr_to_map);
-#else
-    /* When using devmemd, the local address is not used, but must be non-zero. */
-    localv = (unsigned char *)0xBAD;
-#endif
-#elif defined(UNIX_KERNEL)
-    localv = ioremap(addr, size);
-#else
-    localv = (void *)addr;
-#endif
-    return localv;
-}
-
-
-int _cs_map(struct cs_device *d, int writable)
-{
-    d->local_addr = (unsigned char volatile *)io_map(d->phys_addr, 4096, writable);
-    return d->local_addr != NULL;
-}
-
-
-void io_unmap(void volatile *addr, unsigned int size)
-{
-#ifdef UNIX_USERSPACE
-#ifndef USE_DEVMEMD
-    (void)munmap((void *)addr, size);
-#endif
-#elif defined(UNIX_KERNEL)
-    iounmap(addr);
-#else
-    /* do nothing */
-#endif
-}
-
-void _cs_unmap(struct cs_device *d)
-{
-    if (d->local_addr) {
-        io_unmap(d->local_addr, 4096);
-    }
 }
 
 /* end of cs_access_cmnfns.c */

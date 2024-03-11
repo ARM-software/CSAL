@@ -35,13 +35,6 @@ extern "C" {
 
 #include "csregisters.h"
 
-#ifdef UNIX_USERSPACE
-#include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#endif				/* UNIX_USERSPACE */
-
 #ifdef UNIX_KERNEL
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -58,7 +51,7 @@ extern "C" {
 #endif
 #if defined(UNIX_KERNEL)
 #include <linux/string.h>
-#include <asm/io.h>
+//#include <asm/io.h>
 #define assert(x) BUG_ON(x)
 #endif
 #include <stddef.h>
@@ -69,8 +62,8 @@ extern "C" {
 #endif /* USE_DEVMEMD */
 
 
-#define CS_LIB_VERSION_MAJ 0x02
-#define CS_LIB_VERSION_MIN 0x03
+#define CS_LIB_VERSION_MAJ 0x03
+#define CS_LIB_VERSION_MIN 0x02
 
 /*
   DIAG defines whether this build is capable of writing diagnostic messages.
@@ -119,6 +112,7 @@ struct cs_device_ops {
 struct cs_device {
     /* Next device in global list - no particular order */
     struct cs_device *next;
+    struct cs_global *glob;       /**< Pointer to CSAL global state */
 
     struct cs_device_ops ops;
 
@@ -154,8 +148,8 @@ struct cs_device {
     /* Device-specific properties */
     union {
         struct debug_props {
-            unsigned int didr;	      /**< Contents of DBGDIDR */
-            unsigned int devid;	      /**< Contents of DBGDEVID, or zero when not present */
+            uint32_t didr;	          /**< Contents of DBGDIDR */
+            uint32_t devid;	          /**< Contents of DBGDEVID, or zero when not present */
             unsigned int pcsamplereg; /**< Offset to PC sampling register */
             unsigned int debug_arch;  /**< debug architecture */
             struct cs_device *pmu;    /**< PMU for this CPU */
@@ -163,7 +157,7 @@ struct cs_device {
             struct cs_device *cti;    /**< CTI for this CPU */
         } debug;
         struct pmu_props {
-            unsigned int cfgr;
+            uint32_t cfgr;
             unsigned int n_counters;  /**< Number of event counters, not including cycle counter */
             unsigned char map_scale;  /**< Spacing in the memory map (power of 2) */
         } pmu;
@@ -256,7 +250,7 @@ struct addr_exclude {
   no provision for the library managing multiple SoCs, or multiple physical memory
   spaces etc.
 */
-struct global {
+struct cs_global {
     struct cs_device *device_top;
 #ifdef UNIX_USERSPACE
     int mem_fd;			   /**< File handle for the memory mapped I/O */
@@ -282,13 +276,20 @@ struct global {
     struct addr_exclude *exclusions;
 };
 
+
 /**
- * Convert an opaque device descriptor into a pointer to a device structure
+ * Convert an opaque device descriptor into a pointer to a device structure.
  */
+static inline struct cs_device *cs_get_device_struct(cs_device_t dev)
+{
+    assert(dev != ERRDESC);
+    return (struct cs_device *)(dev);
+}
+
 #define DEV(d) cs_get_device_struct(d)
 
 /**
- * Convert a pointer to a device structure into an opaque device descriptor
+ * Convert a pointer to a device structure into an opaque device descriptor.
  */
 #define DEVDESC(d) ((void *)(d))
 
@@ -306,7 +307,7 @@ struct global {
  */
 
 #ifdef DIAG
-#define DTRACE(d) ((d)->diag_tracing | G.diag_tracing_default)
+#define DTRACE(d) ((d)->diag_tracing | (d)->glob->diag_tracing_default)
 #define DTRACEG   (G.diag_tracing_default)
 #else				/* !DIAG */
 #define DTRACE(d) 0
@@ -320,7 +321,7 @@ struct global {
   DCHECK() defines whether extra checks are done on the device.
 */
 #if CHECK
-#define DCHECK(d) (G.diag_checking)
+#define DCHECK(d) (d->glob->diag_checking)
 #else				/* !CHECK */
 #define DCHECK(d) 0
 #endif				/* CHECK */
@@ -378,7 +379,7 @@ typedef int check_mmap_offset_is_big_enough[1 /
 
 /* Non API functions implemented in cs_access_cmnfns.c */
 /* data */
-extern struct global G;
+extern struct cs_global G;
 
 /* functions */
 extern int cs_device_is_non_mmio(struct cs_device *d);
@@ -393,7 +394,7 @@ extern void cs_device_init(struct cs_device *d, cs_physaddr_t addr);
 extern struct cs_device *cs_device_new(cs_physaddr_t addr,
                                        void volatile *local_addr);
 
-extern unsigned int volatile *_cs_get_register_address(struct cs_device *d,
+extern uint32_t volatile *_cs_get_register_address(struct cs_device *d,
                                                        unsigned int off);
 extern uint32_t _cs_read(struct cs_device *d, unsigned int off);
 extern uint64_t _cs_read64(struct cs_device *d, unsigned int off);
@@ -424,9 +425,9 @@ extern int _cs_isset(struct cs_device *d, unsigned int off,
                      uint32_t bits);
 extern void _cs_set_wait_iterations(int iterations);
 extern int _cs_wait(struct cs_device *d, unsigned int off,
-                    unsigned int bit);
+                    uint32_t bits);
 extern int _cs_waitnot(struct cs_device *d, unsigned int off,
-                       unsigned int bit);
+                       uint32_t bits);
 extern int _cs_waitbits(struct cs_device *d, unsigned int off,
                         uint32_t bits, cs_reg_waitbits_op_t operation,
                         uint32_t pattern, uint32_t *p_last_val);
@@ -439,11 +440,6 @@ extern int _cs_isunlocked(struct cs_device *d);
 extern int _cs_is_lockable(struct cs_device *d);
 extern int _cs_unlock(struct cs_device *d);
 extern int _cs_lock(struct cs_device *d);
-
-extern void *io_map(cs_physaddr_t addr, unsigned int size, int writable);
-extern void io_unmap(void volatile *addr, unsigned int size);
-extern int _cs_map(struct cs_device *d, int writable);
-extern void _cs_unmap(struct cs_device *d);
 
 #define _cs_write(d, off, data) _cs_write_traced(d, off, data, #off)
 #define _cs_write64(d, off, data) _cs_write64_traced(d, off, data, #off)

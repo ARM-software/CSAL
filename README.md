@@ -237,6 +237,11 @@ Version 3.1
 -----------
 - Added support for CoreSight ELA
 
+Version 3.2
+-----------
+- Portability and efficiency fixes.
+- Increased reported version number from 2.3 to 3.2.
+
 
 ------------------------------------
 
