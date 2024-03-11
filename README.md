@@ -20,8 +20,9 @@ The following trace components are supported by the library:
 
 - ETMv3.x: used in Cortex A5, A7 cores; Cortex R4, R5 cores.
 - PTMv1.x: used in Cortex A9, A15, A17 cores.
-- ETMv4.x: Used in Cortex R7 and later R-profile cores.
+- ETMv4.x: Used in Cortex R7 and later R-profile and M-profile cores.
   Used in **V8 Architecture** Cores - Cortex A and Neoverse cores.
+- ETE: Used in v9 A-profile cores.
 - CoreSight ITM.
 - CoreSight STM.
 - CoreSight ETB.
@@ -34,7 +35,7 @@ The following trace components are supported by the library:
 The library also supports access to the v7 Arch or v8 Arch debug sampling registers,
 allowing non intrusive sampling of PC, VMID and ContextID on a running core.
 
-Optional support is provided for intrusive halting mode debug support of v7 Arch debug cores.
+Optional support is provided for intrusive halting mode debug support of v7/v8 Arch debug cores.
 
 Normally, components are accessed in the local memory space.
 The library also supports accessing components through a MEM-AP device.
@@ -239,8 +240,16 @@ Version 3.1
 
 Version 3.2
 -----------
-- Portability and efficiency fixes.
-- Increased reported version number from 2.3 to 3.2.
+- Portability and efficiency fixes
+- Increased reported version number from 2.3 to 3.2
+
+Future changes
+--------------
+It is unlikely that CSAL will see major development, but it may be improved in areas including:
+
+- Updates for new releases of CoreSight IP
+- Reduction of code path lengths on register access (e.g. automatic unlock-on-write may become optional)
+- Support for additional boards and SoCs in the demonstration code
 
 
 ------------------------------------
@@ -248,7 +257,7 @@ Version 3.2
 Licence Information
 ===================
 
-*Copyright (C) ARM Limited, 2014-2021. All rights reserved.*
+*Copyright (C) ARM Limited, 2014-2024. All rights reserved.*
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
