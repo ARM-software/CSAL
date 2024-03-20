@@ -129,8 +129,8 @@ struct cs_device {
     unsigned int devaff0;	  /**< Device affinity register for CPU-affine devices - might be CPU's MPIDR, but might also be zero */
     cs_cpu_t affine_cpu;	  /**< Set by the user via the API */
     cs_power_domain_t power_domain;
-    int is_unlocked:1;
-    int is_permanently_unlocked:1;
+    unsigned int is_unlocked:1;   /**< Device is (as far as we know) unlocked, either permanently or via LAR */
+    unsigned int is_permanently_unlocked:1;   /**< LAR not implemented, device does not need to be unlocked */
 
 #if DIAG
     cs_diag_level_t diag_tracing;     /**< Diagnostic messages for actions on this device */
@@ -186,9 +186,9 @@ struct cs_device {
         } etm;
         struct etb_props {
             unsigned int buffer_size_bytes;
-            int currently_reading:1;
-            int finished_reading:1;
-            int is_tmc_device:1;	/* This is a TMC, as opposed to e.g. a classic ETB */
+            unsigned int currently_reading:1;
+            unsigned int finished_reading:1;
+            unsigned int is_tmc_device:1;     /**< This is a TMC, as opposed to e.g. a classic ETB */
             /* For pre-TMC ETBs, the read and write pointers address words within
                the buffer RAM - for CoreSight ETBs the buffer is always 32-bit RAM,
                so the pointers are scaled by 4.  Only very old pre-CoreSight ETBs
@@ -209,16 +209,16 @@ struct cs_device {
             unsigned int n_masters;
             unsigned int current_master;
             unsigned char **ext_ports;	  /**< array of pointers to mappings of master ports. */
-            int basic_ports:1;
+            unsigned int basic_ports:1;
             stm_static_config_t s_config;     /**< RO features registers */
         } stm;
         struct ts_gen_props {
             cs_ts_gen_config_t config;
         } ts;
         struct memap_props {
-            int DAR_present:1;            /**< Direct Access Registers are available */
-            int TAR_valid:1;              /**< We have a cached copy of the TAR */
-            int memap_LPAE:1;             /**< Large Physical Addresses implemented */
+            unsigned int DAR_present:1;   /**< Direct Access Registers are available */
+            unsigned int TAR_valid:1;     /**< We have a cached copy of the TAR */
+            unsigned int memap_LPAE:1;    /**< Large Physical Addresses implemented */
             unsigned long cached_TAR;     /**< Cached copy of the TAR */
         } memap;
         struct ela_props {
@@ -261,13 +261,13 @@ struct cs_global {
 #ifdef DIAG
     FILE *diag_fd;                 /**< Output stream for diagnostics */
 #endif
-    int init_called:1;             /**< cs_init() has been called */
-    int registration_open:1;       /**< cs_registration_complete() not yet called */
-    int force_writes:1;            /**< Always write back on RMW operations even when unchanged */
-    int diag_checking:1;	   /**< Default diag setting for new devices */
-    int phys_addr_lpae:1;	   /**< 1 if built with LPAE */
-    int virt_addr_64bit:1;         /**< 1 if built with 64 bit virtual addresses */
-    int devaff0_used:1;            /**< Non-zero DEVAFF0 has been seen */
+    unsigned int init_called:1;           /**< cs_init() has been called */
+    unsigned int registration_open:1;     /**< cs_registration_complete() not yet called */
+    unsigned int force_writes:1;          /**< Always write back on RMW operations even when unchanged */
+    unsigned int diag_checking:1;         /**< Default diag setting for new devices */
+    unsigned int phys_addr_lpae:1;        /**< 1 if built with LPAE */
+    unsigned int virt_addr_64bit:1;       /**< 1 if built with 64 bit virtual addresses */
+    unsigned int devaff0_used:1;          /**< Non-zero DEVAFF0 has been seen */
     cs_diag_level_t diag_tracing_default;    /**< Default trace setting for new devices */
     unsigned int n_api_errors;
     unsigned int n_devices;
@@ -282,7 +282,7 @@ struct cs_global {
  */
 static inline struct cs_device *cs_get_device_struct(cs_device_t dev)
 {
-    assert(dev != ERRDESC);
+    assert(dev != CS_ERRDESC);
     return (struct cs_device *)(dev);
 }
 
@@ -292,11 +292,6 @@ static inline struct cs_device *cs_get_device_struct(cs_device_t dev)
  * Convert a pointer to a device structure into an opaque device descriptor.
  */
 #define DEVDESC(d) ((void *)(d))
-
-/**
- * The special opaque device descriptor indicating an error
- */
-#define ERRDESC ((void *)0)
 
 
 /**
@@ -323,7 +318,7 @@ static inline struct cs_device *cs_get_device_struct(cs_device_t dev)
 #if CHECK
 #define DCHECK(d) (d->glob->diag_checking)
 #else				/* !CHECK */
-#define DCHECK(d) 0
+#define DCHECK(d) (0)
 #endif				/* CHECK */
 
 

@@ -607,17 +607,16 @@ int _cs_is_lockable(struct cs_device *d)
 int _cs_unlock(struct cs_device *d)
 {
     if (!d->is_unlocked) {
-	_cs_write_wo_traced(d, CS_LAR, CS_KEY, "LAR");
-	d->is_unlocked = 1;
+        _cs_write_wo_traced(d, CS_LAR, CS_KEY, "LAR");
+        d->is_unlocked = 1;
     }
     if (DCHECK(d)) {
-	uint32_t lsr = _cs_read(d, CS_LSR);
-	if ((lsr & 3) == 3) {
-	    /* Implemented (bit 0) and still locked (bit 1) */
-	    diagf("!%" CS_PHYSFMT ": after unlock, LSR=%08X\n",
-		  d->phys_addr, lsr);
+        uint32_t lsr = _cs_read(d, CS_LSR);
+        if ((lsr & 3) == 3) {
+            /* Implemented (bit 0) and still locked (bit 1) */
+            diagf("!%" CS_PHYSFMT ": after unlock, LSR=%08" PRIX32 "\n", d->phys_addr, lsr);
             return -1;
-	}
+        }
     }
     return 0;
 }
@@ -633,7 +632,7 @@ int _cs_lock(struct cs_device *d)
 	unsigned int lsr = _cs_read(d, CS_LSR);
 	if ((lsr & 3) == 1) {
 	    /* Implemented (bit 0) but not locked (bit 1) */
-	    diagf("!%" CS_PHYSFMT ": after lock, LSR=%08X\n",
+	    diagf("!%" CS_PHYSFMT ": after lock, LSR=%08" PRIX32 "\n",
 		  d->phys_addr, lsr);
             return -1;
 	}

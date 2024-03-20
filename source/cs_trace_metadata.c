@@ -171,6 +171,11 @@ int cs_get_trace_metadata(int mtype, cs_device_t dev, int trace_id,
     struct out_buf b;
     cs_devtype_t d_type;
 
+    if (mtype != CS_METADATA_INI) {
+        /* Currently only one metadata format is supported */
+        return -1;
+    }
+
     b.p = buf;
     b.size_left = size;
     b.len = 0;

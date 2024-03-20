@@ -139,6 +139,7 @@ typedef int cs_atid_t;
  * to be some hierarchical nesting of power domains.
  */
 typedef unsigned int cs_power_domain_t;
+#define CS_UNKNOWN_POWER_DOMAIN (cs_power_domain_t)(-1)
 
 /** \brief Device Type
  * 

@@ -60,7 +60,7 @@ uint32_t cs_memap_read32(cs_device_t device, cs_physaddr_t addr);
  * \param addr    the physical address, in MEM-AP space, to write to
  * \param data    the 32-bit data to be written
  */
-void cs_memap_write32(cs_device_t device, cs_physaddr_t addr, uint32_t data);
+int cs_memap_write32(cs_device_t device, cs_physaddr_t addr, uint32_t data);
 
 /**
  * Read a 64-bit value from a location in a MEM-AP's target address space
@@ -79,7 +79,7 @@ uint64_t cs_memap_read64(cs_device_t device, cs_physaddr_t addr);
  * \param addr    the physical address, in MEM-AP space, to write to
  * \param data    the 64-bit data to be written
  */
-void cs_memap_write64(cs_device_t device, cs_physaddr_t addr, uint64_t data);
+int cs_memap_write64(cs_device_t device, cs_physaddr_t addr, uint64_t data);
 
 
 /**
@@ -98,7 +98,7 @@ int cs_memap_check_error(cs_device_t device, int reset);
  * \param device  the MEM-AP device
  * \param addr    the address in the MEM-AP's address space
  */
-void cs_memap_write_TAR(cs_device_t device, cs_physaddr_t addr);
+int cs_memap_write_TAR(cs_device_t device, cs_physaddr_t addr);
 
 /**
  * Read the MEM-AP's Transfer Address Register directly.

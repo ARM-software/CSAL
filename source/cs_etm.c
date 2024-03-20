@@ -49,6 +49,7 @@ int _cs_etm_static_config_init(struct cs_device *d)
     return 0;
 }
 
+
 /*
   Return the ETM version in encoded form.  Compare it against one of
   the provided constants.
@@ -58,6 +59,7 @@ unsigned int _cs_etm_version(struct cs_device *d)
     assert(d->type == DEV_ETM);
     return (d->v.etm.etmidr >> 4) & 0xFF;
 }
+
 
 int _cs_etm_enable_programming(struct cs_device *d)
 {
@@ -287,7 +289,7 @@ static void _cs_etm_config_clean(struct cs_etm_config *c)
         /* config init will have zeroed out the values, but we
            do need to change the access type to 001 (Execute),
            as not all ETMs support access type 000 (Fetch) */
-        for (i = 0; i < c->sc->ccr.s.n_addr_comp_pairs * 2; ++i) {
+        for (i = 0; i < c->sc->ccr.s.n_addr_comp_pairs * 2U; ++i) {
             c->addr_comp[i].access_type |= 1;
         }
     }
@@ -416,7 +418,7 @@ int cs_etm_config_get(cs_device_t dev, struct cs_etm_config *c)
 
     if (c->flags & CS_ETMC_ADDR_COMP) {
         //    for (i = 0; i < c->sc.s.n_addr_comp_pairs * 2; ++i) {
-        for (i = 0; i < c->sc->ccr.s.n_addr_comp_pairs * 2; ++i) {
+        for (i = 0; i < c->sc->ccr.s.n_addr_comp_pairs * 2U; ++i) {
             if (c->addr_comp_mask & (1U << i)) {
                 c->addr_comp[i].address = _cs_read(d, CS_ETMACVR(i));
                 c->addr_comp[i].access_type = _cs_read(d, CS_ETMACTR(i));
@@ -426,7 +428,7 @@ int cs_etm_config_get(cs_device_t dev, struct cs_etm_config *c)
 
     c->data_comp_mask &= onebits(c->sc->ccr.s.n_data_comp);
     if ((c->flags & CS_ETMC_DATA_COMP) && (!is_ptm)) {
-        //    for (i = 0; i < c->sc.s.n_addr_comp_pairs * 2; ++i) {
+        //    for (i = 0; i < c->sc.s.n_addr_comp_pairs * 2U; ++i) {
         for (i = 0; i < c->sc->ccr.s.n_data_comp; ++i) {
             if (c->data_comp_mask & (1U << i)) {
                 c->data_comp[i].value = _cs_read(d, CS_ETMDCVR(i));
@@ -529,7 +531,7 @@ int cs_etm_config_put(cs_device_t dev, struct cs_etm_config *c)
         _cs_write(d, CS_ETMTSEVR, c->timestamp_event);
     }
     if (c->flags & CS_ETMC_ADDR_COMP) {
-        for (i = 0; i < c->sc->ccr.s.n_addr_comp_pairs * 2; ++i) {
+        for (i = 0; i < c->sc->ccr.s.n_addr_comp_pairs * 2U; ++i) {
             if (c->addr_comp_mask & (1U << i)) {
                 _cs_write(d, CS_ETMACVR(i), c->addr_comp[i].address);
                 atype = (c->addr_comp[i].access_type & 7);
@@ -547,7 +549,7 @@ int cs_etm_config_put(cs_device_t dev, struct cs_etm_config *c)
     }
     c->data_comp_mask &= onebits(c->sc->ccr.s.n_data_comp);
     if ((c->flags & CS_ETMC_DATA_COMP) && has_data_trace) {
-        //    for (i = 0; i < c->sc.s.n_addr_comp_pairs * 2; ++i) {
+        //    for (i = 0; i < c->sc.s.n_addr_comp_pairs * 2U; ++i) {
         for (i = 0; i < c->sc->ccr.s.n_data_comp; ++i) {
             if (c->data_comp_mask & (1U << i)) {
                 _cs_write(d, CS_ETMDCVR(i), c->data_comp[i].value);
@@ -834,7 +836,7 @@ int cs_etm_config_print(struct cs_etm_config *c)
     if (c->flags & CS_ETMC_ADDR_COMP) {
         printf("  Address comparators: %u\n",
                c->sc->ccr.s.n_addr_comp_pairs * 2);
-        for (i = 0; i < c->sc->ccr.s.n_addr_comp_pairs * 2; ++i) {
+        for (i = 0; i < c->sc->ccr.s.n_addr_comp_pairs * 2U; ++i) {
             if (c->addr_comp_mask & (1U << i)) {
                 static char const *const tnames[8] = {
                     "fetch", "execute", "ex-pass", "ex-fail",

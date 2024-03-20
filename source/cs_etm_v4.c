@@ -831,6 +831,9 @@ int _cs_etm_v4_config_print(struct cs_device *d, cs_etmv4_config_t * c)
         "All QE enabled"
     };
 
+#ifndef DEBUG
+    (void)d;    /* The device parameter is unused outside of the asserts */
+#endif
     assert(d->type == DEV_ETM);
     assert(CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4);
     if (c->flags == 0) {

@@ -161,7 +161,7 @@ int cs_set_buffer_trigger_counter(cs_device_t dev, unsigned int bytes)
     struct cs_device *d = DEV(dev);
     assert(cs_device_has_class(dev, CS_DEVCLASS_SINK));
 
-    assert(bytes <= cs_get_buffer_size_bytes(dev));
+    assert((int)bytes <= cs_get_buffer_size_bytes(dev));
     _cs_unlock(d);
     /* For TMCs this is defined as a count of 32-bit words.  For CoreSight ETBs it's the same. */
     return _cs_write(d, CS_ETB_TRIGGER_COUNT,

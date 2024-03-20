@@ -27,9 +27,12 @@
 #include <sys/mman.h>
 #endif /* UNIX_USERSPACE */
 
+#define UNUSED_PARAMETER(x) ((void)(x))
+
 
 /*
-  Map a region (generally 4K) of physical memory.
+  Map a region (generally 4K) of physical memory, returning an address
+  usable by the caller - a virtual address in the case of non-baremetal.
   Return NULL if unsuccessful.
 */
 void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
@@ -60,8 +63,15 @@ void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
     localv = (unsigned char *)0xBAD;
 #endif
 #elif defined(UNIX_KERNEL)
+    UNUSED_PARAMETER(writable);
     localv = ioremap(addr, size);
 #else
+    /* Bare-metal: the caller directly accesses the physical memory.
+       Note that the combination of BAREMETAL and LPAE is not supported
+       with a 32-bit target, and will likely error here when trying to
+       cast a 64-bit cs_physaddr_t to a pointer. */
+    UNUSED_PARAMETER(writable);
+    UNUSED_PARAMETER(size);
     localv = (void *)addr;
 #endif
     return localv;
@@ -82,8 +92,11 @@ void io_unmap(void volatile *addr, unsigned int size)
     (void)munmap((void *)addr, size);
 #endif
 #elif defined(UNIX_KERNEL)
+    UNUSED_PARAMETER(size);
     iounmap(addr);
 #else
+    UNUSED_PARAMETER(addr);
+    UNUSED_PARAMETER(size);
     /* do nothing */
 #endif
 }

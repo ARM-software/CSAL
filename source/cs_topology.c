@@ -117,7 +117,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
     }
     if (cs_addr_is_excluded(addr)) {
         diagf("!skipping excluded device at %" CS_PHYSFMT "\n", addr);
-        return ERRDESC;
+        return CS_ERRDESC;
     }
 
     cs_device_init(&protod, addr);
@@ -125,18 +125,18 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
     /* From this point on, we may need to access the device to read ID registers. */
     if (!_cs_map(&protod, /*writable=*/1)) {
         cs_report_error("can't map device at %" CS_PHYSFMT "", addr);
-        return ERRDESC;
+        return CS_ERRDESC;
     }
     if (_cs_read(&protod, CS_CIDR3) != 0xB1) {
         cs_report_error("not a CoreSight component at %" CS_PHYSFMT "", addr);
-        return ERRDESC;
+        return CS_ERRDESC;
     }
     cs_class = CS_CLASS_OF(_cs_read(&protod, CS_CIDR1));
     if (cs_is_romtable(&protod)) {
         /* Recursively scan a secondary ROM table */
         cs_scan_romtable(&protod);
         _cs_unmap(&protod);
-        return ERRDESC;		/* not a device */
+        return CS_ERRDESC;		/* not a device */
     }
 
     if (cs_class == CS_CLASS_CORESIGHT) {
@@ -308,7 +308,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                     if (d->v.stm.n_ports > 32) {
                         cs_report_error
                             ("STM can handle max. 32 basic ports");
-                        return ERRDESC;
+                        return CS_ERRDESC;
                     }
                     d->v.stm.basic_ports = 1;
                     break;
@@ -461,12 +461,12 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         } else {
             diagf("!Unexpected PrimeCell part %03X at %" CS_PHYSFMT "\n",
                   part_number, addr);
-            return ERRDESC;
+            return CS_ERRDESC;
         }
     } else {
         diagf("!Unexpected device class %u at %" CS_PHYSFMT "\n",
               cs_class, addr);
-        return ERRDESC;
+        return CS_ERRDESC;
     }
     if (d != NULL && DTRACEG) {
         cs_device_diag_summary(d);
@@ -729,7 +729,7 @@ static int cs_scan_romtable(struct cs_device *d)
         } else {
             cs_physaddr_t dev_addr;
             signed int offset = (entry & 0xFFFFF000);   /* May be -ve */
-            int power_domain = (entry & 4) ? ((entry >> 4) & 31) : -1;
+            cs_power_domain_t power_domain = (entry & 4) ? ((entry >> 4) & 31) : CS_UNKNOWN_POWER_DOMAIN;
             cs_set_default_power_domain(power_domain);
             dev_addr = d->phys_addr + offset;
             cs_device_or_romtable_register(dev_addr);
@@ -868,7 +868,7 @@ int cs_device_set_affinity(cs_device_t dev, cs_cpu_t cpu)
     } else {
         cs_device_t ed =
             cs_cpu_get_device(cpu, CS_DEVCLASS_CPU | CS_DEVCLASS_DEBUG);
-        if (ed != ERRDESC) {
+        if (ed != CS_ERRDESC) {
             _cs_link_affinity(DEV(ed), d);
         }
     }
@@ -959,11 +959,11 @@ cs_device_t cs_device_first(void)
 cs_device_t cs_device_next(cs_device_t dev)
 {
     struct cs_device *d;
-    assert(dev != ERRDESC);
+    assert(dev != CS_ERRDESC);
     d = DEV(dev);
     assert(d != NULL);
     if (d->next == NULL) {
-        return ERRDESC;
+        return CS_ERRDESC;
     } else {
         return DEVDESC(d->next);
     }
@@ -1047,7 +1047,7 @@ cs_device_t cs_cpu_get_device(cs_cpu_t cpu, unsigned int cls)
     if (d != NULL) {
         return DEVDESC(d);
     } else {
-        return ERRDESC;
+        return CS_ERRDESC;
     }
 }
 
@@ -1057,7 +1057,7 @@ cs_device_t cs_device_get(cs_physaddr_t addr)
     if (d != NULL) {
         return DEVDESC(d);
     } else {
-        return ERRDESC;
+        return CS_ERRDESC;
     }
 }
 

@@ -79,18 +79,18 @@ uint64_t cs_memap_read64(cs_device_t dev, cs_physaddr_t addr)
 /*
  * Write data to a memory location, via a MEM-AP.
  */
-void cs_memap_write32(cs_device_t dev, cs_physaddr_t addr, uint32_t data)
+int cs_memap_write32(cs_device_t dev, cs_physaddr_t addr, uint32_t data)
 {
     struct cs_device *d = DEV(dev);
     unsigned int reg = cs_memap_prepare(d, addr);
-    _cs_write(d, reg, data);
+    return _cs_write(d, reg, data);
 }
 
 
-void cs_memap_write64(cs_device_t dev, cs_physaddr_t addr, uint64_t data)
+int cs_memap_write64(cs_device_t dev, cs_physaddr_t addr, uint64_t data)
 {
     cs_memap_write32(dev, addr, (uint32_t)data);
-    cs_memap_write32(dev, addr+4, (uint32_t)(data >> 32));
+    return cs_memap_write32(dev, addr+4, (uint32_t)(data >> 32));
 }
 
 
@@ -113,10 +113,14 @@ cs_physaddr_t cs_memap_read_TAR(cs_device_t dev)
 /*
  * Set the current value of the TAR
  */
-void cs_memap_write_TAR(cs_device_t dev, cs_physaddr_t addr)
+int cs_memap_write_TAR(cs_device_t dev, cs_physaddr_t addr)
 {
+    int rc;
     struct cs_device *d = DEV(dev);
-    _cs_write(d, CS_MEMAP_TAR, addr);
+    rc = _cs_write(d, CS_MEMAP_TAR, addr);
+    if (rc) {
+        return rc;
+    }
 #ifdef LPAE
     if (d->v.memap.memap_LPAE) {
         _cs_write(d, CS_MEMAP_TARHI, (addr >> 32));
@@ -124,6 +128,7 @@ void cs_memap_write_TAR(cs_device_t dev, cs_physaddr_t addr)
 #endif
     d->v.memap.cached_TAR = addr;
     d->v.memap.TAR_valid = 1;
+    return 0;
 }
 
 

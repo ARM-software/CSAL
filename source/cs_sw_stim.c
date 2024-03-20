@@ -121,7 +121,7 @@ int cs_trace_stimulus(cs_device_t dev, unsigned int port, uint32_t value)
 
     assert(cs_device_has_class
            (dev, CS_DEVCLASS_SOURCE | CS_DEVCLASS_SWSTIM));
-    assert(port < cs_trace_swstim_get_port_count(dev));
+    assert((int)port < cs_trace_swstim_get_port_count(dev));
 
     if (d->type == DEV_ITM) {
         /* "The lock access mechanism is not present for any access to stimulus
@@ -294,7 +294,7 @@ int cs_stm_ext_write(cs_device_t dev, const unsigned int port,
     assert(d->type == DEV_STM);
     assert(STM_OP_VALID(trans_type));
     assert((value != 0) || !STM_OP_DATA(trans_type));
-    assert(port < cs_trace_swstim_get_port_count(dev));
+    assert((int)port < cs_trace_swstim_get_port_count(dev));
     assert(master != NULL);
     assert((value == 0) || (length > 0));
 

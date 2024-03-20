@@ -132,6 +132,7 @@ int cs_device_diag_set(cs_device_t dev, int tracing)
 
 void cs_device_data_barrier(cs_device_t dev)
 {
+    (void)dev;    /* Currently none of the barrier methods are device-specific */
 #ifndef USE_DEVMEMD
 #if __ARM_ARCH >= 7
     __asm__ __volatile__("dmb sy");
@@ -143,6 +144,7 @@ void cs_device_data_barrier(cs_device_t dev)
 
 void cs_device_instruction_barrier(cs_device_t dev)
 {
+    (void)dev;    /* Currently none of the barrier methods are device-specific */
 #ifndef USE_DEVMEMD
 #if __ARM_ARCH >= 7
     __asm__ __volatile__("dsb sy");
