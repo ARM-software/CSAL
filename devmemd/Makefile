@@ -1,4 +1,4 @@
-CCOPTS=-O2 -g -Wall -Werror -Wpedantic -Wextra -Wabi
+CCOPTS=-O2 -g -Wall -Werror -Wpedantic -Wextra
 
 devmemd: devmemd.c devmemd.h
 	$(CC) $(CCOPTS) -o $@ $<

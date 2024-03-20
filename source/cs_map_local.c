@@ -59,7 +59,12 @@ void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
     }
     localv = (unsigned char *) localv + (addr - addr_to_map);
 #else
-    /* When using devmemd, the local address is not used, but must be non-zero. */
+    /* When using devmemd, the local address is not used (the read/write
+       functions will redirect access via devmemd), but we need to set
+       the local address to a dummy non-zero value. */
+    UNUSED_PARAMETER(addr);
+    UNUSED_PARAMETER(writable);
+    UNUSED_PARAMETER(size);
     localv = (unsigned char *)0xBAD;
 #endif
 #elif defined(UNIX_KERNEL)
@@ -90,6 +95,9 @@ void io_unmap(void volatile *addr, unsigned int size)
 #ifdef UNIX_USERSPACE
 #ifndef USE_DEVMEMD
     (void)munmap((void *)addr, size);
+#else
+    UNUSED_PARAMETER(addr);
+    UNUSED_PARAMETER(size);
 #endif
 #elif defined(UNIX_KERNEL)
     UNUSED_PARAMETER(size);

@@ -212,6 +212,8 @@ uint32_t volatile *_cs_get_register_address(struct cs_device *d,
     assert(d->local_addr != NULL);
     return (uint32_t volatile *)(d->local_addr + off);
 #else
+    (void)off;
+    (void)d;         /* No direct access to registers when using devmemd */
     return NULL;     /* Caller must fall back to _cs_read/_cs_write */
 #endif
 }
