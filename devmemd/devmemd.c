@@ -43,6 +43,7 @@ limitations under the License.
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <errno.h>
 
 #include "devmemd.h"
 
@@ -122,8 +123,10 @@ static void *devmem_map_page(struct page *p)
         unsigned int mmap_prot = (o_readonly ? PROT_READ : (PROT_READ|PROT_WRITE));
         void *res = mmap(NULL, page_size, mmap_prot, mmap_flags, devmem_fd, p->phys_addr);
         if (res == MAP_FAILED) {
+            int save = errno;
             perror("mmap");
             fprintf(stderr, "failed to map 0x%lx\n", p->phys_addr);
+            errno = save;
             return NULL;
         }
         p->virt_addr = (unsigned char *)res;
@@ -162,6 +165,7 @@ static int devmem_read(physaddr_t addr, uint64_t *data, unsigned int size)
 {
     void *p = devmem_loc(addr);
     if (!p) {
+        *data = (uint64_t)errno;
         return DEVMEMD_ERR_MMAP;
     }
     if (!is_aligned(addr, size)) {
@@ -416,6 +420,9 @@ listen_for_new_connection:
         case DEVMEMD_REQ_WRITE:
             if (!o_readonly) {
                 rsp.status = devmem_write(req.phys_addr, req.data, req.size);
+                if (rsp.status == DEVMEMD_ERR_MMAP) {
+                    rsp.data = (uint64_t)errno;
+                }
             } else {
                 rsp.status = DEVMEMD_ERR_WPROT;
             }
@@ -435,6 +442,8 @@ listen_for_new_connection:
         case DEVMEMD_REQ_WPROT:
             o_readonly = 1;
             break;
+        case DEVMEMD_REQ_USER+0:
+            /* daemon can be extended here */
         default:
             rsp.status = DEVMEMD_ERR_BADREQ;
             break;

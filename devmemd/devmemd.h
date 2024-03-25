@@ -30,7 +30,7 @@ typedef uint64_t physaddr_t;
 typedef struct {
     uint16_t seq;              /* Arbitrary number, copied to response */
     unsigned char pkt_len;     /* Packet length, 24 */
-    unsigned char req;         /* Request type, see REQ_xxx */
+    unsigned char req;         /* Request type, see DEVMEMD_REQ_xxx */
     unsigned char size;        /* Read or write size */
     uint64_t phys_addr;        /* The physical address, naturally aligned */
     uint64_t data;             /* Data, for a write */
@@ -44,21 +44,23 @@ typedef struct {
 #define DEVMEMD_REQ_RESET  5    /* reset settings to default */
 #define DEVMEMD_REQ_PAGE   6    /* get page size */
 #define DEVMEMD_REQ_WPROT  7    /* write-protect from now on */
+#define DEVMEMD_REQ_USER   128  /* available for user extensions */
 
 /* Response packet, 16 bytes */
 typedef struct {
     uint16_t seq;              /* Number copied from request */
     unsigned char pkt_len;     /* Packet length, 16 */
-    unsigned char status;      /* Status, see ERR_xxx */
+    unsigned char status;      /* Status, see DEVMEMD_ERR_xxx */
     uint64_t data;             /* e.g. data read from /dev/mem */
 } devmemd_response_t;
 
 #define DEVMEMD_ERR_OK     0   /* no error */
-#define DEVMEMD_ERR_MMAP   1   /* failed to mmap() /dev/mem */
+#define DEVMEMD_ERR_MMAP   1   /* failed to mmap() /dev/mem; errno in <data> */
 #define DEVMEMD_ERR_ALIGN  2   /* physical address not aligned for data */
 #define DEVMEMD_ERR_BADREQ 3   /* unknown request code */
 #define DEVMEMD_ERR_BUS    4   /* bus error */
 #define DEVMEMD_ERR_WPROT  5   /* write when daemon is in write-protect mode */
+#define DEVMEMD_ERR_SYSTEM 6   /* other system error; errno in <data> */
 
 #endif /* included */
 
