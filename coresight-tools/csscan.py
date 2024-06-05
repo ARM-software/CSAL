@@ -319,7 +319,7 @@ class DeviceViaMemAP:
 
 class Device:
     """
-    A single CoreSight device mapped by a ROM table (including ROM tables themselves).    
+    A single CoreSight device mapped by a ROM table (including ROM tables themselves).
     """
 
     def __init__(self, cs, addr, write=False, unlock=False, checking=None, verbose=None):
@@ -351,7 +351,7 @@ class Device:
         self.devtype = None
         self.devarch = None
         self.device_is_checking = checking    # if None, will inherit from CSROM
-        if self.is_coresight():            
+        if self.is_coresight():
             arch = self.read32(0xFBC)     # DEVARCH
             if (arch & 0x00100000) != 0:
                 self.devarch = arch
@@ -560,7 +560,7 @@ class Device:
 
     def is_coresight(self):
         return self.device_class() == 9
-   
+
     def is_coresight_timestamp(self):
         # Strangely, a CoreSight global timestamp generator doesn't report as a CoreSight device
         return self.device_class() == 0xF and self.is_arm_part_number(0x101)
@@ -570,7 +570,7 @@ class Device:
 
     def coresight_device_type(self):
         assert self.is_coresight()
-        assert self.devtype is not None        
+        assert self.devtype is not None
         major = self.devtype & 15
         minor = (self.devtype >> 4) & 15
         return (major, minor)
@@ -666,7 +666,7 @@ class Device:
         else:
             return 0
 
-    def affinity_id(self):        
+    def affinity_id(self):
         # Return the affinity descriptor as reported by the device.
         # Architecturally, this is only standardized for CoreSight devices.
         if self.is_coresight():
@@ -704,7 +704,7 @@ class Device:
 
     def is_arm_architecture(self, arch=None):
         return self.is_coresight() and (self.architect() == JEDEC_ARM) and (arch is None or arch == self.architecture())
-    
+
     def is_arm_architecture_core(self):
         # Return true if the device is (the debug interface to) an Arm-architecture core
         return self.is_arm_architecture() and (self.architecture() & 0x0fff) == 0x0a15
@@ -790,8 +790,8 @@ class ROMTableEntry:
 
     def is_present(self):
         return (self.descriptor & 1) != 0
-          
-    def device_offset(self): 
+
+    def device_offset(self):
         # offset is at the top of the word and can be negative
         if self.width == 4:
             off = (self.descriptor & 0xfffff000)
@@ -1052,7 +1052,7 @@ class CSROM:
             else:
                 eword = td.read64(a)
             if eword == 0:
-                break            
+                break
             if (eword & 1) == 0 and not include_empty:
                 continue
             e = ROMTableEntry(td, a, ewidth, eword)
@@ -1106,7 +1106,7 @@ class CSROM:
                     if id:
                         d.affinity_group.set_affine_device(d, adtype)
                     else:
-                        # Allocate to the first CPU that hasn't yet got an affine device of this type 
+                        # Allocate to the first CPU that hasn't yet got an affine device of this type
                         for c in cpus_in_this_table:
                             if c.affine_device(adtype) is None:
                                 # If not using DEVAFF, core should be at -64K offset from the CTI
@@ -1123,7 +1123,7 @@ class CSROM:
                 # exhausted if we have a 300-core SoC with 5 devices per core.
                 d.unmap()
             else:
-                yield e 
+                yield e
 
     @staticmethod
     def show_coresight_device(d):
@@ -1135,7 +1135,7 @@ class CSROM:
           - architecture or product: e.g. ETMv4.1, or CoreSight ETB
           - configuration chosen by designer: e.g. ETMv4.1 with four counters, 16K ETB
           - programming: e.g. ETM counter transition rules, ETF in circular mode
-          - state: ETM current counter values, ETB buffer occupancy 
+          - state: ETM current counter values, ETB buffer occupancy
         """
 
         # Registers architected by CoreSight, with architected values
@@ -1167,7 +1167,7 @@ class CSROM:
         # don't print here, already printed in show_device() to cope with non-CoreSight devices
         if False and arm_part is not None and arm_part in arm_part_numbers:
             print(" %s" % arm_part_numbers[arm_part], end="")
-            
+
         # Now extract additional device-specific information. In general, we can establish
         # the type of device, and our ability to determine further information, in two ways:
         #
@@ -1180,10 +1180,10 @@ class CSROM:
         #   - PIDR may indicate that it is an Arm-designed device (such as CTI, Funnel etc.
         #     from the CoreSight IP product portfolio), and we can then reference Arm's
         #     product Technical Reference Manual (TRM).
-        # 
+        #
         # We should always check one or other of DEVARCH and PIDR. It is not sufficient
         # just to look at DEVTYPE.
-        # 
+        #
         # Some functionality might be implementation-defined (product-specific) even for
         # devices that implement an architecture.
 
@@ -1344,7 +1344,7 @@ class CSROM:
                 if emajor > 4 or eminor >= 3:
                     if bits(etmid4,16,4) == 0:
                         n_resource_selectors = 0
-                        n_events = 0       
+                        n_events = 0
                 print(" events:%u resources:%u addrcomp:%u ssc:%u pecomp:%u counters:%u seqstates:%u extin:%u extinsel:%u" % (n_events, n_resource_selectors, n_address_comparator_pairs, n_single_shot, n_pe_comparators, n_counters, n_seqstates, n_extin, n_extinsel), end="")
                 if bit(etmid5,31):
                     print(" reduced-function-counter", end="")
@@ -1647,6 +1647,8 @@ class CSROM:
                         pair = bits(e,0,4)*2
                         if bit(e,4) or (TYPE and pair == 0):
                             return "?%x" % e
+                        if pair == 0 or pair >= n_resource_selectors:
+                            return "invalid resource pair %u" % pair
                         A = res_bas[pair]
                         B = res_bas[pair+1]
                         A_PAIRINV = bit(res_val[pair],21)
@@ -1753,7 +1755,7 @@ class CSROM:
                     print()
                 # show resources
                 print("  resources:")
-                for rn in range(2,n_resource_selectors):
+                for rn in range(2, n_resource_selectors):
                     # Show trace unit resources from TRCRSCTLR<n>
                     # ETM 4.4.1
                     # Also populate a couple of local dictionaries for when we later show event selectors
@@ -1860,7 +1862,7 @@ class CSROM:
                     print(" %s" % ('|'.join(blist("EL",bits(atyp,12,3),n=3,inv=True))), end="")
                     print(" %s" % ["inst", "load", "store", "load/store"][bits(atyp,0,2)], end="")
                     print()
-                # show counters                
+                # show counters
                 for n in range(0,n_counters):
                     reload_value = d.read32(0x140+n*4)
                     control = d.read32(0x150+n*4)
@@ -1890,7 +1892,7 @@ class CSROM:
                 if o_show_integration:
                     # probe for ETM integration regs: not at consistent addresses
                     any_integration_reg = False
-                    for a in range(0xE80,0xFA0,4):                        
+                    for a in range(0xE80,0xFA0,4):
                         r = d.read32(a)
                         if r != 0:
                             if not any_integration_reg:
@@ -2223,7 +2225,7 @@ class CSROM:
                 # Core debug interface
                 if bits(devid,0,4):
                     pc = d.read32x2(0x0AC,0x0A0)       # EDPCSR: not consecutive
-                    cxid = d.read32(0x0A4) 
+                    cxid = d.read32(0x0A4)
                     vmid = d.read32(0x0A8)
             elif d.is_arm_architecture(ARM_ARCHID_PMU):
                 if bits(devid,0,4):
@@ -2279,7 +2281,7 @@ class CSROM:
         else:
             part_string = "<unknown part>"
         print("%-22s" % part_string, end="")
-        if d.is_rom_table():            
+        if d.is_rom_table():
             print("ROM table")
         elif d.is_coresight_timestamp():
             print("CoreSight timestamp generator")
@@ -2308,7 +2310,7 @@ class CSROM:
                 print("  0xFC8: %08x" % d.read32(0xFC8))
                 for a in range(0,0x030,8):
                     print("  0x%03x: %08x" % (a, d.read32(a)))
-        else: 
+        else:
             print("class:%u" % (d.device_class()))
 
 
@@ -2368,7 +2370,7 @@ def topology_detection_atb(atb_devices, topo):
                 if etmver >= 4:
                     # Some ETMv4 implementations have the integration reg
                     # at 0xEFC rather than 0xEF8.
-                    # We set both, just in case. It should be harmless.                
+                    # We set both, just in case. It should be harmless.
                     d.write32(0xEFC, flag*mask, check=False)
                     # as noted above, we set both: we now falll through to set 0xEF8.
         elif d.is_arm_architecture(ARM_ARCHID_ELA):
@@ -2537,7 +2539,7 @@ class TopologyDetectionCTI:
             if d.is_affine_to_core():
                 ireg = None
             else:
-                ireg = 0xEE8 
+                ireg = 0xEE8
             for i in range(0, n_triggers):
                 yield ("TRIGOUT%u" % i, ireg, i)
         else:
