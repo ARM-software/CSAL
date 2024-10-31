@@ -117,6 +117,7 @@ arm_archids = {
     0x6a15:"v8.0-A",
     0x7a15:"v8.1-A",
     0x8a15:"v8.2-A",
+    0x9a15:"v9",
     0x2a16:"PMUv3",
     0x0a17:"MEM-AP",
     0x0a34:"pwr-rq",     # not 0x0a37 as stated in Issue E
