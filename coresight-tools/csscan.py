@@ -117,7 +117,9 @@ arm_archids = {
     0x6a15:"v8.0-A",
     0x7a15:"v8.1-A",
     0x8a15:"v8.2-A",
-    0x9a15:"v9",
+    0x9a15:"v8.4-A",     # Armv8.4 debug architecture (inc. v9)
+    0xaa15:"v8.8-A",     # Armv8.8 debug architecture
+    0xba15:"v8.9-A",     # Armv8.9 debug architecture
     0x2a16:"PMUv3",
     0x0a17:"MEM-AP",
     0x0a34:"pwr-rq",     # not 0x0a37 as stated in Issue E
@@ -130,6 +132,7 @@ arm_archids = {
 
 # match [11:0] if the major-rev doesn't match (Arm-defined architecture only)
 arm_archparts = {
+    0xa10:"PC-sample",   # PC sample-based profiling without PMU
     0xa13:"cpu-trace",
     0xa15:"v8A-debug",
     0xa16:"PMU"
