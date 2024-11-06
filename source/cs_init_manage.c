@@ -82,6 +82,15 @@ int cs_diag_set(int n)
 {
 #ifdef DIAG
     G.diag_tracing_default = n;
+    if (n > 0) {
+        diagf("CSAL: tracing set to level %d\n", n);
+    }
+#else /* !DIAG */
+    if (n > 0) {
+        /* Attempts to enable diagnostics when not compiled in -
+           we might not have I/O, but we can at least return a fault indication. */
+        return -1;
+    }
 #endif				/* DIAG */
     return 0;
 }

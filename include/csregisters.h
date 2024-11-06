@@ -817,6 +817,7 @@ Register definitions and bitfield values for the Architecture v7 Cortex Core deb
 #define CS_EDSCR_STATUS_NON_DEBUG      0x02    /**< Non-Debug state */
 #define CS_EDSCR_STATUS_EXTERNAL_DBG   0x13    /**< External debug request */
 #define CS_EDSCR_STATUS_HALTING_STEP   0x1b    /**< Halting step, normal */
+#define CS_EDSCR_STATUS_HALTING_STEP_X 0x1f    /**< Halting step, exclusive */
 #define CS_EDSCR_ERR            0x00000040   /**< Sticky error */
 #define CS_EDSCR_A              0x00000080   /**< SError interrupt pending */
 #define CS_EDSCR_EL             0x00000300   /**< Exception level (Debug state only) */

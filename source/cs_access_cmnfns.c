@@ -240,8 +240,8 @@ uint32_t _cs_read(struct cs_device *d, unsigned int off)
 done:
 #endif
     if (DTRACE(d) >= DIAG_TRACE_REGISTERS) {
-	diagf("!%" CS_PHYSFMT ": read %03X = %08X %d\n",
-	      d->phys_addr, off, data, DTRACE(d));
+	diagf("!%" CS_PHYSFMT ": read %03X = %08X\n",
+	      d->phys_addr, off, data);
     }
     return data;
 }
@@ -266,6 +266,10 @@ uint64_t _cs_read64(struct cs_device *d, unsigned int off)
 #ifdef CSAL_MEMAP
 done:
 #endif
+    if (DTRACE(d) >= DIAG_TRACE_REGISTERS) {
+        diagf("!%" CS_PHYSFMT ": read %03X = %016llX\n",
+            d->phys_addr, off, (unsigned long long)data);
+    }
     return data;
 }
 

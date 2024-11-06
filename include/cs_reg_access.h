@@ -65,6 +65,13 @@ uint32_t cs_device_read(cs_device_t dev, unsigned int offset);
 */
 uint64_t cs_device_read32x2(cs_device_t dev, unsigned int hioff, unsigned int looff);
 
+/** Read a 64-bit value from a 64-bit device register
+  *   \param dev     device descriptor
+  *   \param offset  offset for the 64-bit register
+  *   \return        value in the 64-bit register
+*/
+uint64_t cs_device_read64(cs_device_t dev, unsigned int off);
+
 /** Write a value to a device register.
   *
   * This should be used for normal configuration registers that are expected to
@@ -75,6 +82,14 @@ uint64_t cs_device_read32x2(cs_device_t dev, unsigned int hioff, unsigned int lo
   *   \param data    value to write to the register.
   */
 int cs_device_write(cs_device_t dev, unsigned int offset, uint32_t data);
+
+/** Write a value to a 64-bit device register.
+  *
+  *   \param dev     device descriptor
+  *   \param offset  register offset, in bytes
+  *   \param data    64-bit value to write to the register
+  */
+int cs_device_write64(cs_device_t dev, unsigned int offset, uint64_t data);
 
 /** Write a value to a device register.
   *
