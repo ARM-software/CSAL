@@ -106,10 +106,11 @@ ARM_ARCHID_ROM      = 0x0af7
 #
 arm_archids = {
     0x0a00:"RAS",
-    0x1a01:"ITM",
+    0x1a01:"ITMv2",
     0x1a02:"DWT",
     0x2a04:"v8-M",
     0x6a05:"v8-R",
+    0x0a10:"PC-sample",  # PC sample-based profiling without PMU
     0x0a11:"ETR",
     0x4a13:"ETMv4",      # REVISION indicates the ETMv4 minor version
     0x5a13:"ETEv1",      # REVISION indicates the ETE minor version
@@ -126,6 +127,8 @@ arm_archids = {
     0x0a41:"CATU",
     0x0a50:"HSSTP",
     0x0a63:"STM",
+    0x0a66:"AMU32",
+    0x0a67:"AMU64",
     0x0a75:"ELA",
     0x0af7:"ROM"
 }
@@ -512,11 +515,16 @@ class Device:
         self.phy.write64(off, value)
 
     def read32x2(self, hi, lo):
+        """
+        Read a 64-bit value from a pair of registers, low-word first.
+        """
         # CoreSight (APB-connected) devices are generally 32-bit wide,
         # and 64-bit values are read as a pair of registers.
         # We assume that we're not dealing with volatile data (e.g. counters)
         # where special action is needed to return a consistent result.
-        return (self.read32(hi) << 32) | self.read32(lo)
+        # Note that PMPCSR (for example) relies on reading low word first.
+        xlo = self.read32(lo)
+        return (self.read32(hi) << 32) | xlo
 
     def write32x2(self, hi, lo, value, check=None):
         # Write a 64-bit value to hi and lo registers, non-atomically.
@@ -1565,11 +1573,6 @@ class CSROM:
             n_bkpt = bits(dfr,12,4)+1
             n_wpt = bits(dfr,20,4)+1
             for n in range(0,n_bkpt):
-                d.write_enable()
-                d.write32(0x408+(n*16), 0x00000000)
-                C1 = 0x0123456789ABCDEF
-                C1 = 0xEEEEEEEEEEEEEEEE
-                d.write64(0x400+(n*16), C1)
                 bcr = d.read32(0x408+(n*16))    # Breakpoint control
                 bvr = d.read64(0x400+(n*16))    # Breakpoint value
                 if o_verbose or bcr != 0 or bvr != 0:
@@ -2221,6 +2224,8 @@ class CSROM:
             pass
 
         if o_show_sample:
+            # Show PC sample, either from debug i/f or PMU
+            # Note that we rely on read32x2() reading low word first.
             pc = 0
             cxid = None
             cxid_el2 = None
