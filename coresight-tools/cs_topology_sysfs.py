@@ -207,7 +207,7 @@ def device_tree_node_reg(dtn, reg_name="reg"):
 
 def device_tree_node_property_length(dtn, prop):
     prop = "#" + prop + "-cells"
-    assert dtn.startswith("/proc/device-tree/")
+    assert dtn.startswith("/proc/device-tree/"), "unexpected device tree node: %s" % dtn
     while len(dtn) > 18 and not os.path.isfile(os.path.join(dtn, prop)):
         dtn = os.path.dirname(dtn)
     assert dtn != "/proc/device-tree"
