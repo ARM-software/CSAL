@@ -213,7 +213,7 @@ class DTWriter:
         def link_in_dt(p):
             return p.linktype == CS.CS_LINK_ATB 
         def filter_ports(pl):
-            return filter(link_in_dt, pl)
+            return list(filter(link_in_dt, pl))
         dt_in_ports = {}
         dt_out_ports = {}
         for d in self.devices():
