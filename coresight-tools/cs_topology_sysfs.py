@@ -37,6 +37,7 @@ devtypes = {
     "replicator": CS_DEVTYPE_REPLICATOR,
     "etf":        CS_DEVTYPE_FIFO,
     "tmc_etf":    CS_DEVTYPE_FIFO,
+    "ptm":        CS_DEVTYPE_TRACE_CORE,
     "etm":        CS_DEVTYPE_TRACE_CORE,
     "stm":        CS_DEVTYPE_TRACE_SW,
 }
@@ -73,6 +74,27 @@ class IOMem:
             self.by_name[name].append((lo, hi))
 
 
+def sysfs_device_type(sd):
+    """
+    Given a sysfs device, get the base CoreSight device type.
+    Device names might be e.g.
+      etm2           - for ACPI
+      004100000.etm  - for Device Tree
+    We should return "etm" for each.
+    """
+    base = sd
+    while base[-1].isdigit():
+        base = base[:-1]
+    ix = base.find('.')
+    if ix > 0:
+        base = base[ix+1:]     # strip leading hex address
+    return base
+
+
+assert sysfs_device_type("etm2") == "etm"
+assert sysfs_device_type("73540000.ptm") == "ptm"
+
+
 def get_cs_from_sysfs(p=None):
     """
     Get CoreSight topology from /sys/bus/coresight/devices, populating a Platform object.
@@ -87,9 +109,7 @@ def get_cs_from_sysfs(p=None):
     iomem = None
     for sd in os.listdir(cs):
         dp = os.path.join(cs, sd)
-        base = sd
-        while base[-1].isdigit():
-            base = base[:-1]
+        base = sysfs_device_type(sd)
         devtype = devtypes[base]
         d = Device(p, devtype, name=sd)
         d.sysfs_path = dp
@@ -247,6 +267,7 @@ def compat_is_coresight(dcompat):
 
 cs_device_tree_types = {
     "etm3x":               CS_DEVTYPE_TRACE_CORE,
+    "ptm":                 CS_DEVTYPE_TRACE_CORE,
     "etm4x":               CS_DEVTYPE_TRACE_CORE,
     "stm":                 CS_DEVTYPE_TRACE_SW,
     "funnel":              CS_DEVTYPE_FUNNEL,   # obsolete
