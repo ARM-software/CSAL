@@ -57,6 +57,9 @@ o_assume_powered_on = False
 o_lock = False
 o_unlock = False
 
+o_no_write = False           # Fault any attempt to write-map a device
+o_no_unlock = False          # Fault any attempt to unlock a device
+
 g_devmem = None              # Physical memory provider
 
 
@@ -115,12 +118,12 @@ arm_archids = {
     0x4a13:"ETMv4",      # REVISION indicates the ETMv4 minor version
     0x5a13:"ETEv1",      # REVISION indicates the ETE minor version
     0x1a14:"CTI",
-    0x6a15:"v8.0-A",
-    0x7a15:"v8.1-A",
-    0x8a15:"v8.2-A",
-    0x9a15:"v8.4-A",     # Armv8.4 debug architecture (inc. v9)
-    0xaa15:"v8.8-A",     # Armv8.8 debug architecture
-    0xba15:"v8.9-A",     # Armv8.9 debug architecture
+    0x6a15:"v8.0-A",     # Armv8 debug architecture
+    0x7a15:"v8.1-A",     # Armv8 debug architecture with VHE (FEAT_Debugv8p1, FEAT_VHE)
+    0x8a15:"v8.2-A",     # Armv8.2 debug architecture (FEAT_Debugv8p2)
+    0x9a15:"v8.4-A",     # Armv8.4 debug architecture (FEAT_Debugv8p4) (inc. v9)
+    0xaa15:"v8.8-A",     # Armv8.8 debug architecture (FEAT_Debugv8p8)
+    0xba15:"v8.9-A",     # Armv8.9 debug architecture (FEAT_Debugv8p9)
     0x2a16:"PMUv3",
     0x0a17:"MEM-AP",
     0x0a34:"pwr-rq",     # not 0x0a37 as stated in Issue E
@@ -173,11 +176,16 @@ with open(os.path.join(os.path.dirname(__file__), "part-numbers.json")) as f:
         arm_part_numbers[pn] = p["name"]
 
 
-def binstr(n,w=None):
+def binstr(n, w=None, set=None, unset=None):
     if w is None:
-        return "{0:b}".format(n)
+        s = "{0:b}".format(n)
     else:
-        return ("{0:0%ub}" % w).format(n)
+        s = ("{0:0%ub}" % w).format(n)
+    if unset is not None and n == 0:
+        s += " (all %s)" % unset
+    elif set is not None and w is not None and n == ((1 << w) - 1):
+        s += " (all %s)" % set
+    return s
 
 
 def bits_set(w,m):
@@ -193,15 +201,34 @@ def bits_set(w,m):
 assert bits_set(0x011,{0:"x",2:"y",4:"z"}) == "x z"
 
 
-def decode_one_hot(x,n):
+def one_hot_bit(x, n):
+    """
+    Given an integer that is expected to be one-hot, return the
+    encoded index, or None if the encoding isn't valid.
+    """
+    for i in range(n):
+        if x == (1 << i):
+            return i
+    return None
+
+
+def one_hot_str(x, n):
+    """
+    Given an integer that is expected to be one-hot (but might not
+    be because of programming errors), return a suitable string.
+    """
     bs = []
     for i in range(n):
-        if bit(x,i):
+        if bit(x, i):
             bs.append(i)
     if len(bs) == 1:
         return str(bs[0])
     else:
         return "?%s" % str(bs)
+
+assert one_hot_str(32, 8) == "5"
+assert one_hot_str(0, 8) == "?[]"
+assert one_hot_str(3, 8) == "?[0, 1]"
 
 
 class DeviceTimeout(Exception):
@@ -387,6 +414,12 @@ class Device:
             self.phy = None
 
     def write_enable(self):
+        """
+        Ensure the device memory-mapping is writeable.
+        Some devices may also need to be unlocked for writing, c.f. unlock();
+        this of course needs the mapping to be writeable.
+        """
+        assert not o_no_write, "mappings forced read-only by --no-write"
         if not self.map_is_write:
             if self.verbosity(1):
                 print("%s: enabling for write" % str(self))
@@ -615,8 +648,17 @@ class Device:
     def is_replicator(self):
         return self.is_coresight_device_type(2,2)
 
+    def is_coresight_cti(self):
+        """
+        Check for a CTI from CoreSight SoC
+        """
+        return self.is_arm_part_number(0x906) or self.is_arm_part_number(0x9ED)
+
     def is_cti(self):
-        return self.is_arm_architecture(ARM_ARCHID_CTI) or self.is_arm_part_number(0x906) or self.is_arm_part_number(0x9ED)
+        """
+        Check for any kind of CTI, including a core CTI
+        """
+        return self.is_arm_architecture(ARM_ARCHID_CTI) or self.is_coresight_cti()
 
     def is_tmc(self):
         return self.arm_part_number() in [0x961, 0x9e8, 0x9e9, 0x9ea]
@@ -679,8 +721,12 @@ class Device:
             return 0
 
     def affinity_id(self):
-        # Return the affinity descriptor as reported by the device.
-        # Architecturally, this is only standardized for CoreSight devices.
+        """
+        Return the affinity descriptor as reported by the device.
+        Architecturally, this is only standardized for CoreSight devices.
+        For devices associated with a single PE, the affinity should match the PE's MPIDR.
+        A device may be associated with a group of PEs.
+        """
         if self.is_coresight():
             aff = self.read32x2(0xFAC,0xFA8)
             if aff != 0:
@@ -689,7 +735,7 @@ class Device:
 
     def is_affine_to_core(self):
         """
-        Check if the device is affine to a core.
+        Check if the device is affine to a single core.
         Clearly true if affinity has already been detected, but we might also be able to report
         true on the basis of DEVTYPE e.g. (5,1) is specifically a core PMU and not an uncore PMU.
         """
@@ -761,6 +807,11 @@ class Device:
         return (self.read32(0xF00) & 0x01) != 0
 
     def unlock(self):
+        """
+        Some devices protect against accidental misconfiguration by requiring
+        to be "unlocked".
+        """
+        assert not o_no_unlock, "device unlock forbidden by --no_unlock"
         self.write_enable()
         if not self.is_unlocked():
             if self.verbosity(2):
@@ -1249,6 +1300,8 @@ class CSROM:
                     print(" pc-sampling:%u" % bits(devid,0,4), end="")
                 if bits(devid,4,4):
                     print(" DoPD", end="")
+                if bits(devid,24,4):
+                    print(" ACR", end="")
         elif d.is_arm_architecture(ARM_ARCHID_PMU):
             # PMU doesn't have a register of its own to indicate power state - you have to find the affine core.
             if not o_assume_powered_on:
@@ -1530,6 +1583,8 @@ class CSROM:
         if d.is_arm_architecture_core():
             # Core debug interface: show the current status
             dscr = d.read32(0x088)
+            edecr = d.read32(0x024)
+            edesr = d.read32(0x020)
             dstatus = dscr & 0x3f
             dstatus_str = {
                 0x1: "PE restarting",
@@ -1569,6 +1624,8 @@ class CSROM:
                     print("  Secure")
                 if bit(dscr,24):
                     print("  ITR empty")
+            # Show single-step control and status (usually zeroes)
+            print("  edecr: 0x%08x, edesr: 0x%08x" % (edecr, edesr))
             # Show breakpoint/watchpoint programming
             n_bkpt = bits(dfr,12,4)+1
             n_wpt = bits(dfr,20,4)+1
@@ -1920,13 +1977,19 @@ class CSROM:
                 comp_width = group_width
             ctrl = d.read32(0x000)
             timectrl = d.read32(0x004)
-            tssr = d.read32(0x008)
             pta = d.read32(0x010)
             print("  %s" % ["disabled (programming permitted)","enabled"][bit(ctrl,0)])
             def action_str(ac):
                 return "0x%08x (trace:%u stopclock:%u trigout:0x%x elaout:0x%x)" % (ac, bit(ac,3), bit(ac,2), bits(ac,0,2), bits(ac,4,4))
             print("  timestamp: 0x%08x (%s)" % (timectrl, ["disabled","enabled"][bit(timectrl,16)]))
             print("  PTA: %s" % (action_str(pta)))
+            if n_trig_states >= 5:
+                # Show which state(s) have enabled independent trace.
+                # Only state NUM_TRIG_STATES-1 supports independent trace,
+                # and then only if NUM_TRIG_STATES >= 5.
+                # In a basic ELA-500 with 4 states, TSSR does not exist.
+                tssr = d.read32(0x008)
+                print("  trigger state select: 0x%x" % tssr)
             n_comp_words = comp_width // 32
             def print_words(d, off, n):
                 for j in range(n):
@@ -1956,10 +2019,10 @@ class CSROM:
                 print("  state:")
                 # Trigger state is one-hot in CTSR. ELA-500 TRM says that the trigger state is RAZ when CTRL.RUN=0, but it appears not to be
                 print("    %s" % ["tracing","stopped"][bit(ctsr,31)])
-                soh = bits(ctsr,0,n_trig_states)
-                print("    state:%s" % decode_one_hot(soh,n_trig_states))
-                print("    counter:0x%x" % ccvr)
-                print("    captid:0x%x" % d.read32(0x02C))
+                soh = bits(ctsr, 0, n_trig_states)
+                print("    state: %s" % one_hot_str(soh, n_trig_states))
+                print("    counter: 0x%x" % ccvr)
+                print("    captid: 0x%x" % d.read32(0x02C))
             ram_addr_width = bits(devid,8,8)    # SRAM address width in bits, e.g. 6 bits => 64 entries
             n_ram_entries = 1 << ram_addr_width
             rwa = d.read32(0x048)    # Next entry to be written
@@ -2171,13 +2234,18 @@ class CSROM:
                 tout = d.read32(0x0A0 + t*4)
                 if tout:
                     print("  output #%u <- channel %s" % (t, binstr(tout,n_channels)))
-            print("  channel gate:    %s" % (binstr(d.read32(0x140),n_channels)))
+            ctigate = d.read32(0x140)
+            print("  channel gate:    %s" % (binstr(ctigate, n_channels, set="propagated", unset="local")))
             print("  trigger inputs:  %s" % (binstr(d.read32(0x130),n_trigs)))
             if o_show_sample:
                 print("    latched:       %s" % (binstr(d.read32(0xEF8),n_trigs)))
             print("  trigger outputs: %s" % (binstr(d.read32(0x134),n_trigs)))
             print("  channel inputs:  %s" % (binstr(d.read32(0x138),n_channels)))
             print("  channel outputs: %s" % (binstr(d.read32(0x13C),n_channels)))
+            if not d.is_coresight_cti():
+                # Core CTI for core implementing FEAT_DoPD has an additional reg in Debug power domain
+                ctidevctl = d.read32(0x150)
+                print("  devctl: 0x%08x" % ctidevctl)
             integration_regs = [0xEEC,0xEF0,0xEF4,0xEF8]
         elif d.arm_part_number() in [0x908, 0x9eb]:
             # CoreSight funnel
@@ -2822,6 +2890,8 @@ if __name__ == "__main__":
         print("  --assume-powered-on  assume device is powered on")
         print("  --unlock             leave device(s) unlocked")
         print("  --lock               leave device(s) locked")
+        print("  --no-write           don't ever map devices as writeable")
+        print("  --no-unlock          don't ever unlock devices")
         print("  -v/--verbose         increase verbosity level")
         sys.exit(1)
     c = None
@@ -2871,6 +2941,10 @@ if __name__ == "__main__":
             o_lock = True
         elif arg == "--unlock":
             o_unlock = True
+        elif arg == "--no-write":
+            o_no_write = True
+        elif arg == "--no-unlock":
+            o_no_unlock = True
         elif arg == "--assume-powered-on":
             o_assume_powered_on = True
         elif arg.startswith("--limit="):
