@@ -125,7 +125,7 @@ class Device:
         self.part_vendor = None
         self.part_number = None     # e.g. 0x906
         self.cpu_number = None      # CPU (PE) number within the system, e.g. as seen by Linux
-        self.affine_cpu = None
+        self.affine_cpu = None      # a CS_DEVTYPE_CORE Device object we are affine to
         self.type = device_type
         if device_type == CS_DEVTYPE_CORE:
             self.affine_cpu = self
@@ -156,13 +156,26 @@ class Device:
             return str(self.type)
 
     def __str__(self):
+        """
+        Generate a string representation for the device, including its name (if known)
+        and base address. This could unfortunately duplicate the address, if the naming
+        convention includes the address, e.g.
+           etm2@0x80000
+        but
+           etm@0x0080000@0x80000
+        So we try to be clever and only append the base address if it's not already
+        in the name.
+        """
         s = ""
         if self.name is not None:
             s = self.name
         else:
             s += "<%s>" % self.type_str()
         if self.is_memory_mapped():
-            s += "@" + self.address_str()
+            if self.name is not None and '@' in self.name:
+                pass
+            else:
+                s += "@" + self.address_str()
         return s
 
     def links(self, type, end=None):
@@ -208,7 +221,7 @@ class Device:
         """
         if self.affine_cpu != cpu_dev:
             assert self.affine_cpu is None, "set_affine_cpu() called twice with different devices"
-            assert cpu_dev.type == CS_DEVTYPE_CORE
+            assert cpu_dev.type == CS_DEVTYPE_CORE, "set_affine_cpu needs a core device: %s" % cpu_dev
             self.affine_cpu = cpu_dev
             cpu_dev.affine_devices.append(self)
             if self.cpu_number is None:
@@ -218,9 +231,22 @@ class Device:
         self.cpu_number = n
         if n > self.platform.max_cpu_number:
             self.platform.max_cpu_number = n
-        if type == CS_DEVTYPE_CORE:
+        if self.type == CS_DEVTYPE_CORE:
+            # Core cpu number is now known, so update all its affine devices
+            # to get the same CPU number.
             for d in self.affine_devices:
+                assert d.affine_cpu == self
                 d.cpu_number = n
+            # Some devices may already have got a CPU number, but because the core
+            # has only just got its own number, they're not tied together.
+            # Do that now.
+            for d in self.platform.devices:
+                if d.cpu_number == n and d.affine_cpu is not self:
+                    d.set_affine_cpu(self)
+        elif self.affine_cpu is None:
+            cpu_dev = self.platform.device_by_cpu(n)
+            if cpu_dev is not None:
+                self.set_affine_cpu(cpu_dev)
 
     def set_arm_part_number(self, pid):
         assert pid <= 0xfff, "expected 3 hex digit part number: 0x%x" % pid
@@ -552,10 +578,10 @@ class Platform:
             print("  %20s" % name, end="")
             print("  %12s" % (d.type_str()), end="")
             if d.is_affine_to_cpu():
+                if d.cpu_number is not None:
+                    print(" %4u" % d.cpu_number, end="")
                 if d.affine_cpu is not None:
-                    print("%5s" % str(d.affine_cpu), end="")
-                else:
-                    print("%5u" % d.cpu_number, end="")
+                    print(" %4s" % str(d.affine_cpu), end="")
             else:
                 print("     ", end="")
             if d.is_hidden:
@@ -651,6 +677,7 @@ def test():
     Link(df1, ds2, CS_LINK_ATB)
     p.show()
     p.check()
+    print("Self-tests completed.")
 
 
 if __name__ == "__main__":

@@ -40,6 +40,8 @@ devtypes = {
     "ptm":        CS_DEVTYPE_TRACE_CORE,
     "etm":        CS_DEVTYPE_TRACE_CORE,
     "stm":        CS_DEVTYPE_TRACE_SW,
+    "cti_cpu":    CS_DEVTYPE_CTI,
+    "cti_sys":    CS_DEVTYPE_CTI,
 }
 
 
@@ -113,6 +115,7 @@ def get_cs_from_sysfs(p=None):
         devtype = devtypes[base]
         d = Device(p, devtype, name=sd)
         d.sysfs_path = dp
+        # See if the device is affine to a (single) CPU
         try:
             cn = int(read_file(os.path.join(dp, "cpu")))
             d.set_cpu_number(cn)
@@ -128,7 +131,10 @@ def get_cs_from_sysfs(p=None):
         of_node = os.path.join(os.path.dirname(rp), "of_node")
         if os.path.exists(of_node):
             d.of_node = os.path.realpath(of_node)      # /sys/firmware/devicetree
-            d.set_mem_address(device_tree_node_address(d.of_node))
+            addr = device_tree_node_address(d.of_node)
+            if addr == 0:
+                print("warning: %s has zero address" % (d.of_node), file=sys.stderr)
+            d.set_mem_address(addr)
         firmware_node = os.path.join(os.path.dirname(rp), "firmware_node")
         if os.path.exists(firmware_node):
             firmware_node = os.path.realpath(firmware_node)
@@ -172,6 +178,9 @@ def get_cs_from_sysfs(p=None):
 
 
 def device_tree_node_compatibility(dtn):
+    """
+    Get the list of compatibility strings for a device tree node
+    """
     compat = read_file(os.path.join(dtn, "compatible")).split(",")
     cl = []
     for s in compat:
@@ -206,11 +215,14 @@ def device_tree_node_reg(dtn, reg_name="reg"):
 
 
 def device_tree_node_property_length(dtn, prop):
+    """
+    For a device tree node, find the #size-cells or #address-cells value,
+    by looking exactly one level upwards in its directory hierarchy.
+    (Note that if #address-cells file exists in a node, it indicates the
+    size of the address field in any childrens' "reg", not its own "reg".)
+    """
     prop = "#" + prop + "-cells"
-    assert dtn.startswith("/proc/device-tree/"), "unexpected device tree node: %s" % dtn
-    while len(dtn) > 18 and not os.path.isfile(os.path.join(dtn, prop)):
-        dtn = os.path.dirname(dtn)
-    assert dtn != "/proc/device-tree"
+    dtn = os.path.dirname(dtn)    # Go exactly one level up
     alen = device_tree_node_reg(dtn, reg_name=prop)
     alen = alen * 4    # it's counted in words
     return alen
@@ -240,7 +252,9 @@ def device_tree_node_size_length(dtn):
 
 def device_tree_nodes():
     """
-    Iterate through nodes in /proc/device-tree
+    Iterate through nodes in the device tree.
+    The device tree is exported at /sys/firmware/devicetree/base
+    and as an alias at /proc/device-tree .
     """
     for root, dirs, files in os.walk("/proc/device-tree"):
         for d in dirs:
@@ -265,6 +279,9 @@ def compat_is_coresight(dcompat):
     return None
 
 
+#
+# Map device-tree compatibility strings (minus "coresight-") into device types.
+#
 cs_device_tree_types = {
     "etm3x":               CS_DEVTYPE_TRACE_CORE,
     "ptm":                 CS_DEVTYPE_TRACE_CORE,
@@ -276,6 +293,9 @@ cs_device_tree_types = {
     "tpiu":                CS_DEVTYPE_PORT,
     "etb10":               CS_DEVTYPE_BUFFER,
     "tmc":                 CS_DEVTYPE_BUFFER,
+    "cti":                 CS_DEVTYPE_CTI,
+    "cti-v8-arch":         CS_DEVTYPE_CTI,
+    "cpu-debug":           CS_DEVTYPE_CORE,
 }
 
 
@@ -397,6 +417,20 @@ def get_cs_from_device_tree(p=None):
                     #print("Connecting %s.%u -> %u.%s" % (dp, oportnum, sportnum, sd))
                     ln = Link(node_device[dp], node_device[sd], CS_LINK_ATB, master_port=oportnum, slave_port=sportnum)
     return p
+
+
+def list_device_tree_nodes():
+    """
+    Debugging: just list the device tree nodes.
+    """
+    for (dp, phandle, dcompat) in device_tree_nodes():
+        dc = compat_is_coresight(dcompat)
+        if not dc:
+            continue
+        print("  %-20s  %4s  %-40s" % (dc, phandle, dp), end="")
+        reg = read_binary_file(os.path.join(dp, "reg"))
+        print(" reg:%3u" % len(reg), end="")
+        print("  %s" % str(os.listdir(dp)))
 
 
 if __name__ == "__main__":
