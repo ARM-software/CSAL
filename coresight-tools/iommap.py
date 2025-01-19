@@ -61,7 +61,7 @@ libc = ctypes.CDLL(None, use_errno=True)
 syscall = libc.syscall
 libc_mmap = libc.mmap
 libc_mmap.restype = ctypes.c_void_p
-libc_mmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_ulonglong]
+libc_mmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_size_t]
 libc_munmap = libc.munmap
 libc_munmap.restype = ctypes.c_int
 libc_munmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
