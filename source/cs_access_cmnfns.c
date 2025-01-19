@@ -267,8 +267,8 @@ uint64_t _cs_read64(struct cs_device *d, unsigned int off)
 done:
 #endif
     if (DTRACE(d) >= DIAG_TRACE_REGISTERS) {
-        diagf("!%" CS_PHYSFMT ": read %03X = %016llX\n",
-            d->phys_addr, off, (unsigned long long)data);
+        diagf("!%" CS_PHYSFMT ": read %03X = %016" PRIX64 "\n",
+            d->phys_addr, off, data);
     }
     return data;
 }

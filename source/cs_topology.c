@@ -106,7 +106,6 @@ static int cs_is_romtable(struct cs_device *d)
 static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
 {
     unsigned int cs_class;
-    //unsigned char *local;
     struct cs_device protod;  /* Temporary device while we're probing */
     struct cs_device *d = NULL;
 

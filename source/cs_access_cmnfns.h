@@ -51,7 +51,6 @@ extern "C" {
 #endif
 #if defined(UNIX_KERNEL)
 #include <linux/string.h>
-//#include <asm/io.h>
 #define assert(x) BUG_ON(x)
 #endif
 #include <stddef.h>
@@ -180,7 +179,7 @@ struct cs_device {
         struct etm_props {
             unsigned int etmidr;
             cs_etm_static_config_t sc;
-            union {		// union of arch specifc configs - starting with ETMv4
+            union {         /* union of arch specifc configs - starting with ETMv4 */
                 cs_etm_v4_static_config_t etmv4_sc;
             } sc_ex;
         } etm;

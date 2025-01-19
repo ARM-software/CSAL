@@ -22,11 +22,12 @@
  * SVN $Id: $
  */
 
+#ifndef ARM_CS_STM_TYPES_H_INCLUDED
+#define ARM_CS_STM_TYPES_H_INCLUDED
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-#ifndef ARM_CS_STM_TYPES_H_INCLUDED
-#define ARM_CS_STM_TYPES_H_INCLUDED
 
 /**
    \defgroup stm_types STM Data types.
@@ -203,9 +204,10 @@ typedef struct stm_config {
 
 /* TBD add in hw event and dma configs.*/
 
-#endif				// ARM_CS_STM_TYPES_H_INCLUDED
-
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* included */
+
 /* End of File cs_stm_types.h */

@@ -159,7 +159,6 @@ typedef struct {
     ELA trace record, from internal SRAM.
  */
 typedef struct {
-   // unsigned char header;           /**< Header byte */
     unsigned char type;               /**< Record type: counter, signals or timestamp */
 #define CS_ELA_RECORD_COUNTER     0   /**< Record contains counters (ELA-600 only) */
 #define CS_ELA_RECORD_SIGNALS     1   /**< Record contains GRP_WIDTH bits of data */

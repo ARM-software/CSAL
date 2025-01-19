@@ -77,7 +77,7 @@ int _cs_etm_enable_programming(struct cs_device *d)
     {
         unsigned int oslsr = _cs_read(d, CS_ETMOSLSR);
         unsigned int pdsr;
-        //unsigned int lsr = _cs_read(d, CS_ETMLSR);
+        /* unsigned int lsr = _cs_read(d, CS_ETMLSR); */
         /* LSR: bit 1: ETM locked, writes ignored;
            bit 0: access is from an i/f that requires ETM to be unlocked */
 
@@ -116,7 +116,7 @@ int _cs_etm_enable_programming(struct cs_device *d)
                When the OS Lock is set all PTM functions are disabled." */
             /* "Write any other value to unlock" */
             _cs_write_wo(d, CS_ETMOSLAR, 0x00000000);
-            // _cs_write_wo(d, CS_ETMOSLAR, 0xC5ACCE55);
+            /* _cs_write_wo(d, CS_ETMOSLAR, 0xC5ACCE55); */
             /* Now see if the registers are unlocked */
             rc = _cs_waitnot(d, CS_ETMOSLSR, 0x02);
             if (rc != 0) {
@@ -413,11 +413,9 @@ int cs_etm_config_get(cs_device_t dev, struct cs_etm_config *c)
         && version >= CS_ETMVERSION(CS_ETMVERSION_ETMv3, 5)) {
         c->timestamp_event = _cs_read(d, CS_ETMTSEVR);
     }
-    //c->addr_comp_mask &= onebits(c->sc.s.n_addr_comp_pairs * 2);
     c->addr_comp_mask &= onebits(c->sc->ccr.s.n_addr_comp_pairs * 2);
 
     if (c->flags & CS_ETMC_ADDR_COMP) {
-        //    for (i = 0; i < c->sc.s.n_addr_comp_pairs * 2; ++i) {
         for (i = 0; i < c->sc->ccr.s.n_addr_comp_pairs * 2U; ++i) {
             if (c->addr_comp_mask & (1U << i)) {
                 c->addr_comp[i].address = _cs_read(d, CS_ETMACVR(i));
@@ -428,7 +426,6 @@ int cs_etm_config_get(cs_device_t dev, struct cs_etm_config *c)
 
     c->data_comp_mask &= onebits(c->sc->ccr.s.n_data_comp);
     if ((c->flags & CS_ETMC_DATA_COMP) && (!is_ptm)) {
-        //    for (i = 0; i < c->sc.s.n_addr_comp_pairs * 2U; ++i) {
         for (i = 0; i < c->sc->ccr.s.n_data_comp; ++i) {
             if (c->data_comp_mask & (1U << i)) {
                 c->data_comp[i].value = _cs_read(d, CS_ETMDCVR(i));
@@ -549,7 +546,6 @@ int cs_etm_config_put(cs_device_t dev, struct cs_etm_config *c)
     }
     c->data_comp_mask &= onebits(c->sc->ccr.s.n_data_comp);
     if ((c->flags & CS_ETMC_DATA_COMP) && has_data_trace) {
-        //    for (i = 0; i < c->sc.s.n_addr_comp_pairs * 2U; ++i) {
         for (i = 0; i < c->sc->ccr.s.n_data_comp; ++i) {
             if (c->data_comp_mask & (1U << i)) {
                 _cs_write(d, CS_ETMDCVR(i), c->data_comp[i].value);
@@ -934,7 +930,7 @@ static void test_event_descriptions(void)
     for (i = 0; i < 0x20000; ++i) {
         char const *d = edesc(buf, i);
         assert(d == buf);
-        //printf("%05X: %s\n", i, d);
+        /* printf("%05X: %s\n", i, d); */
     }
     assert(buf[EVENT_DESCRIPTION] == '\001');
 }

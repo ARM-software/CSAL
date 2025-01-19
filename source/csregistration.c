@@ -55,7 +55,7 @@ static const struct board *do_probe_board(const struct board *board_list)
     while ((len = getline(&line, &size, fl)) >= 0) {
         if (strncmp(line, "Hardware\t: ", 11) == 0) {
             const struct board *b;
-            unsigned int i;
+            int i;
             line[len - 1] = '\0';
             for (i = 1; i < len; ++i) {
                 if (line[i] == '(') {

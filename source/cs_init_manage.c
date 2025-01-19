@@ -38,12 +38,14 @@ int cs_init(void)
 
 #ifdef UNIX_USERSPACE
 #ifndef USE_DEVMEMD
-    int fd = open("/dev/mem", O_RDWR);
-    if (fd < 0) {
-        G.mem_fd = -1;
-        return cs_report_error("can't open /dev/mem");
+    {
+        int fd = open("/dev/mem", O_RDWR);
+        if (fd < 0) {
+            G.mem_fd = -1;
+            return cs_report_error("can't open /dev/mem");
+        }
+        G.mem_fd = fd;
     }
-    G.mem_fd = fd;
 #else
     devmemd_init();
 #endif

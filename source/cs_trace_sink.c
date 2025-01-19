@@ -46,7 +46,6 @@ int cs_sink_enable(cs_device_t dev)
         unsigned int flfmt;
         d->v.etb.currently_reading = 0;
         if (_cs_isset(d, CS_ETB_CTRL, CS_ETB_CTRL_TraceCaptEn)) {
-            //return cs_report_device_error(d, "buffer is already enabled");
             return 0;
         }
         /* "The RAM Write Pointer Register must be programmed before trace
@@ -301,7 +300,9 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     }
     while (words_left_to_read > 0) {
         unsigned int data = etb_read_reg ? *etb_read_reg : _cs_read(d, CS_ETB_RAM_DATA);
-        //printf("read %08x, read ptr now %08x\n", data, _cs_read(d, CS_ETB_RAM_RD_PTR));
+        if (0) {
+            printf("read %08x, read ptr now %08x\n", data, _cs_read(d, CS_ETB_RAM_RD_PTR));
+        }
         if (data != 0xFFFFFFFF) {
             *op++ = data;
         } else {

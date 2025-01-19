@@ -42,22 +42,24 @@ void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
     assert((addr % 4096) == 0);
 #ifdef UNIX_USERSPACE
 #ifndef USE_DEVMEMD
-    cs_physaddr_t addr_to_map = addr;   /* may be rounded down to phys page size */
     {
-        unsigned int pagesize = sysconf(_SC_PAGESIZE);
-        if (size < pagesize) {
-             size = pagesize;
+        cs_physaddr_t addr_to_map = addr;   /* may be rounded down to phys page size */
+        {
+            unsigned int pagesize = sysconf(_SC_PAGESIZE);
+            if (size < pagesize) {
+                size = pagesize;
+            }
+            if ((addr % pagesize) != 0) {
+                addr_to_map -= (addr % pagesize);
+            }
         }
-        if ((addr % pagesize) != 0) {
-            addr_to_map -= (addr % pagesize);
+        localv = mmap(0, size, (writable ? (PROT_READ | PROT_WRITE) : PROT_READ),
+             MAP_SHARED, G.mem_fd, addr_to_map);
+        if (localv == MAP_FAILED) {
+            return NULL;
         }
+        localv = (unsigned char *) localv + (addr - addr_to_map);
     }
-    localv = mmap(0, size, (writable ? (PROT_READ | PROT_WRITE) : PROT_READ),
-         MAP_SHARED, G.mem_fd, addr_to_map);
-    if (localv == MAP_FAILED) {
-        return NULL;
-    }
-    localv = (unsigned char *) localv + (addr - addr_to_map);
 #else
     /* When using devmemd, the local address is not used (the read/write
        functions will redirect access via devmemd), but we need to set

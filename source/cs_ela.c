@@ -46,7 +46,10 @@ int cs_ela_clear_signals(cs_device_t dev, cs_ela_signals_t *sigs)
 int cs_ela_set_signals(cs_ela_signals_t *sigs, unsigned int bit_offset, unsigned int n_bits, uint64_t value)
 {
     if (sigs->n_bits != 0 && (bit_offset + n_bits > sigs->n_bits)) {
-        //fprintf(stderr, "trying to set bits [%u:%u] in %u-bit signal vector\n", bit_offset+n_bits-1, bit_offset, sigs->n_bits);
+        if (0) {
+            fprintf(stderr, "trying to set bits [%u:%u] in %u-bit signal vector\n",
+                bit_offset+n_bits-1, bit_offset, sigs->n_bits);
+        }
         return 1;
     }
     while (n_bits) {
@@ -406,10 +409,11 @@ int cs_ela_read_ram_entry(cs_device_t dev, cs_ela_record_t *rec)
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_ELA);
     /* "The first read of the RRD after an RRA update returns the trace data header byte value" */
-    unsigned int const header = _cs_read(d, CS_ELA_RRDR);
-    //rec->header = header;
-    rec->type = header & 0x3;
-    rec->trigger_state = (header >> 2) & 0x7;
+    {
+        unsigned int const header = _cs_read(d, CS_ELA_RRDR);
+        rec->type = header & 0x3;
+        rec->trigger_state = (header >> 2) & 0x7;
+    }
     /* All record types require RAM reads as if reading a signal group. */
     for (i = 0; i < d->v.ela.signal_width/32; ++i) {
         rec->signals.v.words[i] = _cs_read(d, CS_ELA_RRDR);
@@ -439,8 +443,8 @@ uint64_t cs_ela_record_timestamp(cs_ela_record_t const *rec)
 int cs_ela_read_init(cs_device_t dev)
 {
     struct cs_device *d = DEV(dev);
-    assert(d->type == DEV_ELA);
     int n_entries = -1;
+    assert(d->type == DEV_ELA);
     if (d->v.ela.ram_size != 0) {
         uint32_t ram_lo;
         uint32_t rwa = _cs_read(d, CS_ELA_RWAR);   /* get the current write pointer */

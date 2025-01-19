@@ -108,13 +108,14 @@ static void create_dump_ini(int index, cs_device_t device, bool zeroindex,
 {
     char buf[8192];
     char filename[32];
+    FILE *fd;
     sprintf(filename, "device_%d.ini", index);
-    FILE *fd = fopen(filename, "w");
+    fd = fopen(filename, "w");
     if (!fd) {
         perror("can't open trace metadata output file");
     } else {
         int n;
-        if (zeroindex == true) {	// handle the case of ITM_0
+        if (zeroindex) {    /* handle the case of ITM_0 */
             n = cs_get_trace_metadata(CS_METADATA_INI, device, 0, buf,
                                       sizeof buf, name_buf, name_buf_size);
         } else {
@@ -137,6 +138,7 @@ static unsigned long physical_kernel_code_base_address(void)
     FILE *fd_iomem;
     char buf[IOMEM_BUF_SIZE];
     char *next;
+    unsigned long start;
 
     if (!(fd_iomem = fopen("/proc/iomem", "r"))) {
         printf("can't open /proc/iomem\n");
@@ -155,9 +157,8 @@ static unsigned long physical_kernel_code_base_address(void)
 
     fclose(fd_iomem);
 
-    unsigned long start = strtoul(buf, &next, 16);
-    //end will be = strtoul(next + 1, NULL, 16);
-
+    start = strtoul(buf, &next, 16);
+    /* end will be = strtoul(next + 1, NULL, 16); */
     if (registration_verbose)
         printf("Kernel code entry in /proc/iomem starts at 0x%lx\n",
                start);
@@ -192,8 +193,9 @@ int dump_kernel_memory(char const *fn, unsigned long start,
             (unsigned char *) mmap(0, mapsize, PROT_READ, MAP_SHARED,
                                    fd_mem, mapstart);
     } else {
+        unsigned long pkcba;
         printf("can't open /dev/kmem, trying /dev/mem instead...\n");
-        unsigned long pkcba = physical_kernel_code_base_address();
+        pkcba = physical_kernel_code_base_address();
         if (pkcba == 1) {
             printf
                 ("can't read the physical kernel code base address from /proc/iomem\n");
@@ -260,6 +262,7 @@ static void do_fetch_trace_etb(cs_device_t etb, char const *name,
                                char const *file_name)
 {
     int len, n;
+    unsigned char *buf;
 
     if (file_name == NULL) {
         file_name = "cstrace.bin";
@@ -272,7 +275,7 @@ static void do_fetch_trace_etb(cs_device_t etb, char const *name,
         printf("  Bytes to read in buffer: %d\n", len);
         printf("  Buffer has wrapped: %d\n", cs_buffer_has_wrapped(etb));
     }
-    unsigned char *buf = (unsigned char *) malloc(len);
+    buf = (unsigned char *)malloc(len);
     n = cs_get_trace_data(etb, buf, len);
     if (n <= 0) {
         fprintf(stderr, "** failed to get trace, rc=%d\n", n);
@@ -317,6 +320,10 @@ void do_dump_config(const struct board *board,
     unsigned int CPSR_VAL, SCTLR_EL1_val;
     int dumped_kernel;
     int separate_itm_buffer;
+    FILE *fdContents;
+    FILE *fd_trace_ini;
+    char ptm_names[LIB_MAX_CPU_DEVICES][32];
+    char itm_name[32];
 
 #ifdef CS_VA64BIT
     aarch64 = 1;
@@ -328,8 +335,8 @@ void do_dump_config(const struct board *board,
     SCTLR_EL1_val = 0;		/* not really used here */
 #endif
 
-    // Top level contents file
-    FILE *fdContents = fopen("snapshot.ini", "w");
+    /* Top level contents file */
+    fdContents = fopen("snapshot.ini", "w");
 
     fputs("[snapshot]\n", fdContents);
     fputs("version=1.0\n\n", fdContents);
@@ -341,8 +348,8 @@ void do_dump_config(const struct board *board,
                             snapshot_trace_start_address,
                             snapshot_trace_end_address);
 
-    // CPU state
-    // Create separate files for each device
+    /* CPU state */
+    /* Create separate files for each device */
     for (i = 0; i < board->n_cpu; ++i) {
         FILE *fdCore;
         char fname[20];
@@ -379,16 +386,14 @@ void do_dump_config(const struct board *board,
         fclose(fdCore);
     }
 
-    // CPU PTMs
-    char ptm_names[LIB_MAX_CPU_DEVICES][32];
+    /* CPU PTMs */
     for (i = 0; i < board->n_cpu; ++i) {
         create_dump_ini(index, devices->ptm[i], false, ptm_names[i], 32);
         fprintf(fdContents, "device%d=device_%d.ini\n", index, index);
         index++;
     }
 
-    // ITM/STM
-    char itm_name[32];
+    /* ITM/STM */
     if (do_dump_swstim) {
         create_dump_ini(index, devices->itm, false, itm_name, 32);
         fprintf(fdContents, "device%d=device_%d.ini\n", index, index);
@@ -396,16 +401,16 @@ void do_dump_config(const struct board *board,
     }
     fputs("\n", fdContents);
 
-    // Add trace dump to snapshot.ini
+    /* Add trace dump to snapshot.ini */
     fputs("\n[trace]\n", fdContents);
     fputs("metadata=trace.ini\n", fdContents);
 
     fclose(fdContents);
 
-    // Assumes single ETB for all cores
-    FILE *fd_trace_ini = fopen("trace.ini", "w");
+    /* Assumes single ETB for all cores */
+    fd_trace_ini = fopen("trace.ini", "w");
 
-    // Generate comma separated list of buffers
+    /* Generate comma separated list of buffers */
     separate_itm_buffer = (devices->itm_etb != NULL && do_dump_swstim);
     fputs("[trace_buffers]\n", fd_trace_ini);
     fputs("buffers=buffer0", fd_trace_ini);
@@ -414,7 +419,7 @@ void do_dump_config(const struct board *board,
     }
     fputs("\n\n", fd_trace_ini);
 
-    // Trace buffers
+    /* Trace buffers */
     fputs("[buffer0]\n", fd_trace_ini);
     fputs("name=ETB_0\n", fd_trace_ini);
     fputs("file=cstrace.bin\n", fd_trace_ini);
@@ -426,7 +431,7 @@ void do_dump_config(const struct board *board,
         fputs("file=cstraceitm.bin\n", fd_trace_ini);
         fputs("format=coresight\n\n", fd_trace_ini);
     }
-    // source to buffer mapping
+    /* source to buffer mapping */
     fputs("[source_buffers]\n", fd_trace_ini);
     for (i = 0; i < board->n_cpu; ++i) {
         fprintf(fd_trace_ini, "%s=%s\n", ptm_names[i], "ETB_0");
@@ -440,7 +445,7 @@ void do_dump_config(const struct board *board,
     }
     fputs("\n", fd_trace_ini);
 
-    // core to source mapping
+    /* core to source mapping */
     fputs("[core_trace_sources]\n", fd_trace_ini);
     for (i = 0; i < board->n_cpu; ++i) {
         fprintf(fd_trace_ini, "cpu_%d=%s\n", i, ptm_names[i]);
