@@ -32,6 +32,7 @@ import os, sys, struct
 devtypes = {
     "tpiu":       CS_DEVTYPE_PORT,
     "etb":        CS_DEVTYPE_BUFFER,
+    "etr":        CS_DEVTYPE_ROUTER,
     "tmc_etr":    CS_DEVTYPE_ROUTER,
     "funnel":     CS_DEVTYPE_FUNNEL,
     "replicator": CS_DEVTYPE_REPLICATOR,
@@ -281,6 +282,8 @@ def compat_is_coresight(dcompat):
 
 #
 # Map device-tree compatibility strings (minus "coresight-") into device types.
+#
+# See Documentation/devicetree/bindings/arm/arm,coresight-*
 #
 cs_device_tree_types = {
     "etm3x":               CS_DEVTYPE_TRACE_CORE,
