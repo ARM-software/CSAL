@@ -351,7 +351,11 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                         d->v.debug.didr = (d->v.debug.didr & 0xFFFFFFF0) | ((devarch >> 12) & 0xF);
                     }
                     d->v.debug.devid = _cs_read(d, CS_V8EDDEVID);
-                    d->v.debug.pcsamplereg = CS_DBGPCSR_40;
+                    if ((d->v.debug.devid & 0xf) != 0) {
+                        d->v.debug.pcsamplereg = CS_DBGPCSR_40;
+                    } else {
+                        d->v.debug.pcsamplereg = CS_DBGPCSR_NONE;
+                    }
                 } else {
                     /* v7 arch core */
                     d->v.debug.debug_arch = 0x7;
@@ -409,6 +413,9 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                         d->v.pmu.n_counters = n;
                     }
                 }
+                d->v.pmu.ext64 = (devarch & 0xfff) == CS_ARM_ARCHID_PMU64;
+                d->v.pmu.pcsr = (devid & 0xf) != 0;
+                d->v.pmu.snapshot = ((devid >> 4) & 0xf) != 0;
                 /* Set up the scale for indexing into the PMU counters in memory */
                 d->v.pmu.map_scale =
                     ((d->v.pmu.cfgr & 0x00003f00) == 0x00003f00) ? 3 : 2;

@@ -126,13 +126,13 @@ void cs_set_default_memap(cs_device_t dev)
 
 /*
   Call this when the library is unloaded.  This doesn't generally disable
-  all trace devices, but it may lock them.
+  all trace devices, but it may lock them and release claim-tags.
 */
 int cs_shutdown(void)
 {
     if (G.init_called) {
         /* Do anything that needs memory-mapped access */
-        cs_release();
+        cs_release();      /* claim tags released here */
         cs_checkpoint();
 #ifdef UNIX_USERSPACE
         /* Now remove memory-mapped access */
@@ -178,7 +178,7 @@ int cs_release(void)
         uint32_t const tag = _cs_device_internal_claim_tag(d);
         if (_cs_isclaimed(d, tag)) {
             if (DTRACE(d)) {
-                diagf("!unclaiming device tag 0x%x at %" CS_PHYSFMT "",
+                diagf("!unclaiming device tag 0x%x at %" CS_PHYSFMT "\n",
                       (unsigned int)tag, d->phys_addr);
             }
             _cs_unclaim(d, tag);

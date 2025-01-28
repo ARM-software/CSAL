@@ -149,7 +149,8 @@ struct cs_device {
         struct debug_props {
             uint32_t didr;	          /**< Contents of DBGDIDR */
             uint32_t devid;	          /**< Contents of DBGDEVID, or zero when not present */
-            unsigned int pcsamplereg; /**< Offset to PC sampling register */
+            uint16_t pcsamplereg;     /**< Offset to PC sampling register */
+#define CS_DBGPCSR_NONE 0xfff         /**< PC sampling not implemented in debug i/f */
             unsigned int debug_arch;  /**< debug architecture */
             struct cs_device *pmu;    /**< PMU for this CPU */
             struct cs_device *etm;    /**< ETM for this CPU */
@@ -157,8 +158,11 @@ struct cs_device {
         } debug;
         struct pmu_props {
             uint32_t cfgr;
-            unsigned int n_counters;  /**< Number of event counters, not including cycle counter */
+            uint8_t n_counters;       /**< Number of event counters, not including cycle counter */
             unsigned char map_scale;  /**< Spacing in the memory map (power of 2) */
+            unsigned int ext64:1;     /**< 64-bit external interface (FEAT_PMUv3_EXT64) */
+            unsigned int pcsr:1;      /**< Implements PC-sampling */
+            unsigned int snapshot:1;  /**< Implements Snapshot extension */
         } pmu;
         struct cti_props {
 #define CTI_CHANNELS 4

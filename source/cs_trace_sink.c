@@ -299,7 +299,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
                 _cs_read(d, CS_TMC_CBUFLEVEL));
     }
     while (words_left_to_read > 0) {
-        unsigned int data = etb_read_reg ? *etb_read_reg : _cs_read(d, CS_ETB_RAM_DATA);
+        uint32_t data = etb_read_reg ? *etb_read_reg : _cs_read(d, CS_ETB_RAM_DATA);
         if (0) {
             printf("read %08x, read ptr now %08x\n", data, _cs_read(d, CS_ETB_RAM_RD_PTR));
         }
@@ -329,7 +329,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
         if (d->v.etb.is_tmc_device) {
             /* The TMC spec says that once we've read all the data in the buffer,
                subsequent reads will read 0xFFFFFFFF. */
-            unsigned int checkff = *etb_read_reg;
+            uint32_t checkff = *etb_read_reg;
             if (checkff != 0xFFFFFFFF) {
                 diagf("  TMC ETB read 0x%08X, expected 0xFFFFFFFF\n",
                       checkff);

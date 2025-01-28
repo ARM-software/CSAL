@@ -26,7 +26,7 @@ extern "C" {
 /**
    \defgroup debug Access to Debug Sampling Registers.
 
-   Non - intrusive interface to sampling debug architecture on CPU
+   Non-intrusive interface to sampling debug architecture on CPU
    Samples PC plus VMID and CONTEXTID if present from a running core via the debug registers. 
 
    @{
@@ -39,6 +39,8 @@ extern "C" {
  *  core is being sampled.
  *
  *  Optionally, CONTEXTID and VMID can be sampled, synchronously with the PC.
+ *
+ *  Note that on recent cores, the PC sampling feature has moved to the PMU device.
  * 
  *  \param dev   device to sample - must be the debug registers on a core.
  *  \param pc    pointer to receive PC virtual address sample. Bit 0 set indicates Thumb state.
@@ -47,7 +49,7 @@ extern "C" {
  *  @return 0 if valid sample was obtained. -1 if sampling is not possible at present time.
  */
 int cs_debug_get_pc_sample(cs_device_t dev, cs_virtaddr_t * pc,
-			   unsigned int *cid, unsigned int *vmid);
+			   uint32_t *cid, uint32_t *vmid);
 
 
 /** @} */

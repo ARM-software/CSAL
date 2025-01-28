@@ -134,6 +134,12 @@ int cs_pmu_reset(cs_device_t, unsigned int flags);
  */
 int cs_pmu_is_enabled(cs_device_t);
 
+
+/**
+ *  Get a PC sample
+ */
+int cs_pmu_get_pc_sample(cs_device_t, cs_virtaddr_t *pc, uint32_t *cid, uint32_t *vmid);
+
 /** @} */
 
 

@@ -89,6 +89,8 @@ Common register definitions in the management group of all CoreSight devices
 #define CS_ARM_ARCHID_CTI      0x1a14
 #define CS_ARM_ARCHID_MEMAP    0x0a17
 #define CS_ARM_ARCHID_ROM      0x0af7
+#define CS_ARM_ARCHID_PMU32    0x0a16
+#define CS_ARM_ARCHID_PMU64    0x0a26
 
 #define CS_DEVAFF0  0xFA8   /**< CS device affinity register 0 */
 #define CS_DEVAFF1  0xFAC   /**< CS device affinity register 1 */
@@ -120,8 +122,8 @@ with a JTAG debugger or OS device drivers.
 #define CS_CLAIM_AP_INTERNAL  0x01  /**< AP is in use by self-hosted software */
 #define CS_CLAIM_AP_EXTERNAL  0x02  /**< AP is in use by external debugger */
 
-#define CS_CLAIM_DEV_EXTERNAL 0x01  /**< Non-AP device is in use by self-hosted software */
-#define CS_CLAIM_DEV_INTERNAL 0x02  /**< Non-AP device is in use by external debugger */
+#define CS_CLAIM_DEV_EXTERNAL 0x01  /**< Non-AP device is in use by external debugger */
+#define CS_CLAIM_DEV_INTERNAL 0x02  /**< Non-AP device is in use by self-hosted software */
 
 #define CS_LAR  0xFB0	    /**< CS component Software Lock access register */
 #define CS_LSR  0xFB4	    /**< CS component Software Lock status register */
@@ -731,6 +733,7 @@ The cross trigger matrix does not have any programmable elements so needs no reg
 #define CS_CTICHINSTATUS     0x138     /**< CTI Channel In Status Register */
 #define CS_CTICHOUTSTATUS    0x13C     /**< CTI Channel Out Status Register */
 #define CS_CTIGATE           0x140     /**< Enable CTI Channel Gate Register */
+#define CS_CTIDEVCTL         0x150     /**< Target-specific device controls (CPU CTI, when FEAT_DoPD) */
 #define CS_CTIITCHOUT        0xEE4     /**< CTI Integration Test Channel Output Register */
 #define CS_CTIITTRIGOUT      0xEE8     /**< CTI Integration Test Trigger Output Register */
 #define CS_CTIITCHIN         0xEF4     /**< CTI Integration Test Channel Input Register (latched) */
@@ -856,6 +859,9 @@ Register definitions and bitfield values for the Architecture v7 Cortex Core deb
 #define CS_DBGWCR(n)         (0x1C0 + (n)*4)  /**< Watchpoint Control */
 #define CS_DBGPRCR           0x310     /**< Device Powerdown and Reset Control */
 #define CS_DBGPRSR           0x314     /**< Device Powerdown and Reset Status */
+#define CS_DBGPRSR_PU          0x01      /**< Device is powered up */
+
+#define CS_DBG_MIDR          0xD00     /**< Copy of MIDR_EL1. (In core PD.) */
 /** @name DBGPRSR Bit Values 
  see #CS_DBGPRSR
 @{*/
@@ -924,6 +930,8 @@ Register definitions and bitfield values for the Architecture v8 Cortex Core deb
     @ingroup reg_defs
 
 Register definitions and bitfield values for the Performance Monitoring Unit.
+
+This describes the 32-bit external interface.
 @{
 */
 #define CS_PMEVCNTR(n,scale) (0x000 + ((n)<<(scale)))  /**< Event Count Register (n) */
@@ -932,6 +940,12 @@ Register definitions and bitfield values for the Performance Monitoring Unit.
 #define CS_PMXEVCNTR(n)      CS_PMEVCNTR32(n)	/**< Event Count Register (n) - deprecated, assumes 32-bit */
 #define CS_PMCCNTR           0x07C     /**< Cycle Count Register - deprecated, assumes 32-bit */
 #define CS_PMCCNTRW(scale)   CS_PMEVCNTR(31,scale)   /**< Cycle Count Register */
+#define CS_PMPCSR            0x200     /**< Program Counter Sample Register (two words) */
+#define CS_PMCID1SR          0x208     /**< CONTEXTIDR_EL1 Sample Register */
+#define CS_PMVCIDSR          0x208     /**< EXT64: VMID and CONTEXTIDR_EL1 */
+#define CS_PMVIDSR           0x20C     /**< VMID Sample Register */
+#define CS_PMCCIDSR          0x228     /**< EXT64: CONTEXTIDR_ELx */
+#define CS_PMCID2SR          0x22C     /**< CONTEXTIDR_EL2 Sample Register */
 #define CS_PMXEVTYPER(n)     (0x400 + (n)*4)	/**< Event Type Register(n) */
 #define CS_PMXEVTYPER31      0x47C     /**< Event Type Select Register (filter register) for CCNT */
 #define CS_PMCCFILTR         0x47C     /**< Cycle Counter Filter Register (alias CS_PMXEVTYPER31) */
@@ -953,6 +967,7 @@ Register definitions and bitfield values for the Performance Monitoring Unit.
 #define CS_PMCEID0           0xE20     /**< Common Event Identification 0 */
 #define CS_PMCEID1           0xE24     /**< Common Event Identification 1 */
 #define CS_PMMIR             0xE40     /**< Machine Identification Register (PMUv3.4) */
+#define CS_PMPCSCTL          0xE50     /**< PC Sample-based Profiling Control Register */
 #define CS_PMAUTHSTATUS      0xFB8     /**< Authentication Status Register */
 /** @} */
 

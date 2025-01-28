@@ -22,16 +22,18 @@
 /* ---------- Local functions ------------- */
 /* this called from API fn if V8 core */
 static int cs_debug_v8_pc_sample(struct cs_device *d, cs_virtaddr_t * pc,
-                                 unsigned int *cid, unsigned int *vmid)
+                                 uint32_t *cid, uint32_t *vmid)
 {
     uint32_t regval;
     cs_virtaddr_t pc_sample = 0;
 
-
     /* check PC sampling support is present */
     if ((d->v.debug.devid & CS_V8EDDEVID_SMPL_MSK) ==
-        CS_V8EDDEVID_SMPL_NONE)
+        CS_V8EDDEVID_SMPL_NONE) {
+        /* PC sampling not implemented in CPU external interface -
+           but might be implemented in PMU external interface */
         return -1;
+    }
 
     /* check target processor is powered, running and accessible */
     regval = _cs_read(d, CS_V8EDPRSR);
@@ -68,9 +70,10 @@ static int cs_debug_v8_pc_sample(struct cs_device *d, cs_virtaddr_t * pc,
     return 0;
 }
 
+
 /* ========== API functions ================ */
 int cs_debug_get_pc_sample(cs_device_t dev, cs_virtaddr_t * pc,
-                           unsigned int *cid, unsigned int *vmid)
+                           uint32_t *cid, uint32_t *vmid)
 {
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_CPU_DEBUG);
