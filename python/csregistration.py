@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+from __future__ import print_function
+
 from csaccess import *
 
 class CSRegisterError(Exception):
@@ -77,12 +79,12 @@ def setup_board(devices):
     # Register TC2 - remove this for more `generic' interface
     board['registration'](devices)
 
-    print "Registration Complete: %d" % cs_registration_complete()
-    print "Error Count: %d" % cs_error_count()
+    print("Registration Complete: %d" % cs_registration_complete())
+    print("Error Count: %d" % cs_error_count())
     
     cs_cti_diag()
-    print "CSDEMO: Registration Complete."
+    print("CSDEMO: Registration Complete.")
     return board
 
 if __name__ != '__main__':
-    print "We're running inside a module"
+    print("We're running inside a module")

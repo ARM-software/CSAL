@@ -75,7 +75,7 @@ CSINCS= $(INC_DIR)/csaccess.h \
 		$(INC_DIR)/cs_trace_sink.h \
 		$(INC_DIR)/cs_trace_source.h \
 		$(INC_DIR)/csregisters.h \
-		$(DEMO_INC_DIR)/csregistration.h
+		$(INC_DIR)/csregistration.h
 
 ####################################
 #
