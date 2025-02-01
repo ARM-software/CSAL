@@ -268,13 +268,13 @@ int cs_pmu_is_enabled(cs_device_t dev)
 int cs_pmu_get_pc_sample(cs_device_t dev, cs_virtaddr_t *pc,
                          uint32_t *cid, uint32_t *vmid)
 {
+    uint64_t pcx;
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_CPU_PMU);
     if (!d->v.pmu.pcsr) {
         /* PC sampling external interface not implemented in PMU */
         return -1;
     }
-    uint64_t pcx;
     if (d->v.pmu.ext64) {
         pcx = _cs_read64(d, CS_PMPCSR);
         if (cid || vmid) {
@@ -289,8 +289,12 @@ int cs_pmu_get_pc_sample(cs_device_t dev, cs_virtaddr_t *pc,
     } else {
         /* reading low word triggers sample */
         uint32_t lo = _cs_read(d, CS_PMPCSR);
+#ifdef CS_VA64BIT
         uint32_t hi = _cs_read(d, CS_PMPCSR+4);
         pcx = ((cs_virtaddr_t)hi << 32) | lo;
+#else
+        pcx = lo;
+#endif
         if (cid) {
             *cid = _cs_read(d, CS_PMCID1SR);
         }
