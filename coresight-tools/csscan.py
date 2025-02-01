@@ -747,6 +747,16 @@ class Device:
         else:
             return None
 
+    def set_affinity_group(self):
+        """
+        If this device has an affinity id, add it to the group.
+        """
+        id = self.affinity_id()
+        if id:
+            self.affinity_group = self.cs.affinity_group(id)
+            self.affinity_group.set_affine_device(self, affinity_type(self))
+        return id
+
     def architect(self):
         # CoreSight devices have a DEVARCH register which specifies the architect and architecture as a JEDEC code.
         assert self.is_coresight()
@@ -881,6 +891,8 @@ class AffinityGroup:
         self.devices = {}     # indexed by type
 
     def set_affine_device(self, d, typ):
+        if typ in self.devices and self.devices[typ] == d:
+            return
         assert typ not in self.devices, "attempt to put two devices of type '%s' in group %s" % (typ, self)
         self.devices[typ] = d
         # As well as its affinity group, each device has a direct link to its core
@@ -1011,6 +1023,27 @@ def authstatus_str(authstatus):
     return s
 
 
+def affinity_type(d):
+    """
+    For tracking device affinity, return a device type that can be
+    used as a device index in the affinity group.
+    We expect to cover all devices that can be affine. Not all devices here are
+    necessarily affine, e.g. CTI and ELA might be non-affine.
+    """
+    adtype = None
+    if d.is_coresight_device_type(6,1):
+        adtype = "PMU"
+    elif d.is_coresight_device_type(3,1):
+        adtype = "ETM"
+    elif d.is_coresight_device_type(4,1):
+        adtype = "CTI"
+    elif d.is_arm_architecture(ARM_ARCHID_ELA):
+        adtype = "ELA"
+    elif d.is_core_debug():
+        adtype = "core"
+    return adtype
+
+
 class CSROM:
     """
     Container for the overall ROM table scan.
@@ -1075,6 +1108,9 @@ class CSROM:
         return d
 
     def affinity_group(self, id):
+        """
+        Given a DEVAFF value (or other unique identifier), return the affinity group.
+        """
         if id not in self.affinity_group_map:
             self.affinity_group_map[id] = AffinityGroup(id)
         return self.affinity_group_map[id]
@@ -1150,26 +1186,30 @@ class CSROM:
                 e.device = d
                 # Fix up device affinity - in the absence of anywhere better.
                 # We could either do this using DEVAFF or heuristically.
-                id = d.affinity_id()
-                if id:
-                    d.affinity_group = self.affinity_group(id)
-                adtype = None
-                if d.is_coresight_device_type(6,1):
-                    adtype = "PMU"
-                elif d.is_coresight_device_type(3,1):
-                    adtype = "ETM"
-                elif d.is_coresight_device_type(4,1):
-                    adtype = "CTI"
+                id = d.set_affinity_group()
+                adtype = affinity_type(d)
                 if d.is_core_debug():
-                    if not id:
-                        d.affinity_group = AffinityGroup()    # anonymous group
-                    d.affinity_group.set_affine_device(d, "core")
                     cpus_in_this_table.append(d)
+                    if not id:
+                        # To track CPU affinity in legacy systems that don't use DEVAFF,
+                        # we create an anonymous affinity group, and tie the devices together
+                        # during the ROM table scan.
+                        d.affinity_group = AffinityGroup()    # anonymous group
+                        d.affinity_group.set_affine_device(d, "core")
                 elif adtype is not None:
-                    if id:
-                        d.affinity_group.set_affine_device(d, adtype)
-                    else:
+                    if not id:
                         # Allocate to the first CPU that hasn't yet got an affine device of this type
+                        # We are making several assumptions here:
+                        #  - affine devices occur in the same order as CPUs
+                        #  - affine devices occur after CPUs
+                        #  - devices with an "affinity type" are in fact affine, and occur before
+                        #    any non-affine devices of the type.
+                        # We might run into problems if we saw e.g.
+                        #  - one or more CPUs that did not (in reality) have an ELA
+                        #  - a system ELA
+                        # In that case we would incorrectly associate the ELA with the first CPU.
+                        # We don't expect that to occur in practice because pre-DEVAFF systems are
+                        # unlikely to have ELAs.
                         for c in cpus_in_this_table:
                             if c.affine_device(adtype) is None:
                                 # If not using DEVAFF, core should be at -64K offset from the CTI
@@ -1209,7 +1249,7 @@ class CSROM:
             archdesc = "<no arch>"
 
         # architected regs with imp def values
-        affinity = d.affinity_id()
+        affinity = d.set_affinity_group()
         devid = d.read32(0xFC8)
 
         authstatus = d.read32(0xFB8)
