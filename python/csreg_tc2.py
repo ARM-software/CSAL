@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+from __future__ import print_function
 
 from csaccess import *
 from csregistration import boards, enum
@@ -24,7 +25,7 @@ def register_tc2(devices):
     """
     cores = enum('A7_0', 'A7_1', 'A7_2', 'A15_0', 'A15_1')
 
-    print "CSDEMO: Registering TC2 CoreSight devices..."
+    print("CSDEMO: Registering TC2 CoreSight devices...")
     cs_register_romtable(0x20000000)
     # Set the PTM affinities
     cs_device_set_affinity(cs_device_register(0x2201C000), cores.A15_0)
@@ -40,7 +41,7 @@ def register_tc2(devices):
     cs_device_set_affinity(cs_device_register(0x22039000), cores.A7_1)
     cs_device_set_affinity(cs_device_register(0x2203A000), cores.A7_2)
 
-    print "CSDEMO: Registering trace-bus connections..."
+    print("CSDEMO: Registering trace-bus connections...")
     # Connect the devices
     funnel = cs_device_get(0x20040000)
 
@@ -77,7 +78,7 @@ if __name__ != '__main__':
     """
     Add corresponding metadata about board to the list
     """    
-    print "Loaded Info for ARM TC2"
+    print("Loaded Info for ARM TC2")
     boards.append({            
         'registration' : register_tc2,
         'n_cpu' : 5,
