@@ -847,16 +847,21 @@ class ROMTableEntry:
     An entry in a ROM table. Contains information from the table itself.
     """
     def __init__(self, td, offset, width, e):
-        self.table = td            # table device
+        self.table = td            # ROM table device
         self.offset = offset       # byte offset of the entry within the table
         self.width = width         # entry width in bytes
         self.descriptor = e        # the 4-byte or 8-byte table entry (device offset, power req)
         self.device = None         # may be populated later
-        self.is_inaccessible = False   # set to True if we can't create a device for it
+        self.is_inaccessible = None   # set to a reason string if we can't create a device for it
 
     def __str__(self):
         s = "0x%x[0x%03x]: " % (self.table.base_address, self.offset)
         s += ("%%0%ux" % (self.width*2)) % self.descriptor
+        pwrid = self.powerid()
+        if pwrid is not None:
+            s += " P%02x" % pwrid
+        else:
+            s += "    "
         if self.is_present():
             s += " -> 0x%x" % self.device_address()
         return s
@@ -864,8 +869,20 @@ class ROMTableEntry:
     def is_present(self):
         return (self.descriptor & 1) != 0
 
+    def powerid(self):
+        """
+        Get POWERID, or None if not valid. Works for class 1 and class 9 entries.
+        """
+        if bit(self.descriptor, 2):
+            return bits(self.descriptor, 4, 5)
+        else:
+            return None
+
     def device_offset(self):
-        # offset is at the top of the word and can be negative
+        """
+        Get the offset to the device, relative to the base of the ROM table.
+        The offset is at the top of the word and can be negative
+        """
         if self.width == 4:
             off = (self.descriptor & 0xfffff000)
             if (off & 0x80000000) != 0:
@@ -1127,10 +1144,13 @@ class CSROM:
         The first entry is at address 0x000. Each subsequent entry is at
         the next 4-byte boundary, until a value of 0x00000000 is read which
         is the final entry.
+
+        We also handle the newer Class 9 ROM tables which may have 4-byte
+        or 8-byte entries.
         """
         assert td.is_rom_table()
         if td.is_coresight():
-            # Class 9 (new) ROM Table
+            # Class 9 (new) ROM Table. See ADI 6.0 chapter D4.
             etop = 0x800
             devid = td.read32(0xFC8)
             format = devid & 15
@@ -1141,9 +1161,9 @@ class CSROM:
             else:
                 assert False, "unknown Class 9 ROM Table format: %u" % format
         else:
-            # Class 1 (old) ROM Table
+            # Class 1 (old) ROM Table. See ADI 6.0 Chapter D3.
             etop = 0xF00
-            ewidth = 4
+            ewidth = 4         # Class 1 are always 4-byte entries
         cpus_in_this_table = []
         for a in range(0, etop, ewidth):
             if ewidth == 4:
@@ -1155,12 +1175,14 @@ class CSROM:
             if (eword & 1) == 0 and not include_empty:
                 continue
             e = ROMTableEntry(td, a, ewidth, eword)
+            if o_verbose:
+                print(e, end="  ")
             if e.is_present():
                 if e.device_offset() == 0:
                     # ROM table points back to itself - shouldn't happen
                     continue
                 if e.device_address() in o_exclusions:
-                    e.is_inaccessible = True
+                    e.is_inaccessible = "device in exclusions list"
                     yield e
                     continue
                 # We don't want to fault when we encounter the same device in multiple
@@ -1173,6 +1195,16 @@ class CSROM:
                         print("  %s" % dd.rom_table_entry)
                         print("  %s" % e)
                     continue
+                if td.device_class() == 9 and e.powerid() is not None:
+                    pwrid = e.powerid()
+                    pcr = td.read32(0xA00 + pwrid*4)
+                    if bit(pcr, 0):
+                        psr = td.read32(0xA80 + pwrid*4)
+                        ps = bits(psr, 0, 2)
+                        if ps == 0:
+                            e.is_inaccessible = (" device in powered-down local power domain P%02x" % pwrid)
+                            yield e
+                            continue
                 # if we're scanning recursively, we have to map the device even if
                 # we aren't otherwise interested in devices. A ROM Table entry doesn't
                 # indicate that it points to a sub-table as opposed to some other device -
@@ -1180,7 +1212,7 @@ class CSROM:
                 try:
                     d = self.create_device_at(e.device_address(), rom_table_entry=e)
                 except PermissionError:
-                    e.is_inaccessible = True
+                    e.is_inaccessible = "permission error"
                     yield e
                     continue
                 e.device = d
@@ -1221,12 +1253,25 @@ class CSROM:
                 if recurse and d.is_rom_table():
                     for se in self.list_table(d, include_empty=include_empty, recurse=True):
                         yield se
+
                 # after yielding the device to whoever wants it, unmap it so we
                 # don't run out of memory mappings. Even a limit of 1000 will be
                 # exhausted if we have a 300-core SoC with 5 devices per core.
                 d.unmap()
             else:
                 yield e
+
+    @staticmethod
+    def is_powered_down_core(d):
+        """
+        Return True if this device is a powered-down core. We might use this
+        to stop scanning a local ROM table, to avoid hitting its ELA.
+        """
+        if d.is_arm_architecture_core():
+            edprsr = d.read32(0x314)
+            core_powered_off = ((edprsr & 0x1) == 0)
+            return core_powered_off
+        return False
 
     @staticmethod
     def show_coresight_device(d):
@@ -1240,6 +1285,10 @@ class CSROM:
           - programming: e.g. ETM counter transition rules, ETF in circular mode
           - state: ETM current counter values, ETB buffer occupancy
         """
+
+        if o_verbose >= 2:
+            print()
+            print("CoreSight device at %s" % d.address_string())
 
         # Registers architected by CoreSight, with architected values
         devtype = d.coresight_device_type()
@@ -1264,7 +1313,7 @@ class CSROM:
             print(" devid=0x%x" % devid, end="")
         if affinity is not None:
             print(" aff=0x%x" % affinity, end="")
-        if False and d.is_affine_to_core():
+        if o_verbose and d.is_affine_to_core():
             print(" affine_core=@0x%x" % d.affine_core.base_address, end="")
         arm_part = d.arm_part_number()    # Will be None if not an ARM part
         # don't print here, already printed in show_device() to cope with non-CoreSight devices
@@ -1379,7 +1428,7 @@ class CSROM:
                 for r in [0xE20,0xE24,0xE28,0xE2C]:
                     print(" %08x" % (d.read32(r)), end="")
             else:
-                print(" not accessing (use --assume-powered-on to force)", end="")
+                print(" CPU may be powered off: not accessing PMU (use --assume-powered-on to force)", end="")
         elif d.is_core_trace_etm():
             # Test if the registers are invalid/unreadable, either because the core power domain
             # is powered off or because the ETM hasn't been initialized since reset.
@@ -1389,34 +1438,48 @@ class CSROM:
             #   TRCPDSR.POWER[0]     indicates the ETM trace unit is powered and all registers
             #                        are accessible.
             pdsr = d.read32(0x314)
-            core_powered_off = ((pdsr & 0x1) == 0) or ((pdsr & 0x2) != 0)
+            core_powered_off = ((pdsr & 0x1) == 0)
+            oslk = ((pdsr & 0x20) != 0)
             print(" pdsr=0x%08x" % pdsr, end="")
-            etmid1 = d.read32(0x1E4)
-            if o_verbose:
-                print(" etmid1=0x%08x" % etmid1, end="")
-            emajor = bits(etmid1,8,4)
-            eminor = bits(etmid1,4,4)
+            if core_powered_off:
+                print(" powered-off", end="")
+            if oslk:
+                print(" OS-lock", end="")
+            # We want to avoid reading the ID registers if the ETM might be powered off.
+            # Prefer to refer to TRCDEVARCH for architecture, if available - it seems to be
+            # available even if trace unit is powered off.
+            earch = None
+            emajor = None     # major architecture rev, but resets to 1 for ETE
             is_ETE = False
-            if emajor != 15:
-                if emajor < 3:
-                    earch = "ETMv%u" % (emajor+1)
-                elif emajor == 3:
-                    earch = "PFTv1"
-                else:
-                    earch = "ETMv%u" % (emajor)
-                earch += ".%u" % eminor
+            eminor = (d.devarch >> 16) & 15
+            if d.is_arm_architecture(ARM_ARCHID_ETM):
+                emajor = 4
+                earch = "ETMv4.%u" % eminor
+            elif d.is_arm_architecture(ARM_ARCHID_ETE):
+                emajor = 1
+                is_ETE = True
+                earch = "ETEv1.%u" % eminor
+            if not core_powered_off and (emajor is None):
+                if o_verbose >= 2:
+                    print("can't get trace major version from DEVARCH - trying ID registers")
+                etmid1 = d.read32(0x1E4)
+                if o_verbose:
+                    print(" etmid1=0x%08x" % etmid1, end="")
+                emajor = bits(etmid1,8,4)
+                eminor = bits(etmid1,4,4)
+                is_ETE = False
+                if emajor != 15:
+                    if emajor < 3:
+                        earch = "ETMv%u" % (emajor+1)
+                    elif emajor == 3:
+                        earch = "PFTv1"
+                    else:
+                        earch = "ETMv%u" % (emajor)
+                    earch += ".%u" % eminor
+            if earch is not None:
                 print(" %s" % (earch), end="")
-            else:
-                # refer to TRCDEVARCH for architecture: probably ETE
-                eminor = (d.devarch >> 16) & 15
-                if d.is_arm_architecture(ARM_ARCHID_ETM):
-                    emajor = 4
-                elif d.is_arm_architecture(ARM_ARCHID_ETE):
-                    emajor = 1
-                    is_ETE = True
-                else:
-                    emajor = None
-            if emajor >= 4 or is_ETE:
+            if (not core_powered_off) and (emajor >= 4 or is_ETE):
+                # Read ID registers to get detailed ETM4/ETE feature set
                 etmid0 = d.read32(0x1E0)
                 etmid3 = d.read32(0x1EC)
                 etmid4 = d.read32(0x1F0)
@@ -1484,15 +1547,25 @@ class CSROM:
             if rombase not in [0x0,0x2]:
                 print(" ROM:%#x" % rombase, end="")
         elif d.is_arm_architecture(ARM_ARCHID_ELA):
+            # Core ELA has similar power-off issue as PMU - a core ELA
+            # may be inaccessible if the core is powered off, but the ELA
+            # doesn't have its own power status bit. In fact, as implemented,
+            # when the core ELA is powered off, even the basic PrimeCell ID
+            # registers result in an ERROR response, so we likely will have
+            # locked up the system at device creation before getting here.
+            # On some current implementations, the ELA power status is indicated
+            # via the power status mechanism in the cluster's Class 9 ROM table,
+            # so if we get to the ELA by scanning the ROM table, we will be
+            # able to exclude the device.
             devid1 = d.read32(0xFC4)
             devid2 = d.read32(0xFC0)
             ram_addr_width = bits(devid,8,8)    # SRAM address width in bits, e.g. 6 bits => 64 entries
             # Show ELA-500 version from PIDR2
             prod_rev = (d.PIDR >> 20) & 15       # PIDR2.REVISION
             if d.is_arm_part_number(0x9B8):     # ELA-500
-                rev_names = ["r0p0","r1p0","r2p0","r2p1","r2p2"]
+                rev_names = ["r0p0", "r1p0", "r2p0", "r2p1", "r2p2"]
             elif d.is_arm_part_number(0x9D0):   # ELA-600
-                rev_names = ["r0p0","r1p0","r2p0"]
+                rev_names = ["r0p0", "r1p0", "r2p0"]
             else:
                 rev_names = None
             if rev_names is not None and prod_rev < len(rev_names):
@@ -1578,24 +1651,35 @@ class CSROM:
             print(" -", end="")
 
         # dynamic information, but generic for all CoreSight devices
-        if not d.is_lockable():
-            print(" no-lock", end="")
-            if not d.is_unlocked():
-                # If SLI=0 indicating s/w lock is not implemented, SLK should be 0
-                # indicating that writes are permitted.
-                print(" (but locked?)", end="")
-        elif d.is_unlocked():
-            print(" unlocked", end="")
-        else:
-            print(" locked", end="")
         if not core_powered_off:
+            if not d.is_lockable():
+                print(" no-lock", end="")
+                if not d.is_unlocked():
+                    # If SLI=0 indicating s/w lock is not implemented, SLK should be 0
+                    # indicating that writes are permitted.
+                    print(" (but locked?)", end="")
+            elif d.is_unlocked():
+                print(" unlocked", end="")
+            else:
+                print(" locked", end="")
             claimed = d.read32(0xFA4)
             if claimed:
                 print(" claimed:0x%x" % claimed, end="")
-        if d.is_in_integration_mode():
-            print(" integration", end="")
+            if d.is_in_integration_mode():
+                print(" integration", end="")
+        else:
+            print(" (lock/claim status unavailable)", end="")
+        if d.rom_table_entry is not None:
+            pwrid = d.rom_table_entry.powerid()
+            if pwrid is not None:
+                # Device has a powerid, local to its ROM table
+                print(" powerid=%s.P%02x" % (d.rom_table_entry.table.address_string(), pwrid), end="")
+
         print()
-        if d.is_lockable():
+        if o_verbose >= 2:
+            print("finished showing device static information")
+
+        if (not core_powered_off) and d.is_lockable():
             if o_unlock:
                 d.unlock()
             if o_lock:
@@ -1614,6 +1698,8 @@ class CSROM:
         if not o_show_programming:
             return
         if core_powered_off:
+            if o_verbose >= 2:
+                print("powered off: not showing current status")
             return
 
         # Some components have integration registers that we can optionally show.
@@ -2399,7 +2485,19 @@ class CSROM:
             part_string = "<unknown part>"
         print("%-22s" % part_string, end="")
         if d.is_rom_table():
-            print("ROM table")
+            print("ROM table (class %u)" % d.device_class(), end="")
+            if d.device_class() == 9:
+                # Which power domains can be controlled?
+                for i in range(0, 32):
+                    pcr = d.read32(0xA00 + i*4)
+                    if bit(pcr, 0):
+                        print(" P%02x" % i, end="")
+                        if bit(pcr, 1):
+                            print(".PR", end="")
+                        psr = d.read32(0xA80 + i*4)
+                        ps = bits(psr, 0, 2)
+                        print(".PS=%u" % (ps), end="")
+            print()
         elif d.is_coresight_timestamp():
             print("CoreSight timestamp generator")
             if o_show_programming:
@@ -2823,14 +2921,15 @@ def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology
     We can also use this to list a single device.
     """
     table = c.create_device_at(table_addr)
-    c.show_device(table)
+    c.show_device(table)                    # Show the ROM table itself
     if not table.is_rom_table():
         return
     n = 0
     devices = []
     ts = []
     for e in c.list_table(table, recurse=recurse):
-        assert e.device is not None or e.is_inaccessible
+        # We must have created a device mapping, or had a reason not to
+        assert e.device is not None or e.is_inaccessible is not None
         if e.device is not None:
             if e.device.is_coresight():
                 devices.append(e.device)
@@ -2839,19 +2938,21 @@ def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology
         n += 1
         if n <= o_max_devices:
             if e.device is None:
-                print("@0x%x - device excluded from scan" % e.device_address())
+                print("@0x%x - device excluded: %s" % (e.device_address(), e.is_inaccessible))
             else:
                 c.show_device(e.device)
         elif n == (o_max_devices+1):
             print("... further devices not shown.")
         else:
             pass
-    if False:
+
+    if o_verbose >= 2:
         print("Affinity groups:")
         for ag in sorted(c.affinity_group_map.values()):
             print("  %s" % ag)
             for (typ, d) in ag.devices.items():
                 print("    %-5s %s" % (typ, d))
+
     # Prepare to generate a topology JSON file, that can be used to create
     # a Linux device tree.
     atb_devices = []
@@ -2872,7 +2973,12 @@ def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology
             def get_etm_architecture(d):
                 etm_version = None
                 if d.is_arm_architecture(ARM_ARCHID_ETM):
-                    etm_version = bits(d.read32(0x1E4),8,4)
+                    pdsr = d.read32(0x314)
+                    core_powered_off = ((pdsr & 0x1) == 0)
+                    if not core_powered_off:
+                        etm_version = bits(d.read32(0x1E4),8,4)
+                    else:
+                        etm_version = None
                 return etm_version
             etm_version = get_etm_architecture(d)
             if etm_version is not None:
@@ -2907,13 +3013,22 @@ def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology
         if not n_found:
             print("No timestamp devices found")
     fn = "topology.json"
-    f = open(fn, "w")
-    json.dump(topo, f, indent=4)
-    f.close()
+    with open(fn, "w") as f:
+        json.dump(topo, f, indent=4)
 
 
 def disable_stdout_buffering():
-    sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
+    global print
+    if o_verbose >= 2:
+        print("disabling output buffering on %d" % sys.stdout.fileno())
+    if sys.version_info[0] == 2:
+        sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
+    else:
+        # Python3 fails above with "can't have unbuffered text I/O"
+        import functools
+        print = functools.partial(print, flush=True)
+    print("output buffering", end="")
+    print(" disabled")
 
 
 if __name__ == "__main__":
