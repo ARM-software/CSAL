@@ -219,6 +219,18 @@ int cs_device_unlock(cs_device_t dev);
  */
 int cs_device_lock(cs_device_t dev);
 
+
+/**
+ *   Check if a device is powered, if possible.
+ *
+ *   \param dev     device descriptor
+ */
+int cs_device_is_powered(cs_device_t dev);
+#define CS_POWER_UNKNOWN  -1
+#define CS_POWER_OFF       0
+#define CS_POWER_ON        1
+
+
 /** @} */
 
 #endif				/* _included_cs_reg_access_h */

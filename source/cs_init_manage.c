@@ -168,6 +168,34 @@ uint32_t _cs_device_internal_claim_tag(struct cs_device *d)
 }
 
 
+/*
+ * Check if this device is powered.
+ * For some devices types, in some configurations, we can inspect
+ * an always-on register.
+ *  - CPU debug, without FEAT_DoPD, we can read DBGPRSR
+ *  - ETM/ETE, without FEAT_DoPD
+ * Return -1 if power status is unknown.
+ */
+int _cs_device_is_powered(struct cs_device *d)
+{
+    if (cs_device_has_class(d, CS_DEVCLASS_DEBUG)) {
+        uint32_t edprsr = _cs_read(d, CS_DBGPRSR);
+        return (edprsr & 1) == 1;
+    } else if (cs_device_has_class(d, CS_DEVCLASS_SOURCE|CS_DEVCLASS_CPU)) {
+        uint32_t edpdsr = _cs_read(d, CS_ETMPDSR);
+        return (edpdsr & 1) == 1;
+    } else {
+        return CS_POWER_UNKNOWN;
+    }
+}
+
+
+int cs_device_is_powered(cs_device_t dev)
+{
+    return _cs_device_is_powered(DEV(dev));
+}
+
+
 int cs_release(void)
 {
     /* Release all CoreSight devices.  The system is now in a state where
@@ -175,7 +203,15 @@ int cs_release(void)
        and cross-triggering, not necessarily CPU hardware breakpoints). */
     struct cs_device *d;
     for (d = G.device_top; d != NULL; d = d->next) {
+        /* Get the appropriate tag bit for this device type. */
         uint32_t const tag = _cs_device_internal_claim_tag(d);
+        /* For certain devices, we might have been able to create
+           the device object, but then found that the device is
+           powered down. E.g. CPU debug interfaces. In this case,
+           reading the claim tag will likely lock up. */
+        if (_cs_device_is_powered(d) == CS_POWER_OFF) {
+            continue;
+        }
         if (_cs_isclaimed(d, tag)) {
             if (DTRACE(d)) {
                 diagf("!unclaiming device tag 0x%x at %" CS_PHYSFMT "\n",

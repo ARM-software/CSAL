@@ -50,8 +50,10 @@ void cs_diagf(char const *, ...);
 int cs_diag_set_fd(FILE *fd);
 #endif
 
+
 /** Lock all components (devices) */
 int cs_shutdown(void);
+
 
 /**
    Release internal claims on all trace devices, e.g. by unsetting the
@@ -60,11 +62,14 @@ int cs_shutdown(void);
 */
 int cs_release(void);
 
+
 /** Return the number of programming errors detected so far. */
 unsigned int cs_error_count(void);
 
+
 /** Make all current configuration take effect */
 int cs_checkpoint(void);
+
 
 /** return the version number for the library 
  *  version number in form 0xMMNN:
