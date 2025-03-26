@@ -770,7 +770,7 @@ static void _cs_link_affinity(struct cs_device *dbg,
 }
 
 /* Used in asserts only */
-#ifdef DEBUG
+#if defined(DEBUG) || defined(BAREMETAL)
 static int cs_device_has_atb_out(struct cs_device *d)
 {
     return (d->devclass & (CS_DEVCLASS_SOURCE | CS_DEVCLASS_LINK)) != 0;
