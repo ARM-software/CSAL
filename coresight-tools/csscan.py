@@ -2601,6 +2601,9 @@ def topology_detection_atb(atb_devices, topo):
         if d.is_arm_part_number(0x9eb):
             # CSSoC-600 funnel
             (reg, mask) = (0xEF4, 0x01)
+        elif d.is_arm_part_number(0x9ec):
+            # CSSoC-600 replicator
+            (reg, mask) = (0xEF8, 0x10)
         elif d.is_replicator():
             (reg, mask) = (0xEFC, 0x10)
         else:
