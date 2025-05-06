@@ -17,6 +17,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+from __future__ import print_function
 
 import sys, os, struct, re
 
@@ -68,7 +69,7 @@ def show_trace_records(fn):
         if base_time is None:
             base_time = time
         delta = time - base_time
-        print "%-15d %11d  %-12s %7u" % (time, delta, type_name(type), len(data))
+        print("%-15d %11d  %-12s %7u" % (time, delta, type_name(type), len(data)))
 
 
 if __name__ == "__main__":
@@ -78,15 +79,15 @@ if __name__ == "__main__":
     for arg in sys.argv[1:]:
         if arg.startswith("-"):
             if arg == "--help":
-                print "Usage: %s [options] trace.data" % sys.argv[0]
-                print "   show profile data created by csprofile"
-                print "  -v             increase verbosity level"
-                print "  --kernel=<fn>  specify kernel ELF file"
+                print("Usage: %s [options] trace.data" % sys.argv[0])
+                print("   show profile data created by csprofile")
+                print("  -v             increase verbosity level")
+                print("  --kernel=<fn>  specify kernel ELF file")
                 sys.exit()
             elif arg == "-v" or arg == "--verbose":
                 o_verbose += 1 
             else:
-                print "%s: wrong args: %s" % (sys.argv[0], arg)
+                print("%s: wrong args: %s" % (sys.argv[0], arg))
                 sys.exit(1)
         else:
             show_trace_records(arg)
