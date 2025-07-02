@@ -29,7 +29,7 @@ limitations under the License.
 
 MODULE_AUTHOR("Arm Ltd");
 MODULE_DESCRIPTION("CoreSight: report basic info, then unload");
-MODULE_VERSION("0.1");
+MODULE_VERSION("0.2");
 MODULE_LICENSE("Proprietary");
 
 
@@ -41,18 +41,24 @@ static char const *const dbgarch_str[] = {
 	[5] = "ARMv7, debug v7.1",
 	[6] = "ARMv8, debug v8",
 	[7] = "ARMv8.1, debug v8 with VHE",
-	[8] = "ARMv8.2, debug v8.2"
+	[8] = "ARMv8.2, debug v8.2",
+	[9] = "Armv8.4 debug",
+	[10] = "Armv8.8 debug",
+	[11] = "Armv8.9 debug",
 };
 
 
 struct cpu_info {
-	u32 midr;	/* CPU type descriptor (e.g. "Arm Cortex-A75") */
+	/* Following are expected to be unique per CPU */
+	unsigned int cpu;  /* CPU number */
 	u64 mpidr;	/* CPU identifier within the topology, e.g. 2.1.3 */
-	u64 rombase;	/* Top-level ROM base address */
+	/* Following are expected to be identiical for a given MIDR */
+	u32 midr;	/* CPU type descriptor (e.g. "Arm Cortex-A75 r2p0") */
+	u64 rombase;	/* Top-level ROM base address (zero on newer CPUs) */
 };
 
 
-static void report_on_cpu(void *infov)
+static void collect_on_cpu(void *infov)
 {
 	unsigned int const cpu = smp_processor_id();
 	struct cpu_info *info = (struct cpu_info *)infov + cpu;
@@ -69,10 +75,10 @@ static void report_on_cpu(void *infov)
         __asm__("mrc p15,0,%0,c0,c0,5":"=r"(mpidr32));
         info->mpidr = mpidr32;
 	__asm__("mrc p14,0,%0,c0,c0,0":"=r"(dbgid));
-	printk(KERN_INFO "  DBGDIDR           = 0x%08x\n", dbgid);
+	pr_info("  DBGDIDR           = 0x%08x\n", dbgid);
 	DebugVer = (dbgid >> 16) & 0xf;
         __asm__("mrc p14,0,%0,c7,c2,7":"=r"(dbgdevid));
-	printk(KERN_INFO "  DBGDEVID          = 0x%08x\n", dbgdevid);
+	pr_info("  DBGDEVID          = 0x%08x\n", dbgdevid);
 	{
 		u32 hi, lo;
 		__asm__("mrrc p14,0,%0,%1,c1":"=r"(lo),"=r"(hi));
@@ -93,10 +99,10 @@ static void report_on_cpu(void *infov)
 		info->mpidr = mpidr;
 	}
 	__asm__("mrs %0,ID_AA64DFR0_EL1":"=r"(dfr64));
-	printk(KERN_INFO "  ID_AA64DFR0_EL1   = 0x%016llx\n", dfr64);
+	pr_info("  ID_AA64DFR0_EL1   = 0x%016llx\n", dfr64);
 	TraceVer = (unsigned int)(dfr64 >> 4) & 0xf;
 	DebugVer = (unsigned int)dfr64 & 0xf;
-	printk(KERN_INFO "    ETM system register interface %simplemented\n", (TraceVer ? "" : "not "));
+	pr_info("    ETM system register interface %simplemented\n", (TraceVer ? "" : "not "));
 	{
 		u64 rombase;
 		__asm__("mrs %0,MDRAR_EL1":"=r"(rombase));
@@ -105,8 +111,10 @@ static void report_on_cpu(void *infov)
 
 #endif
 
-	if (dbgarch_str[DebugVer])
-		printk(KERN_INFO "#%-3u    Architecture: %s\n", cpu, dbgarch_str[DebugVer]);
+	if (DebugVer < (sizeof dbgarch_str / sizeof dbgarch_str[0]))
+		pr_info("#%-3u    Debug architecture: %s\n", cpu, dbgarch_str[DebugVer]);
+	else
+		pr_info("#%-3u    Debug architecture: %u?\n", cpu, DebugVer);
 }
 
 
@@ -115,11 +123,11 @@ static void show_debug_info(void)
 	int cpu;
 	struct cpu_info *infos = (struct cpu_info *)vmalloc(sizeof(struct cpu_info) * NR_CPUS);
 	memset(infos, 0, sizeof(struct cpu_info) * NR_CPUS);
-	on_each_cpu(report_on_cpu, infos, 1);
+	on_each_cpu(collect_on_cpu, infos, 1);
 	for (cpu = 0; cpu < NR_CPUS; ++cpu) {
 		struct cpu_info const *info = &infos[cpu];
 		if (info->midr != 0) {
-			printk(KERN_INFO "#%-3u  MIDR: %08x   MPIDR: 0x%016llx  ROM table: 0x%016llx\n",
+			pr_info("#%-3u  MIDR: %08x   MPIDR: 0x%016llx  ROM table: 0x%016llx\n",
 				cpu, info->midr, info->mpidr, (info->rombase & ~3));
 		}
 	}
@@ -140,7 +148,7 @@ static void show_cpu_hwcaps(void)
 		i = find_next_bit(cpu_hwcaps, ARM64_NCAPS, i);
 		if (i == ARM64_NCAPS)
 			break;
-		printk(KERN_INFO "  CPU capability %u\n", i);
+		pr_info("  CPU capability %u\n", i);
 		++i;
 		++panic;
 		if (panic > 1000)
@@ -153,9 +161,9 @@ static void show_cpu_hwcaps(void)
 static int __init csinfo_init(void)
 {
 #ifndef CONFIG_64BIT
-	printk(KERN_INFO "CoreSight information module (AArch32)\n");
+	pr_info("CoreSight information module (AArch32)\n");
 #else
-	printk(KERN_INFO "CoreSight information module (AArch64)\n");
+	pr_info("CoreSight information module (AArch64)\n");
 #endif
 	show_debug_info();
 #ifdef SHOW_CPU_HWCAPS
