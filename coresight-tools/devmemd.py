@@ -95,7 +95,7 @@ class Devmem:
         if status != ERR_OK:
             raise DevmemException
         return (status, data)
-    
+
     def read(self, size, addr):
         """
         Read a value from physical memory.
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     opts = parser.parse_args()
     (addr, port) = opts.target.split(':')
     port = int(port)
-    m = Devmem(addr, port, verbosity=opts.verbose) 
+    m = Devmem(addr, port, verbosity=opts.verbose)
     while True:
         ln = raw_input("devmem> ")
         toks = ln.strip().split()

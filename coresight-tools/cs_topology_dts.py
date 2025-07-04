@@ -26,8 +26,9 @@ limitations under the License.
 
 from __future__ import print_function
 
-import cs_topology as CS
 import sys
+
+import cs_topology as CS
 
 
 """
@@ -68,13 +69,13 @@ class DTWriter:
     Manage the writing of a CoreSight topology description as a Linux device tree fragment.
     """
     def __init__(self, platform):
-        platform.check()     
+        platform.check()
         self.platform = platform
         # initialize some parameters that the user can override before writing
         self.prefix = "\t\t"
         self.style = 2         # 1 is original port style, 2 is new one Suzuki Poulose introduced 2018
         self.clocks = ["DBGCLK"]
-        self.clock_names = ["dbgclk"]        
+        self.clock_names = ["dbgclk"]
         # initialize structures that are going to be used when we generate the DT
         # and that the user can override
         self.dev_cpu_number = {}
@@ -85,7 +86,7 @@ class DTWriter:
         for dev in platform:
             if dev.cpu_number is not None:
                 self.dev_cpu_number[dev] = dev.cpu_number
-            elif dev.type == CS.CS_DEVTYPE_CORE:                
+            elif dev.type == CS.CS_DEVTYPE_CORE:
                 self.dev_cpu_number[dev] = n_core
                 n_core += 1
             # give each device a unique name for endpoint purposes
@@ -204,14 +205,14 @@ class DTWriter:
             print(" * derived from %s" % self.platform.source_file)
         print(" */")
         print("")
-        print("/* auto-generated */")     
+        print("/* auto-generated */")
         def plural(n):
             if n > 1:
                 return "s"
             else:
                 return ""
         def link_in_dt(p):
-            return p.linktype == CS.CS_LINK_ATB 
+            return p.linktype == CS.CS_LINK_ATB
         def filter_ports(pl):
             return list(filter(link_in_dt, pl))
         dt_in_ports = {}
@@ -236,7 +237,7 @@ class DTWriter:
                 compat += ", \"arm,primecell\""
             print("%s\tcompatible = %s;" % (self.prefix, compat))
             if d.is_memory_mapped():
-                print("%s\treg = %s" % (self.prefix, self.addr_reg_string(d.mem_address, 0x1000)), end="")                
+                print("%s\treg = %s" % (self.prefix, self.addr_reg_string(d.mem_address, 0x1000)), end="")
                 if self.dt_type_name(d) == "stm":
                     # Currently the STM driver requires a stimulus base address.
                     sb = d.stimulus_base_address
@@ -263,7 +264,7 @@ class DTWriter:
             in_ports = filter_ports(d.inlinks)
             out_ports = filter_ports(d.outlinks)
             ports = in_ports + out_ports
-            o_diag_ports = False 
+            o_diag_ports = False
             if ports:
                 print()
                 if o_diag_ports:
@@ -284,7 +285,7 @@ class DTWriter:
                         first = False
                         if pn == 0 and is_input:
                             if self.style == 1:
-                                print("%s\t\t/* %s input port%s */" % (self.prefix, self.dt_name(d), plural(len(in_ports))))                        
+                                print("%s\t\t/* %s input port%s */" % (self.prefix, self.dt_name(d), plural(len(in_ports))))
                             else:
                                 print("%s\tin-ports {" % (self.prefix))
                             first = True
@@ -325,7 +326,11 @@ def gen_dts(p, file=None):
 
 
 if __name__ == "__main__":
-    for arg in sys.argv[1:]:
+    import argparse
+    parser = argparse.ArgumentParser(description="read CS topology from Device Tree Source")
+    parser.add_argument("files", type=str, nargs="+", help="DTS files")
+    opts = parser.parse_args()
+    for arg in opts.files:
         p = CS.load(arg)
         gen_dts(p)
- 
+

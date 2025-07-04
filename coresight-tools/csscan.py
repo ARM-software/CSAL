@@ -107,17 +107,22 @@ ARM_ARCHID_ROM      = 0x0af7
 # Architecture identifiers indicate the programming interface which a device conforms to.
 # Multiple parts may have the same architecture identifier.
 #
+# ARCHIDs are mostly described in:
+#   - CoreSight Architecture 3.0 table B2-8
+#   - ADIv6.0 C1.4.5 (for APv2)
+#
 arm_archids = {
     0x0a00:"RAS",
-    0x1a01:"ITMv2",
+    0x1a01:"ITMv2",      # Instrumentation Trace Macrocell
     0x1a02:"DWT",
+    0x1a03:"FPB",        # Flash Patch and Breakpoint unit
     0x2a04:"v8-M",
     0x6a05:"v8-R",
     0x0a10:"PC-sample",  # PC sample-based profiling without PMU
     0x0a11:"ETR",
     0x4a13:"ETMv4",      # REVISION indicates the ETMv4 minor version
     0x5a13:"ETEv1",      # REVISION indicates the ETE minor version
-    0x1a14:"CTI",
+    0x1a14:"CTI",        # Cross Trigger Interface
     0x6a15:"v8.0-A",     # Armv8 debug architecture
     0x7a15:"v8.1-A",     # Armv8 debug architecture with VHE (FEAT_Debugv8p1, FEAT_VHE)
     0x8a15:"v8.2-A",     # Armv8.2 debug architecture (FEAT_Debugv8p2)
@@ -125,14 +130,17 @@ arm_archids = {
     0xaa15:"v8.8-A",     # Armv8.8 debug architecture (FEAT_Debugv8p8)
     0xba15:"v8.9-A",     # Armv8.9 debug architecture (FEAT_Debugv8p9)
     0x2a16:"PMUv3",
-    0x0a17:"MEM-AP",
+    0x0a17:"MEM-AP",     # Memory APv2
+    0x0a27:"JTAG-AP",    # JTAG APv2: see ADIv6.0 C1.4.5
+    0x0a31:"basic-TR",   # basic trace router
     0x0a34:"pwr-rq",     # not 0x0a37 as stated in Issue E
     0x0a41:"CATU",
+    0x0a47:"unk-APv2",   # including APv1s adapted to APv2 (see ADIv6.0 C1.4.5)
     0x0a50:"HSSTP",
-    0x0a63:"STM",
+    0x0a63:"STM",        # Software Trace Macrocell
     0x0a66:"AMU32",
     0x0a67:"AMU64",
-    0x0a75:"ELA",
+    0x0a75:"ELA",        # CoreSight Embedded Logic Analyzer
     0x0af7:"ROM"
 }
 
@@ -1755,26 +1763,26 @@ class CSROM:
             # Show breakpoint/watchpoint programming
             n_bkpt = bits(dfr,12,4)+1
             n_wpt = bits(dfr,20,4)+1
-            for n in range(0,n_bkpt):
+            for n in range(0, n_bkpt):
                 bcr = d.read32(0x408+(n*16))    # Breakpoint control
                 bvr = d.read64(0x400+(n*16))    # Breakpoint value
                 if o_verbose or bcr != 0 or bvr != 0:
-                    is_enabled = bit(bcr,0)
+                    is_enabled = bit(bcr, 0)
                     print("  BP #%u: value=0x%016x control=0x%08x" % (n, bvr, bcr), end="")
                     print(" type=0x%x" % (bits(bcr,20,4)), end="")
-                    if bit(bcr,20):
+                    if bit(bcr, 20):
                         print(" linked=BP#%u" % (bits(bcr,16,4)), end="")
                     # TBD: interpret SSC, HMC and PMC
                     print(" PMC=EL%u" % (bits(bcr,1,2)), end="")
                     print([" disabled"," enabled"][is_enabled], end="")
                     print()
-            for n in range(0,n_wpt):
+            for n in range(0, n_wpt):
                 wcr = d.read32(0x808+(n*16))
                 wvr = d.read64(0x800+(n*16))
                 if o_verbose or wcr != 0 or wvr != 0:
-                    is_enabled = bit(wcr,0)
+                    is_enabled = bit(wcr, 0)
                     print("  WP #%u: value=0x%016x control=0x%08x" % (n, wvr, wcr), end="")
-                    if bit(wcr,20):
+                    if bit(wcr, 20):
                         print(" linked=WP#%u" % (bits(wcr,16,4)), end="")
                     print([" disabled"," enabled"][is_enabled], end="")
                     print()
@@ -2483,7 +2491,7 @@ class CSROM:
             part_string = ""      # ROM table part numbers tend not to mean much
         else:
             part_string = "<unknown part>"
-        print("%-22s" % part_string, end="")
+        print("%-21s " % part_string, end="")
         if d.is_rom_table():
             print("ROM table (class %u)" % d.device_class(), end="")
             if d.device_class() == 9:

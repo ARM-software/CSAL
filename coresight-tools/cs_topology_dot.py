@@ -20,8 +20,9 @@ limitations under the License.
 
 from __future__ import print_function
 
-import cs_topology
 import sys
+
+import cs_topology
 
 
 def memory_size_str(sz):
@@ -111,7 +112,13 @@ def generate_dot(p):
                 lab = "%u bits" % d.mem_width_bits
             except AttributeError:
                 lab = ""
-            print("  %s -> %sAXI [label=\"%s\"];" % (d.dotid, d.dotid, lab))
+            try:
+                catu = d.catu_device_name
+                print("  %sCATU [label=\"CATU:%s\"];" % (d.dotid, catu))
+                print("  %s -> %sCATU [label=\"%s\"];" % (d.dotid, d.dotid, lab))
+                print("  %sCATU -> %sAXI [label=\"%s\"];" % (d.dotid, d.dotid, lab))
+            except AttributeError:
+                print("  %s -> %sAXI [label=\"%s\"];" % (d.dotid, d.dotid, lab))
         elif d.type == cs_topology.CS_DEVTYPE_PORT:
             lab = "port"
             try:
@@ -124,7 +131,7 @@ def generate_dot(p):
         printed = False
         for d in x:
             if d.dotshow:
-                if not printed:                    
+                if not printed:
                     print("  subgraph {")
                     print("    rank=same;")
                     printed = True
@@ -151,5 +158,11 @@ def generate_digraph(p, size="7,10", label="None"):
 
 
 if __name__ == "__main__":
-    p = cs_topology.load("topology.json")
-    generate_digraph(p)
+    import argparse
+    parser = argparse.ArgumentParser(description="generate DOT graph")
+    parser.add_argument("-i", "--input", type=str, default="topology.json", help="input JSON")
+    parser.add_argument("--size", type=str, default="7,10")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="increase verbosity")
+    opts = parser.parse_args()
+    p = cs_topology.load(opts.input)
+    generate_digraph(p, size=opts.size)

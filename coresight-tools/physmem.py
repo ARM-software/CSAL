@@ -82,7 +82,7 @@ class PhysMem:
       2 to force huge pages, using MAP_HUGETLB
     """
     def __init__(self, size, lock=True, huge=HUGE_NOT, contiguous=False, init=None):
-        self.requested_size = size         
+        self.requested_size = size
         self.page_size = os.sysconf("SC_PAGE_SIZE")
         self.va = None
         self.is_locked = False
@@ -135,7 +135,7 @@ class PhysMem:
         if rc != 0:
             raise OSError
         self.is_locked = True
-        
+
     def unlock(self):
         assert self.is_locked, "block is already unlocked"
         rc = libc_munlock(self.va, self.alloc_size)
@@ -217,7 +217,7 @@ class PhysMem:
             if not self.is_in_memory():
                 s += ",unalloc"
             if self.is_locked:
-                s += ",locked"            
+                s += ",locked"
         return "{%s}" % s
 
 
@@ -245,7 +245,7 @@ def show_huge_page_config():
     for ps in hpsizes:
         d = os.path.join(hpc, "hugepages-%ukB" % ps)
         assert os.path.isdir(d)
-        pnr = _readn(os.path.join(d, "nr_hugepages")) 
+        pnr = _readn(os.path.join(d, "nr_hugepages"))
         pfree = _readn(os.path.join(d, "free_hugepages"))
         print("  %9ukB %9u %9u" % (ps, pnr, pfree))
 

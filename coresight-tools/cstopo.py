@@ -1,13 +1,16 @@
 #!/usr/bin/python
 
 """
-Utility for processing CS topolgies.
+Utility for processing CS topologies.
+
+Reads and writes topology descriptions in various forms.
 """
 
 from __future__ import print_function
 
 
 import sys
+import os
 
 
 import cs_topology
@@ -52,7 +55,7 @@ def save(S, fn):
         oo = sys.stdout
         with open(fn, "w") as f:
             sys.stdout = f
-            cs_topology_dot.generate_digraph(S)     
+            cs_topology_dot.generate_digraph(S)
         sys.stdout = oo
     elif fn == "-":
         S.show()
@@ -68,8 +71,29 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", type=str, action="append", default=[], help="output file(s)")
     parser.add_argument("--check", action="store_true", help="check topology")
     opts = parser.parse_args()
-    S = load(opts.input)
-    if opts.check:
-        cs_topology.check_topology(S)
-    for out in opts.output:
-        save(S, out)
+    def process(fn):
+        S = load(fn)
+        if S is None:
+            print("%s: skipping as empty" % fn, file=sys.stderr)
+        else:
+            print("%s" % S)
+            if opts.check:
+                res = S.check_topology()
+                if res:
+                    print("%s: topology issues detected" % fn, file=sys.stderr)
+        return S
+    if os.path.isdir(opts.input):
+        # Scan directory tree looking for SDF files, and summarize/check as needed.
+        if opts.output:
+            print("Can't use output when scanning directory", file=sys.stderr)
+            sys.exit(1)
+        for root, dirs, files in os.walk(opts.input):
+            for fn in files:
+                if fn.endswith(".sdf"):
+                    fn = os.path.join(root, fn)
+                    process(fn)
+    else:
+        S = process(opts.input)
+        if S is not None:
+            for out in opts.output:
+                save(S, out)

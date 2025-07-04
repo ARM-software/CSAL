@@ -105,12 +105,12 @@ class Device:
     A CoreSight device.
     """
 
-    def __init__(self, platform, device_type, is_hidden=False, name=None, type_name=None, mem_address=None):
+    def __init__(self, platform, device_type, is_hidden=False, name=None, type_name=None, mem_address=None, dap_name=DAP_CORE):
         """
         Create a device.
           - device_type should be a major/minor pair, e.g. CS_DEVTYPE_FIFO.
           - name is free for user use and should be a unique name for
-            this device instance within the platform, e.g. "ETB#1".          
+            this device instance within the platform, e.g. "ETB#1".
           - type_name is free for user use and should be a descriptive name
             for the device type: especially useful for cores
         """
@@ -136,14 +136,13 @@ class Device:
         elif device_type == CS_DEVTYPE_TRACE_CORE:
             self.etm_architecture = None
         self.mem_address = None     # Ideally, memory address as seen by the core (DAP-relative address may differ)
-        self.dap_name = DAP_CORE    # By default
         # Input and output links can be of various types: ATB, CTI etc.
         # The device may also have configured ports that do not have links.
         self.outlinks = []
         self.inlinks = []
         platform.devices.append(self)
         if mem_address is not None:
-            self.set_mem_address(mem_address)
+            self.set_mem_address(mem_address, dap_name=dap_name)
         if platform.trace_creation:
             print("  created %s%s" % (str(self), [""," (hidden)"][is_hidden]))
             platform.check()
@@ -204,12 +203,18 @@ class Device:
         Get a path (a list of links) to another device, or None if no path.
         """
         if td == self:
-            return Path() 
+            return Path()
         for ln in self.outlinks:
             p = ln.slave.get_path_to(td, type=type)
             if p is not None:
                 return p.prepend(ln)
         return None
+
+    def is_replicator(self):
+        return self.type == CS_DEVTYPE_REPLICATOR
+
+    def is_funnel(self):
+        return self.type == CS_DEVTYPE_FUNNEL
 
     def is_affine_to_cpu(self):
         return self.cpu_number is not None or self.affine_cpu is not None
@@ -226,7 +231,7 @@ class Device:
             cpu_dev.affine_devices.append(self)
             if self.cpu_number is None:
                 self.cpu_number = cpu_dev.cpu_number
-            
+
     def set_cpu_number(self, n):
         self.cpu_number = n
         if n > self.platform.max_cpu_number:
@@ -259,17 +264,22 @@ class Device:
             assert False, "%s: duplicate device name '%s'" % (self.platform, name)
         self.platform.devices_by_name[name] = self
 
-    def set_mem_address(self, maddr):
+    def set_mem_address(self, maddr, dap_name=DAP_CORE):
+        """
+        Set the address of this device, also registering it in the Platform's
+        address mapping and checking for multiple devices at the same address.
+        """
         self.mem_address = maddr
+        self.dap_name = dap_name
         addr = self.address()
         if addr is not None:
             while addr in self.platform.devices_by_address:
                 # we should only ever see this when enumerating devices by JTAG
                 # and when the devices differ in AP index
-                print("%s: warning: address %s has duplicate devices %s and %s" % (self.platform.source_file, self.address_str(), self.platform.devices_by_address[addr].name, self.name))
+                print("%s: warning: address %s has multiple devices %s and %s" % (self.platform.source_file, self.address_str(), self.platform.devices_by_address[addr].name, self.name))
                 # TBD this is a hack
                 (d, a) = addr
-                addr = (d, a+1) 
+                addr = (d, a+1)
             self.platform.devices_by_address[addr] = self
 
     def address(self):
@@ -297,16 +307,22 @@ class Device:
 class Link:
 
     """
-    Link is the class of objects that represent point-to-point links between CoreSight components, e.g.
+    Link is the class of objects that represent point-to-point links
+    between CoreSight components, e.g.
       ATB
       cross-trigger
       core-to-ETM
+    Note that CoreSight has the concept of a "trace link" which is
+    a device such as a funnel or ETF. In our object model, that is a
+    Device, not a Link.
     """
 
     def __init__(self, master, slave, linktype, master_port=0, slave_port=0):
+        assert isinstance(master, Device)
+        assert isinstance(slave, Device)
         assert master.platform == slave.platform
-        platform = master.platform        
-        assert master != slave       
+        platform = master.platform
+        assert master != slave
         assert linktype in link_types
         if linktype == CS_LINK_CORE_TRACE:
             assert master.type == CS_DEVTYPE_CORE
@@ -316,7 +332,7 @@ class Link:
         elif linktype == CS_LINK_CTI:
             assert master.type not in [CS_DEVTYPE_FUNNEL, CS_DEVTYPE_REPLICATOR]
             assert slave.type not in [CS_DEVTYPE_FUNNEL, CS_DEVTYPE_REPLICATOR]
-        elif linktype == CS_LINK_ATB:           
+        elif linktype == CS_LINK_ATB:
             pass
         self.linktype = linktype
         self.master = master        # input to this link
@@ -334,7 +350,7 @@ class Link:
                     print("** %s.m%s -> %s.s%s: slave already ATB-connected from %s" % (master, master_port, slave, slave_port, sl.master))
                     assert False
                 # check if there's already a hidden funnel on this slave port
-                if sl.master.type == CS_DEVTYPE_FUNNEL and sl.master.is_hidden: 
+                if sl.master.type == CS_DEVTYPE_FUNNEL and sl.master.is_hidden:
                     pd = sl.master
                     # this new link will now go to the slave port on the existing hidden funnel
                 else:
@@ -412,7 +428,7 @@ class Link:
         elif d == self.slave:
             return CS_LINK_SLAVE
         else:
-            return None 
+            return None
 
     def link_port(self, d):
         if d == self.master:
@@ -437,35 +453,64 @@ class Path:
     """
     A collection of links. Usually of the same type.
     """
-    def __init__(self):
-        self.links = []
+    def __init__(self, links=[]):
+        self.links = [ln for ln in links]
 
     def len(self):
         return len(self.links)
 
     def append(self, ln):
-        assert (not self.links) or self.links[-1].slave == ln.master
+        """
+        Update the path in place by adding another link.
+        """
+        assert (not self.links) or self.links[-1].slave == ln.master, "%s append %s" % (self, ln)
         self.links.append(ln)
         return self
 
+    def __add__(self, ln):
+        """
+        Create a new path from an old one with a new link appended.
+        """
+        return Path(self.links).append(ln)
+
     def prepend(self, ln):
-        assert (not self.links) or ln.slave == self.links[0].master
+        assert (not self.links) or ln.slave == self.links[0].master, "%s prepend %s" % (ln, self)
         self.links.insert(0, ln)
         return self
 
-    def __str__(self):
+    def devices(self, hidden=True):
+        assert self.links
+        for (i, ln) in enumerate(self.links):
+            if i == 0 or not ln.master.is_hidden:
+                yield ln.master
+        yield self.links[-1].slave
+
+    def first_device(self):
+        return self.links[0].master
+
+    def last_device(self):
+        return self.links[-1].slave
+
+    def str(self, typed=True, hidden=True):
         if not self.links:
             return "[]"
         ln0 = self.links[0]
         s = str(ln0.master)
-        for ln in self.links:
+        for (i, ln) in enumerate(self.links):
             if ln.master_port is not None:
                 s += ".%u" % ln.master_port
-            s += " --(%s)--> " % link_type_str[ln.linktype]
-            if ln.slave_port is not None:
-                s += "%u." % ln.slave_port
-            s += str(ln.slave)
+            s += " "
+            if typed:
+                s += "--(%s)" % link_type_str[ln.linktype]
+            s += "--> "
+            if hidden or not ln.slave.is_hidden or (i == len(self.links)-1):
+                if ln.slave_port is not None:
+                    s += "%u." % ln.slave_port
+                s += str(ln.slave)
         return s
+
+    def __str__(self):
+        return str(self, typed=True)
 
 
 class Platform:
@@ -473,16 +518,29 @@ class Platform:
     A collection of linked CoreSight devices.
     """
 
-    def __init__(self, name=None, auto_split=False):
-        self.trace_creation = False 
+    def __init__(self, name=None, source_file=None, auto_split=False):
+        self.trace_creation = False
         self.name = name
+        self.source_file = source_file    # diagnostic use only - need not exist
         self.auto_split = auto_split
         self.devices = []
         self.devices_by_address = {}
         self.devices_by_name = {}
         self.links = []              # all links
-        self.source_file = None
         self.max_cpu_number = 0
+
+    def name_str(self):
+        if self.name is not None:
+            s = self.name
+        elif self.source_file is not None:
+            s = self.source_file
+        else:
+            s = "<CoreSight>"
+        return s
+
+    def __str__(self):
+        s = "%s: %u devices, %u links" % (self.name_str(), len(self.devices), len(self.links))
+        return s
 
     def device_by_address(self, addr):
         """
@@ -544,6 +602,11 @@ class Platform:
         """
         Run various consistency checks over the topology representation,
         checking that devices and links are properly connected.
+        We expect this to always succeed, by construction,
+        regardless of whether the topology representation is
+        correct or compliant as regards CoreSight.
+
+        For a CoreSight architecture compliance check, see check_topology().
         """
         all_devices = list(self)
         assert len(self.devices) == len(all_devices)
@@ -560,6 +623,9 @@ class Platform:
             if d.mem_address is not None:
                 assert d.address() in self.devices_by_address
         return self
+
+    def check_topology(self):
+        return check_topology(self)
 
     def show(self):
         """
@@ -635,7 +701,7 @@ def load(fn):
             if isinstance(port, list):
                 (fa, fp) = tuple(port)
             else:
-                (fa, fp) = (port, 0)                
+                (fa, fp) = (port, 0)
             fa = jaddr(fa)
             fd = p.device_by_address((DAP_CORE, fa))
             if fd is None:
@@ -648,6 +714,128 @@ def load(fn):
             Link(fd, td, CS_LINK_ATB, master_port=fp, slave_port=tp)
     f.close()
     return p
+
+
+def link_can_be_disabled(ln):
+    """
+    Check if an ATB link can be disabled dynamically.
+    """
+    if ln.master.is_replicator() and not ln.master.is_hidden:
+        return True
+    if ln.slave.is_funnel() and not ln.slave.is_hidden:
+        return True
+    return False
+
+
+def path_can_be_disabled(p):
+    """
+    Check if path can be disabled dynamically.
+    """
+    for ln in p.links:
+        if link_can_be_disabled(ln):
+            return ln
+    return None
+
+
+class TopologyChecker:
+    """
+    Check that topology is compliant with CoreSight architectural constraints.
+    Basically there can't be multiple paths between any two devices
+    (and by implication, no cycles).
+
+    There are at least three possible interpretations of the architectural requirement:
+
+     - there cannot be multiple paths statically, i.e. there must be no
+       possible way of programming links such that trace could go from
+       a source to a sink by two different routes
+
+     - there may be multiple paths statically, as long as all paths can
+       independently be enabled, such that other paths can be disabled,
+       so that trace does not reach the same sink by two different paths.
+
+     - there may be multiple paths statically as long as there is some
+       way of programming all links so that trace does not reach the same
+       sink by two different paths.
+
+    Note that considered as an undirected graph, there may be cycles, e.g. the
+    configuration where two replicators and two funnels are used as a crossbar
+    switch to connect two sources and two sinks, is valid.
+
+    Method: for all devices, explore all paths forward, looking to see if we
+    reach the same node two ways. Complexity-wise, this is not optimal.
+    """
+    def __init__(self, S, strict=False, max_issues=10):
+        self.S = S
+        self.strict = strict
+        self.max_issues = max_issues
+        self.check()
+
+    class MaxIssues(Exception):
+        pass
+
+    def check(self):
+        # Check the whole topology.
+        self.n_issues = 0
+        try:
+            # Iterate through all possible starting trace sources.
+            # Note that a CPU with data trace must be considered as
+            # two trace sources.
+            for d in self.S.devices:
+                if False and d.is_hidden:
+                    continue
+                if not d.is_replicator():
+                    continue
+                self.seen = {}
+                self.seen_non_disabled = {}
+                self.explore(d, Path())
+            return self.n_issues
+        except self.MaxIssues:
+            print("%s: ... further issues will be ignored" % self.S.name_str())
+            return self.max_issues + 1
+
+    def report(self, d, p1, p2):
+        """
+        Report that a device is reachable by two paths, at least one
+        of which cannot be dynamically disabled.
+        """
+        self.n_issues += 1
+        print()
+        print("%s: [%u] %s seen from two paths:" % (self.S.name_str(), self.n_issues, d))
+        while len(p1.links) >= 2 and len(p2.links) >= 2 and p1.links[0] == p2.links[0] and p1.links[1] == p2.links[1]:
+            p1.links.pop(0)
+            p2.links.pop(0)
+        print("  %s" % p1.str(typed=False, hidden=False), end="")
+        if not path_can_be_disabled(p1):
+            print(" (always enabled)", end="")
+        print()
+        print("  %s" % p2.str(typed=False, hidden=False), end="")
+        if not path_can_be_disabled(p2):
+            print(" (always enabled)", end="")
+        print()
+        if self.n_issues >= self.max_issues:
+            raise self.MaxIssues
+
+    def explore(self, d, path):
+        nd = not path_can_be_disabled(path)
+        if not d.is_hidden:
+            if d in self.seen and (self.strict or not nd):
+                self.report(d, self.seen[d], path)
+                return
+            elif d in self.seen_non_disabled:
+                self.report(d, self.seen_non_disabled[d], path)
+                return
+        self.seen[d] = path
+        if nd:
+            self.seen_non_disabled[d] = path
+        for x in d.outlinks:
+            assert x.master == d
+            if x.linktype == CS_LINK_ATB:
+                self.explore(x.slave, path + x)
+
+
+def check_topology(S):
+    checker = TopologyChecker(S)
+    return checker.check()
 
 
 def test():

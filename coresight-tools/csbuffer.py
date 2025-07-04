@@ -96,7 +96,10 @@ def sink_show_status(etf, title=None):
     print("  ETF     028  mode:   0x%08x %s" % (mode, ["CB","SWF1","?","SWF2"][mode]))
     print("  ETF 11C/118  DBA:    0x%016x" % etf.read32x2(0x11C,0x118))
     print("  ETF     004  size:   0x%08x words" % etf.read32(0x004))
-    print("  ETF     020  ctl:    0x%08x" % etf.read32(0x020))
+    print("  ETF     020  ctl:    0x%08x" % control, end="")
+    if control & 1:
+        print(" (enabled)", end="")
+    print()
     print("  ETF     00C  status: 0x%08x" % status, end="")
     if status & 0x01:
         # Circular buffer mode: RAM write pointer has wrapped around top of buffer.
@@ -122,8 +125,12 @@ def sink_show_status(etf, title=None):
     print("  ETF     304  ffcr:   0x%08x" % ffcr, end="")
     if ffcr & 0x1:
         print(" formatting", end="")
+    if ffcr & 0x02:
+        print(" EnTI", end="")
     if ffcr & 0x1000:
         print(" stop-on-flush", end="")
+    if ffcr & 0x40:
+        print(" FlushMan", end="")
     print()
     print("  ETF     300  ffstat: 0x%08x" % flushstatus, end="")
     if flushstatus & 0x01:
@@ -147,7 +154,7 @@ def sink_is_wrapped(etf):
     return (etf.read32(0x00C) & 1) != 0
 
 
-def sink_buffer_range(etf, ignore_empty=False):
+def sink_buffer_range(etf, ignore_empty=False, ignore_wrapped=False):
     """
     Given an ETF/ETR, return (start_offset, n_bytes)
     This is non-destructive, i.e. it does not modify any registers.
@@ -166,7 +173,7 @@ def sink_buffer_range(etf, ignore_empty=False):
             dba = 0
             rp = etf.read32(0x014)
             wp = etf.read32(0x018)
-        if sink_is_wrapped(etf):
+        if (not ignore_wrapped) and sink_is_wrapped(etf):
             start = wp
             avail_bytes = buffer_size_bytes
         else:
@@ -188,7 +195,7 @@ def sink_set_read_pointer(etf, start):
         etf.write32(0x014,start)
 
 
-def sink_buffer(etf, max_bytes=None, ignore_empty=False):
+def sink_buffer(etf, max_bytes=None, ignore_empty=False, ignore_wrapped=False, verbose=0):
     """
     Read ETF/ETB contents, returning as a bytearray.
     Contents are returned starting from the current write pointer, i.e. oldest data first.
@@ -197,26 +204,31 @@ def sink_buffer(etf, max_bytes=None, ignore_empty=False):
     # i.e. TraceCaptEn=1, TMCReady=1. This ensures RRP wraps correctly.
     workaround_disabled_read = False
     if is_etr(etf) and not sink_is_stopped(etf):
-        if False:
-            print("warning: ETF is not in Stopped state", file=sys.stderr)
+        if verbose:
+            print("warning: ETF is not in Stopped state: workaround disabled read", file=sys.stderr)
         workaround_disabled_read = True
     s = b""
-    (start, avail_bytes) = sink_buffer_range(etf, ignore_empty=ignore_empty)
+    (start, avail_bytes) = sink_buffer_range(etf, ignore_empty=ignore_empty, ignore_wrapped=ignore_wrapped)
+    if verbose:
+        print("%s: start=0x%x, avail_bytes=0x%x, is_wrapped=%s" % (etf, start, avail_bytes, sink_is_wrapped(etf)))
     # Get the write pointer and set the read pointer
     if False:
         sink_set_read_pointer(etf, start)
     # Deal with ETR failure to wrap RRP when in Disabled state
     if workaround_disabled_read:
-        dba = etf.read32x2(0x11C,0x118)
-        n_bytes = etf.read32(0x004)*4
+        dba = etf.read32x2(0x11C,0x118)      # base address of buffer
+        n_bytes = etf.read32(0x004)*4        # total bytes in buffer
         assert start >= dba and start < dba+n_bytes
         n_words_to_end = (dba+n_bytes - start) // 4
+        if verbose:
+            print("DBA=0x%x, start=0x%x, n_bytes=0x%x, n_words_to_end=%u\n" % (dba, start, n_bytes, n_words_to_end))
     if max_bytes is not None and avail_bytes > max_bytes:
         avail_bytes = max_bytes
     for i in range(0, avail_bytes//4):
         # read from RRD. After a full width of data has been read, the RRP register is incremented.
         x = etf.read32(0x010)    # destructive - increments read pointer
-        #print("read 0x%x, RRP=0x%x" % (x, etf.read32x2(0x038,0x014)))
+        if verbose >= 2:
+            print("read 0x%x, RRP=0x%x" % (x, etf.read32x2(0x038,0x014)))
         if workaround_disabled_read:
             n_words_to_end -= 1
             if n_words_to_end == 0:
@@ -248,7 +260,7 @@ if __name__ == "__main__":
     import argparse
     import csscan
     def inthex(s):
-        return int(s,16)    
+        return int(s,16)
     parser = argparse.ArgumentParser(description="read sink buffer")
     parser.add_argument("--sink", type=inthex, help="device address", required=True)
     parser.add_argument("--buffer", type=inthex, help="set new ETR buffer address")
