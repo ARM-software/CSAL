@@ -512,11 +512,70 @@ static int do_registration_axx5500(struct cs_devices_t *devices)
     return 0;
 }
 
+
 static int do_registration_soc600fpga(struct cs_devices_t *devices)
 {
     cs_register_romtable(0x208d0000);
     return -1;
 }
+
+
+static int do_registration_n1sdp(struct cs_devices_t *devices)
+{
+    int i;
+    cs_physaddr_t const base = 0x400000000;
+    if (registration_verbose)
+        printf("CSDEMO: Registering CoreSight devices for N1SDP...\n");
+    cs_register_romtable(base);
+    cs_device_t cluster_funnel[2], cluster_etf[2], clusters_funnel, system_funnel, system_etf, main_funnel, main_replicator, tpiu, etr, stm, stm_etf;
+    for (i = 0; i < 4; ++i) {
+        cs_device_t debug, pmu, cti, etm;
+        static cs_physaddr_t const cbases[4] = { 0x2000000, 0x2100000, 0x3000000, 0x3100000 };
+        cs_physaddr_t cbase = base + cbases[i];
+        debug = cs_device_register(cbase + 0x10000);
+        cti = cs_device_register(cbase + 0x20000);
+        pmu = cs_device_register(cbase + 0x30000);
+        etm = cs_device_register(cbase + 0x40000);
+        cs_device_set_affinity(debug, i);
+        cs_device_set_affinity(cti, i);
+        cs_device_set_affinity(pmu, i);
+        cs_device_set_affinity(etm, i);
+    }
+    /* The CPU funnels within each cluster are non-programmable (invisible) */
+    cluster_funnel[0] = cs_atb_add_funnel(2);
+    cluster_funnel[1] = cs_atb_add_funnel(2);
+    /* Funnel input port numbers are notional only */
+    cs_atb_register(cs_cpu_get_device(0, CS_DEVCLASS_SOURCE), 0, cluster_funnel[0], 0);
+    cs_atb_register(cs_cpu_get_device(1, CS_DEVCLASS_SOURCE), 0, cluster_funnel[0], 1);
+    cs_atb_register(cs_cpu_get_device(2, CS_DEVCLASS_SOURCE), 0, cluster_funnel[1], 0);
+    cs_atb_register(cs_cpu_get_device(3, CS_DEVCLASS_SOURCE), 0, cluster_funnel[1], 1);
+    cluster_etf[0] = cs_device_register(base + 0x410000);
+    cluster_etf[1] = cs_device_register(base + 0x420000);
+    clusters_funnel = cs_device_register(base + 0xB0000);
+    for (i = 0; i < 2; ++i) {
+        cs_atb_register(cluster_funnel[i], 0, cluster_etf[i], 0);
+        cs_atb_register(cluster_etf[i], 0, clusters_funnel, i);
+    }
+    main_funnel = cs_device_register(base + 0xA0000);
+    cs_atb_register(clusters_funnel, 0, main_funnel, 0);
+    main_replicator = cs_device_register(base + 0x110000);
+    cs_atb_register(main_funnel, 0, main_replicator, 0);
+    tpiu = cs_device_register(base + 0x130000);
+    cs_atb_register(main_replicator, 0, tpiu, 0);
+    etr = cs_device_register(base + 0x120000);
+    cs_atb_register(main_replicator, 1, etr, 0);
+    /* System funnel input 1 is CMN-600, input 2 is SCP */
+    system_funnel = cs_device_register(base + 0x90000);
+    system_etf = cs_device_register(base + 0x20000);
+    cs_atb_register(system_funnel, 0, system_etf, 0);
+    cs_atb_register(system_etf, 0, main_funnel, 4);
+    stm = cs_device_register(base + 0x800000);
+    stm_etf = cs_device_register(base + 0x10000);
+    cs_atb_register(stm, 0, stm_etf, 0);
+    cs_atb_register(stm_etf, 0, main_funnel, 5);
+    return 0;
+}
+
 
 const struct board known_boards[] = {
     {
@@ -547,6 +606,10 @@ const struct board known_boards[] = {
         .do_registration = do_registration_soc600fpga,
         .n_cpu = 2,
         .hardware = "SoC-600 FPGA",
+    }, {
+        .do_registration = do_registration_n1sdp,
+        .n_cpu = 4,
+        .hardware = "N1SDP",
     },
     {}
 };
