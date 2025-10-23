@@ -88,7 +88,7 @@ int cs_sink_disable(cs_device_t dev)
     _cs_unlock(d);
     if (d->type == DEV_TPIU) {
         /* TPIU */
-        _cs_set(d, CS_TPIU_FLFMT_CTRL, CS_TPIU_FLFMT_CTRL_StopFl);	/* Stop flush */
+        _cs_set(d, CS_TPIU_FLFMT_CTRL, CS_TPIU_FLFMT_CTRL_StopFl);   /* Stop flush */
         /* When we request a flush via FOnMan, the FOnMan reads back as 1 while the
            flush is in progress, then goes to 0.  So don't try to read back. */
         _cs_set_wo(d, CS_TPIU_FLFMT_CTRL, CS_TPIU_FLFMT_CTRL_FOnMan);
@@ -273,7 +273,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     if (d->v.etb.is_tmc_device) {
         to_read &= ~((1U << d->v.etb.tmc.memory_width) - 1);
     } else {
-        to_read &= ~3;		/* round down to 32-bit words */
+        to_read &= ~3;   /* round down to 32-bit words */
     }
 
     words_left_to_read = to_read >> 2;

@@ -108,6 +108,11 @@ static void collect_on_cpu(void *infov)
 		__asm__("mrs %0,MDRAR_EL1":"=r"(rombase));
 		info->rombase = rombase;
 	}
+    {
+        u64 cpuectlr;
+        __asm__("mrs %0,CPUECTLR_EL1":"=r"(cpuectlr));
+        pr_info("    CPUECTLR_EL1 = 0x%016lx\n", cpuectlr);
+    }
 
 #endif
 

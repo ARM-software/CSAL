@@ -94,8 +94,8 @@ int cs_tsgen_set_value(cs_device_t dev, uint64_t value)
         && (d->v.ts.config.if_type != TSGEN_INTERFACE_RO)) {
         val_h = (uint32_t) (value >> 32);
         val_l = (uint32_t) (value & 0xFFFFFFFF);
-        _cs_write_wo(d, CS_CNTCVL, val_l);	/* write lower */
-        _cs_write_wo(d, CS_CNTCVU, val_h);	/* write upper - full 64 bit value transferred to counter on this write */
+        _cs_write_wo(d, CS_CNTCVL, val_l);  /* write lower */
+        _cs_write_wo(d, CS_CNTCVU, val_h);  /* write upper - full 64 bit value transferred to counter on this write */
         return 0;
     }
     return -1;

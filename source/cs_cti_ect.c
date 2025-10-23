@@ -29,7 +29,7 @@
 struct cs_channel {
     unsigned int n_src;
     unsigned int n_dst;
-    unsigned int n_cti;		/* Number of distinct CTIs involved */
+    unsigned int n_cti;    /* Number of distinct CTIs involved */
     /* Arbitrary array size just for prototyping this API, not a limit of CS architecture */
 #define CS_CHAN_LIMIT 16
 #define CS_CHAN_CTI_LIMIT 16
@@ -77,7 +77,7 @@ static int cs_channel_uses_cti(cs_channel_t chan, cs_device_t cti)
 static int cs_ect_add_cti(struct cs_channel *c, cs_device_t cti)
 {
     if (cs_channel_uses_cti(c, cti)) {
-        return 0;		/* already used - nothing to do */
+        return 0;     /* already used - nothing to do */
     } else {
         if (c->n_cti == CS_CHAN_CTI_LIMIT - 1) {
             return -1;

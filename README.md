@@ -1,7 +1,7 @@
 CoreSight Access Library        {#mainpage}
 ========================
 
-The __CoreSight Access Library__ (CSAL) provides an API which enables user code to interact directly with CoreSight devices on a target.
+The __CoreSight Access Library__ (CSAL) provides an API which enables user code to interact directly with Arm(R) CoreSight(TM) compliant devices on a target.
 This allows, for example, program execution trace to be captured in a production system without the need to 
 have an external debugger connected.  The saved trace can be retrieved later and loaded into a debugger for analysis. CSAL can be run on application core or a management core.
 
@@ -18,10 +18,10 @@ CoreSight Component Support
 
 The following trace components are supported by the library:
 
-- ETMv3.x: used in Cortex A5, A7 cores; Cortex R4, R5 cores.
-- PTMv1.x: used in Cortex A9, A15, A17 cores.
-- ETMv4.x: Used in Cortex R7 and later R-profile and M-profile cores.
-  Used in **V8 Architecture** Cores - Cortex A and Neoverse cores.
+- ETMv3.x: used in Cortex-A5(tm), Cortex-A7(tm) cores; Cortex-R4(tm), Cortex-R5(tm) cores.
+- PTMv1.x: used in Cortex-A9(tm), Cortex-A15(tm), Cortex-A17(tm) cores.
+- ETMv4.x: Used in Cortex-R7(tm) and later R-profile and M-profile cores.
+  Used in **V8 Architecture** Cores - Cortex-A(R) and Neoverse(TM) cores.
 - ETE: Used in v9 A-profile cores.
 - CoreSight ITM.
 - CoreSight STM.
@@ -270,3 +270,9 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+
+Copyright Information
+=====================
+
+Arm is a registered trademark of Arm Limited (or its subsidiaries or affiliates).

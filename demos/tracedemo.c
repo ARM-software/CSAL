@@ -70,7 +70,7 @@ static bool itm;
 static bool itm_only;
 static bool full;
 static unsigned int seed = 0x10000000;
-static bool verbose;
+static int verbose;
 static bool trace_timestamps;
 static bool trace_cycle_accurate;
 #define BOARD_NAME_LEN 256
@@ -586,11 +586,11 @@ int main(int argc, char **argv)
     full = true;
     etb_stop_on_flush = 0;
     etb_post_trig_words = 0;
-    verbose = false;
+    verbose = 0;
     trace_timestamps = false;
     trace_cycle_accurate = false;
     return_stack = false;
-    board_name[0] = 0;
+    board_name[0] = '\0';
 
     pause_mode = 0;
 
@@ -664,8 +664,8 @@ int main(int argc, char **argv)
                     help();
                     return EXIT_SUCCESS;
                 } else if (strcmp(opt, "v") == 0) {
-                    cs_diag_set(1);
-                    verbose = true;
+                    verbose += 1;
+                    cs_diag_set(1 << (verbose-1));
                 } else if (strncmp(opt, "filter", 6) == 0) {
                     printf("Trace filtering active.\n");
                     full = false;
@@ -746,6 +746,7 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
     } else {
+        printf("CSDEMO: no board name supplied...\n");
         if (setup_known_board(&board, &devices) < 0) {
             return EXIT_FAILURE;
         }

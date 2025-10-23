@@ -40,9 +40,12 @@ static void add_to_buf(struct out_buf *b, char const *fmt, ...)
     if (b->size_left > 0) {
         /* TBD: vsnprintf is non-standard.  May need retargeting for bare-metal. */
         n = vsnprintf(b->p, b->size_left, fmt, args);
+        b->len += n;
+        if (n > (int)b->size_left) {
+            n = b->size_left;
+        }
         b->size_left -= n;
         b->p += n;
-        b->len += n;
     } else {
     }
     va_end(args);

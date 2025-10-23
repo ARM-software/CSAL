@@ -192,6 +192,7 @@ int dump_kernel_memory(char const *fn, unsigned long start,
         local =
             (unsigned char *) mmap(0, mapsize, PROT_READ, MAP_SHARED,
                                    fd_mem, mapstart);
+        close(fd_mem);
     } else {
         unsigned long pkcba;
         printf("can't open /dev/kmem, trying /dev/mem instead...\n");
@@ -242,7 +243,6 @@ int dump_kernel_memory(char const *fn, unsigned long start,
             err = 1;
         }
     }
-    close(fd_mem);
 
 #else				/* for bare-metal */
     local = (unsigned char *) start;

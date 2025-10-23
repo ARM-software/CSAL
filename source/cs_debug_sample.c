@@ -45,7 +45,7 @@ static int cs_debug_v8_pc_sample(struct cs_device *d, cs_virtaddr_t * pc,
 
     /* if we really want the PC then set the output value */
     if (pc != NULL) {
-        if (G.virt_addr_64bit) {	/* built with 64 bit address values */
+        if (G.virt_addr_64bit) {     /* built with 64 bit address values */
             /* only compile this if we have 64 bit VA - will generate compile warning otherwise. */
 #ifdef CS_VA64BIT
             uint32_t regval_h = _cs_read(d, CS_V8EDPCSR_h);

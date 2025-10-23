@@ -906,7 +906,8 @@ Register definitions and bitfield values for the Architecture v8 Cortex Core deb
 #define CS_V8EDPRSR_HALTED      0x0010	    /**< Processor in halted debug state. */
 #define CS_V8EDPRSR_OSLK        0x0020	    /**< OS Lock set. */
 #define CS_V8EDPRSR_DLK         0x0040	    /**< Double lock set. */
-#define CS_V8EDPRSR_EPMAD       0x0200	    /**< External PMU registers disable*/
+#define CS_V8EDPRSR_EPMAD       0x0200	    /**< External PMU registers disable */
+#define CS_V8EDPRSR_SDR         0x0800      /**< Sticky Debug Restart - reding EDPRSR clears this bit */
 #define CS_V8EDPRSR_COREOK_MSK  0x0075	    /**< Core Domain accessible mask.  Register bits that affect access to core power domain registers. */
 #define CS_V8EDPRSR_COREOK_VAL  0x0001	    /**< Core Domain accessible value. If masked register value equal to this then we can access core power domain registers. */
 /**@}*/

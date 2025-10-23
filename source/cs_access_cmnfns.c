@@ -103,13 +103,14 @@ char const *cs_device_type_name(struct cs_device *d)
     }
 }
 
+
 int cs_report_error(char const *fmt, ...)
 {
     va_list args;
     char err_mesg[100];
     ++G.n_api_errors;
     va_start(args, fmt);
-    vsprintf(err_mesg, fmt, args);
+    vsnprintf(err_mesg, sizeof err_mesg, fmt, args);
     va_end(args);
 #ifdef UNIX_KERNEL
     printk("** csaccess: %s\n", err_mesg);
@@ -129,7 +130,7 @@ int cs_report_device_error(struct cs_device *d, char const *fmt, ...)
     ++d->n_api_errors;
     ++G.n_api_errors;
     va_start(args, fmt);
-    vsprintf(err_mesg, fmt, args);
+    vsnprintf(err_mesg, sizeof err_mesg, fmt, args);
     va_end(args);
 #ifdef UNIX_KERNEL
     printk("** csaccess(%" CS_PHYSFMT "): %s\n", d->phys_addr, err_mesg);

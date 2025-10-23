@@ -27,6 +27,7 @@ int main(int argc, char **argv)
     unsigned long romAddr = 0x10880000;	/* arndale */
     int do_custom = 0;
     int argidx = 1;
+    int o_verbose = 0;
     unsigned long exclude_lo, exclude_hi;
     cs_physaddr_t memap_addr = 0;
 
@@ -91,7 +92,8 @@ int main(int argc, char **argv)
                 }
             } else if ((strcmp(argv[argidx], "-v") == 0)
                        || (strcmp(argv[argidx], "-verbose") == 0)) {
-                cs_diag_set(1);
+                o_verbose = o_verbose ? (o_verbose << 1) : 1;
+                cs_diag_set(o_verbose);
             } else if ((strcmp(argv[argidx], "--help") == 0)
                        || (strcmp(argv[argidx], "-help") == 0)) {
                 printf
@@ -132,6 +134,13 @@ int main(int argc, char **argv)
         /* Arndale : Exclude the Cortex-A5s */
         cs_exclude_range(0x108A0000, 0x108C0000);
         cs_register_romtable(0x10880000);
+    }
+    {
+        cs_device_t d;
+        for (d = cs_device_first(); d; d = cs_device_next(d)) {
+            cs_diagf("%" CS_PHYSFMT ": ", cs_device_address(d));
+            cs_device_diag_summary(d);
+        }
     }
     printf("** CSLS: done listing CoreSight config\n");
     cs_shutdown();
