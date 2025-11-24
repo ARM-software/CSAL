@@ -17,6 +17,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+from __future__ import print_function
 
 import sys, os, struct, re
 import ConfigParser as CP
@@ -55,7 +56,7 @@ def read_trace(fn, verbose=0, decode=True, viewer=None, limit=None):
                 tds = "<no time>"
             else:
                 tds = "+%d" % tdelt
-            print >>sys.stderr, "%s: %s: record type %u len %u" % (fn, tds, type, len(data))
+            print("%s: %s: record type %u len %u" % (fn, tds, type, len(data)), file=sys.stderr)
         if type == TREC_CSMETA:
             # coresight trace metadata
             if data[-1] == '\0':
@@ -74,16 +75,16 @@ def read_trace(fn, verbose=0, decode=True, viewer=None, limit=None):
                 regs[nk] = int(value, 16) 
             cfg = cs_decode_etm.etm_config(regs)
             if verbose:
-                print >>sys.stderr, "%s: got trace configuration for trace id %u" % (fn, cfg.traceid)
+                print("%s: got trace configuration for trace id %u" % (fn, cfg.traceid), file=sys.stderr)
                 if verbose >= 2:
                     for k in regs:
-                        print >>sys.stderr, "  %-20s 0x%08x" % (k, regs[k])
+                        print("  %-20s 0x%08x" % (k, regs[k]), file=sys.stderr)
             decoder_cfg[cfg.traceid] = cfg
         elif type == TREC_CSTRACE:
             # coresight trace
             n_buffers += 1
             if verbose:
-                print >>sys.stderr, "%s: ETM trace buffer, size %u" % (fn, len(data))
+                print("%s: ETM trace buffer, size %u" % (fn, len(data)), file=sys.stderr)
                 if verbose >= 2:
                     # Show the current memory-map for decoding this trace buffer
                     g_map.show()
@@ -98,7 +99,7 @@ def read_trace(fn, verbose=0, decode=True, viewer=None, limit=None):
                     decoders[traceid] = cs_decode_etm.decode_etm(cfg, traceid, viewer=viewer)
                 cs_decode.buffer_decode(data, decoders, fn=fn, verbose=(verbose >= 2))
             if limit is not None and n_buffers >= limit:
-                print "%s: hit limit of %u buffers" % (fn, limit)
+                print("%s: hit limit of %u buffers" % (fn, limit))
                 break
         elif type == TREC_MMAP:
             # memory mapping from file - usually an ELF executable or shared object, although it could be /etc/ld.so.cache
@@ -106,7 +107,7 @@ def read_trace(fn, verbose=0, decode=True, viewer=None, limit=None):
             (addr, size, offset) = struct.unpack("QII", data[:16])
             name = data[16:-1]
             if verbose:
-                print >>sys.stderr, "%s: mapped file \"%s\" at 0x%x-0x%x, offset 0x%x" % (fn, name, addr, addr+size, offset)
+                print("%s: mapped file \"%s\" at 0x%x-0x%x, offset 0x%x" % (fn, name, addr, addr+size, offset), file=sys.stderr)
             if name[0] == '[':
                 # Possibly "[vdso]" or similar pseudo file.  TBD: should these even appear as a TREC_MMAP record?
                 # we expect to tget a TREC_MEM record with the actual data.
@@ -118,21 +119,21 @@ def read_trace(fn, verbose=0, decode=True, viewer=None, limit=None):
             (addr, size) = struct.unpack("QI", data[:12])
             name = data[12:-1]
             if verbose:
-                print >>sys.stderr, "%s: mapped raw binary file \"%s\" at 0x%x" % (fn, name, addr)
+                print("%s: mapped raw binary file \"%s\" at 0x%x" % (fn, name, addr), file=sys.stderr)
             g_map.add_bin(name, addr)
         elif type == TREC_MEM:
             # memory mapping - inline data
             (addr,) = struct.unpack("Q", data[:8])
             if verbose:
-                print >>sys.stderr, "%s: mapped raw data (0x%x bytes) at 0x%x" % (fn, len(data[8:]), addr)
+                print("%s: mapped raw data (0x%x bytes) at 0x%x" % (fn, len(data[8:]), addr), file=sys.stderr)
             g_map.add_segment(data[8:], addr)
         elif type < 100:
-            print >>sys.stderr, "%s: ignoring unknown record type %u" % (fn, type)
+            print("%s: ignoring unknown record type %u" % (fn, type), file=sys.stderr)
         else:
-            print >>sys.stderr, "%s: trace container looks corrupt" % (fn)
+            print("%s: trace container looks corrupt" % (fn), file=sys.stderr)
             break
     if verbose:
-        print "%s: processing complete." % (fn)
+        print("%s: processing complete." % (fn))
 
 
 if __name__ == "__main__":
@@ -143,11 +144,11 @@ if __name__ == "__main__":
     for arg in sys.argv[1:]:
         if arg.startswith("-"):
             if arg == "--help":
-                print "Usage: %s [options] trace.data" % sys.argv[0]
-                print "   decode profile data created by csprofile"
-                print "  -v             increase verbosity level"
-                print "  --decode       decode the CoreSight trace data"
-                print "  --kernel=<fn>  specify kernel ELF file"
+                print("Usage: %s [options] trace.data" % sys.argv[0])
+                print("   decode profile data created by csprofile")
+                print("  -v             increase verbosity level")
+                print("  --decode       decode the CoreSight trace data")
+                print("  --kernel=<fn>  specify kernel ELF file")
                 sys.exit()
             elif arg == "-v" or arg == "--verbose":
                 o_verbose += 1 
@@ -158,7 +159,7 @@ if __name__ == "__main__":
             elif arg.startswith("--kernel="):
                 g_map.add_elf(arg[9:])
             else:
-                print "%s: wrong args: %s" % (sys.argv[0], arg)
+                print("%s: wrong args: %s" % (sys.argv[0], arg))
                 sys.exit(1)
         else:
             read_trace(arg, decode=o_decode, verbose=o_verbose)
