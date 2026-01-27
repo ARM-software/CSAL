@@ -60,7 +60,7 @@ int cs_debug_halt(cs_device_t dev, unsigned int flags)
     unsigned int req;
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_CPU_DEBUG);
-    assert(!IS_V8(d));   /* In v8, we need to halt via the CTI */
+    assert(!IS_V8(d)); /* In v8, we need to halt via the CTI */
 
     /* Request halt */
     _cs_unlock(d);
@@ -81,7 +81,7 @@ int cs_debug_halt(cs_device_t dev, unsigned int flags)
 }
 
 
-int cs_debug_is_halted(cs_device_t dev, cs_debug_moe_t * reason)
+int cs_debug_is_halted(cs_device_t dev, cs_debug_moe_t *reason)
 {
     int flag;
     struct cs_device *d = DEV(dev);
@@ -91,7 +91,7 @@ int cs_debug_is_halted(cs_device_t dev, cs_debug_moe_t * reason)
     flag = _cs_isset(d, CS_DBGDSCR, CS_DBGDSCR_HALTED);
     if (flag && reason != NULL) {
         /* Read the MOE field */
-        *reason = (cs_debug_moe_t) ((_cs_read(d, CS_DBGDSCR) >> 2) & 0xF);
+        *reason = (cs_debug_moe_t)((_cs_read(d, CS_DBGDSCR) >> 2) & 0xF);
     }
     return flag;
 }
@@ -131,8 +131,8 @@ int cs_debug_cpu_is_active(cs_device_t dev)
 #define R0 0
 #define R1 1
 
-#define CP15_DFAR   0xEE060F10
-#define CP15_DFSR   0xEE050F10
+#define CP15_DFAR 0xEE060F10
+#define CP15_DFSR 0xEE050F10
 
 static int _cs_debug_exec(struct cs_device *d, unsigned int inst)
 {
@@ -161,7 +161,7 @@ int cs_debug_exec(cs_device_t dev, unsigned int inst)
   is in the middle of a page fault handler.
   The caller is assumed to have taken steps to preserve and restore these registers.
 */
-#define CS_DEBUG_READ_DATA_ABORT  (-10)
+#define CS_DEBUG_READ_DATA_ABORT (-10)
 #define CS_DEBUG_READ_NO_RESPONSE (-11)
 static int cs_debug_exec_and_read(struct cs_device *d, unsigned int inst,
                                   unsigned int *pvalue)
@@ -291,7 +291,7 @@ int cs_debug_read_sysreg(cs_device_t dev, unsigned int reg,
 
     rc = cs_debug_read_register(d, R0, &save_r0);
     if (!rc) {
-        cs_debug_exec(d, 0xE10F0000 | (reg << 22) | (R0 << 12));	/* MRS r0,... */
+        cs_debug_exec(d, 0xE10F0000 | (reg << 22) | (R0 << 12)); /* MRS r0,... */
         cs_debug_read_register(d, R0, pvalue);
         rc = cs_debug_write_register(d, R0, save_r0);
     }
@@ -308,7 +308,7 @@ int cs_debug_read_memory(cs_device_t dev, cs_virtaddr_t addr, void *data,
     /* R0 is used as the base address register */
     unsigned int save_r0;
     unsigned int save_dfar, save_dfsr;
-    unsigned char *p = (unsigned char *) data;
+    unsigned char *p = (unsigned char *)data;
 
     assert(!IS_V8(d));
 
@@ -349,7 +349,7 @@ int cs_debug_read_memory(cs_device_t dev, cs_virtaddr_t addr, void *data,
                     --size;
                 }
             } else {
-                *(unsigned int *) p = value;
+                *(unsigned int *)p = value;
                 p += 4;
                 size -= 4;
             }
@@ -387,6 +387,6 @@ int cs_debug_restart(cs_device_t dev)
     return rc;
 }
 
-#endif				/*  USING_V7_DBG_HALT */
+#endif /*  USING_V7_DBG_HALT */
 
 /* end of cs_debug_halt.c */

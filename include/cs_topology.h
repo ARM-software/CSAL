@@ -91,7 +91,7 @@ int cs_device_set_affinity(cs_device_t dev, cs_cpu_t cpu);
     \param power_domain The power domain ID number.
  */
 int cs_device_set_power_domain(cs_device_t dev,
-			       cs_power_domain_t power_domain);
+                               cs_power_domain_t power_domain);
 
 /** Register a trace bus connection between two components.
  *
@@ -105,7 +105,7 @@ int cs_device_set_power_domain(cs_device_t dev,
  *  \param to_port   Input trace port on destination device - may be non-zero for e.g. funnels
  */
 int cs_atb_register(cs_device_t from, unsigned int from_port,
-		    cs_device_t to, unsigned int to_port);
+                    cs_device_t to, unsigned int to_port);
 
 
 /** Check if trace source identifier is valid.  This does not check if the
@@ -169,7 +169,7 @@ cs_device_t cs_device_next(cs_device_t dev);
 
 /** Macro to iterate over all registered devices */
 #define cs_for_each_device(d) \
-  for (d = cs_device_first(); d != CS_ERRDESC; d = cs_device_next(d))
+    for (d = cs_device_first(); d != CS_ERRDESC; d = cs_device_next(d))
 
 /** Get device by physical address */
 cs_device_t cs_device_get(cs_physaddr_t addr);
@@ -251,11 +251,10 @@ Given a CPU, get a CPU-specific device of a specific class (e.g. ETM, CTI).
 cs_device_t cs_cpu_get_device(cs_cpu_t cpu, unsigned int classes);
 
 
-
 /** @} End of topology iteration section */
 
 
-#endif				/* _included_cs_topology_h */
+#endif /* _included_cs_topology_h */
 
 #ifdef __cplusplus
 }

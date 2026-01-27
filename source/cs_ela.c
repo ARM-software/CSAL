@@ -24,7 +24,7 @@
 #include "cs_access_cmnfns.h"
 
 #define ela_has_atb(d) (d->v.ela.ram_size == 0)
-#define ela_is_600(d)  (d->v.ela.is_ela600)
+#define ela_is_600(d) (d->v.ela.is_ela600)
 
 /*
  * Initialize a signal vector to the signal width of the ELA. N.b. comparator width may be smaller.
@@ -34,7 +34,7 @@ int cs_ela_clear_signals(cs_device_t dev, cs_ela_signals_t *sigs)
     unsigned int i;
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_ELA);
-    for (i = 0; i < d->v.ela.signal_width/32; ++i) {
+    for (i = 0; i < d->v.ela.signal_width / 32; ++i) {
         sigs->v.words[i] = 0;
     }
     /* Don't set sigs->n_bits, in case this is actually a (smaller) comparator vector */
@@ -48,16 +48,16 @@ int cs_ela_set_signals(cs_ela_signals_t *sigs, unsigned int bit_offset, unsigned
     if (sigs->n_bits != 0 && (bit_offset + n_bits > sigs->n_bits)) {
         if (0) {
             fprintf(stderr, "trying to set bits [%u:%u] in %u-bit signal vector\n",
-                bit_offset+n_bits-1, bit_offset, sigs->n_bits);
+                    bit_offset + n_bits - 1, bit_offset, sigs->n_bits);
         }
         return 1;
     }
     while (n_bits) {
         unsigned int wix = bit_offset / 32;
         unsigned int pos_in_word = bit_offset % 32;
-        unsigned int n_bits_this_word = (n_bits+pos_in_word) > 32 ? 32-pos_in_word : n_bits;
+        unsigned int n_bits_this_word = (n_bits + pos_in_word) > 32 ? 32 - pos_in_word : n_bits;
         uint32_t data = (uint32_t)value;
-        if (n_bits_this_word < 32) { 
+        if (n_bits_this_word < 32) {
             uint32_t mask = (((uint32_t)1 << n_bits_this_word) - 1) << pos_in_word;
             assert(mask != 0);
             data = (sigs->v.words[wix] & ~mask) | ((data << pos_in_word) & mask);
@@ -66,7 +66,7 @@ int cs_ela_set_signals(cs_ela_signals_t *sigs, unsigned int bit_offset, unsigned
         bit_offset += n_bits_this_word;
         n_bits -= n_bits_this_word;
         value >>= n_bits_this_word;
-        assert(n_bits == 0 || (bit_offset%32) == 0);
+        assert(n_bits == 0 || (bit_offset % 32) == 0);
     }
     assert(value == 0);
     return 0;
@@ -92,7 +92,7 @@ uint64_t cs_ela_get_signals(cs_ela_signals_t const *sigs, unsigned int bit_offse
     while (n_bits) {
         unsigned int wix = bit_offset / 32;
         unsigned int pos_in_word = bit_offset % 32;
-        unsigned int n_bits_this_word = (n_bits+pos_in_word) > 32 ? 32-pos_in_word : n_bits;
+        unsigned int n_bits_this_word = (n_bits + pos_in_word) > 32 ? 32 - pos_in_word : n_bits;
         uint32_t data = sigs->v.words[wix];
         if (n_bits_this_word < 32) {
             uint32_t mask = (((uint32_t)1 << n_bits_this_word) - 1) << pos_in_word;
@@ -103,16 +103,16 @@ uint64_t cs_ela_get_signals(cs_ela_signals_t const *sigs, unsigned int bit_offse
         bit_offset += n_bits_this_word;
         n_bits -= n_bits_this_word;
         value_offset += n_bits_this_word;
-        assert(n_bits == 0 || (bit_offset%32) == 0);
+        assert(n_bits == 0 || (bit_offset % 32) == 0);
     }
-    return value; 
+    return value;
 }
 
 static int read_regs(struct cs_device *d, unsigned int off, unsigned int n_words, uint32_t *data)
 {
     unsigned int i;
     for (i = 0; i < n_words; ++i) {
-        data[i] = _cs_read(d, off+(4*i));
+        data[i] = _cs_read(d, off + (4 * i));
     }
     return 0;
 }
@@ -121,14 +121,14 @@ static int read_regs(struct cs_device *d, unsigned int off, unsigned int n_words
 static int read_signals(struct cs_device *d, unsigned int off, unsigned int n_bits, cs_ela_signals_t *sigs)
 {
     sigs->n_bits = n_bits;
-    return read_regs(d, off, n_bits/32, sigs->v.words);
+    return read_regs(d, off, n_bits / 32, sigs->v.words);
 }
 
 static int write_regs(struct cs_device *d, unsigned int off, unsigned int n, uint32_t const *data)
 {
     unsigned int i;
     for (i = 0; i < n; ++i) {
-        _cs_write(d, off+(4*i), data[i]);
+        _cs_write(d, off + (4 * i), data[i]);
     }
     return 0;
 }
@@ -295,7 +295,7 @@ int cs_ela_set_trigconf(cs_device_t dev, unsigned int ts, cs_ela_trigconf_t cons
     if (!is_zero_one_hot(tc->next_state)) {
         return -1;
     }
-    _cs_write(d, CS_ELA_NEXTSTATE(ts), tc->next_state);   /* 0 means don't change, final state */
+    _cs_write(d, CS_ELA_NEXTSTATE(ts), tc->next_state); /* 0 means don't change, final state */
     _cs_write(d, CS_ELA_ACTION(ts), tc->action);
     _cs_write(d, CS_ELA_ALTNEXTSTATE(ts), tc->alt_next_state);
     _cs_write(d, CS_ELA_ALTACTION(ts), tc->alt_action);
@@ -321,8 +321,8 @@ int cs_ela_set_trigconf(cs_device_t dev, unsigned int ts, cs_ela_trigconf_t cons
     _cs_write(d, CS_ELA_EXTMASK(ts), tc->external_mask);
     _cs_write(d, CS_ELA_EXTCOMP(ts), tc->external_value);
     _cs_write(d, CS_ELA_COUNTCOMP(ts), tc->counter_compare);
-    write_regs(d, CS_ELA_SIGMASK(ts), d->v.ela.comp_width/32, tc->compare_mask.v.words);
-    write_regs(d, CS_ELA_SIGCOMP(ts), d->v.ela.comp_width/32, tc->compare_value.v.words);
+    write_regs(d, CS_ELA_SIGMASK(ts), d->v.ela.comp_width / 32, tc->compare_mask.v.words);
+    write_regs(d, CS_ELA_SIGCOMP(ts), d->v.ela.comp_width / 32, tc->compare_value.v.words);
     return 0;
 }
 
@@ -395,7 +395,7 @@ int cs_ela_get_state(cs_device_t dev, cs_ela_state_t *st)
 {
     struct cs_device *d = DEV(dev);
     assert(d->type == DEV_ELA);
-    st->active = _cs_isset(d, CS_ELA_CTRL, CS_ELA_CTRL_RUN); 
+    st->active = _cs_isset(d, CS_ELA_CTRL, CS_ELA_CTRL_RUN);
     /* Reading CTSR samples the state and some other data. Can be done when RUN=1. */
     st->trigger_state = _cs_read(d, CS_ELA_CTSR);
     st->counter = _cs_read(d, CS_ELA_CCVR);
@@ -415,7 +415,7 @@ int cs_ela_read_ram_entry(cs_device_t dev, cs_ela_record_t *rec)
         rec->trigger_state = (header >> 2) & 0x7;
     }
     /* All record types require RAM reads as if reading a signal group. */
-    for (i = 0; i < d->v.ela.signal_width/32; ++i) {
+    for (i = 0; i < d->v.ela.signal_width / 32; ++i) {
         rec->signals.v.words[i] = _cs_read(d, CS_ELA_RRDR);
     }
     rec->signals.n_bits = d->v.ela.signal_width;
@@ -447,7 +447,7 @@ int cs_ela_read_init(cs_device_t dev)
     assert(d->type == DEV_ELA);
     if (d->v.ela.ram_size != 0) {
         uint32_t ram_lo;
-        uint32_t rwa = _cs_read(d, CS_ELA_RWAR);   /* get the current write pointer */
+        uint32_t rwa = _cs_read(d, CS_ELA_RWAR); /* get the current write pointer */
         if (rwa & 0x80000000) {
             /* RAM has wrapped */
             ram_lo = rwa & 0x7fffffff;

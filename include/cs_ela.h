@@ -57,8 +57,8 @@ extern "C" {
 #include <stdint.h>
 #include "cs_types.h"
 
-#define CS_ELA_MAX_SIGNALS 256    /* Maximum supported in any ELA configuration */
-#define CS_ELA_MAX_SIGNAL_WORDS (CS_ELA_MAX_SIGNALS/32)
+#define CS_ELA_MAX_SIGNALS 256 /* Maximum supported in any ELA configuration */
+#define CS_ELA_MAX_SIGNAL_WORDS (CS_ELA_MAX_SIGNALS / 32)
 
 /**
    Bit vector for signal group comparators, and internal RAM.
@@ -66,11 +66,10 @@ extern "C" {
 typedef struct {
     unsigned short n_bits;
     union {
-        unsigned char bytes[CS_ELA_MAX_SIGNALS/8];
+        unsigned char bytes[CS_ELA_MAX_SIGNALS / 8];
         uint32_t words[CS_ELA_MAX_SIGNAL_WORDS];
     } v;
 } cs_ela_signals_t;
-
 
 
 /**
@@ -94,14 +93,14 @@ typedef uint32_t cs_ela_action_t;
  */
 typedef struct {
     /* Usually use CS_ELA_TIMECTRL_TSEN | (tsbit << CS_ELA_TIMECTRL_TSINT_SHIFT) */
-    uint32_t timectrl;           /**< 0x004: Timestamp configuration */
+    uint32_t timectrl; /**< 0x004: Timestamp configuration */
     /* When n_trigger_states is 5 or 8, tssr can be set to the one-hot value
        of the last trigger state, to enable independent trace from that state.
        I.e. the only valid values are 0 or (1<<(N_TRIGGER_STATES-1)).
        If the ELA has 4 trigger states, this feature is not available. */
-    uint32_t tssr;               /**< 0x008: Trigger state select (if available) */
-    cs_ela_action_t ptaction;    /**< 0x010: Pre-trigger actions */
-    uint32_t counter_select;     /**< 0x018: Counter select for trace (ELA-600 only) */
+    uint32_t tssr;            /**< 0x008: Trigger state select (if available) */
+    cs_ela_action_t ptaction; /**< 0x010: Pre-trigger actions */
+    uint32_t counter_select;  /**< 0x018: Counter select for trace (ELA-600 only) */
 } cs_ela_config_t;
 
 
@@ -112,8 +111,8 @@ typedef struct {
    Instead, call cs_set_trace_source_id() from the general CSAL API.
  */
 typedef struct {
-    uint32_t atbctrl;            /**< 0x00C: ATB control (ELA-600 ATB only) */
-    uint32_t auxctrl;            /**< 0x014: Auxiliary control (ELA-600 ATB only) */
+    uint32_t atbctrl; /**< 0x00C: ATB control (ELA-600 ATB only) */
+    uint32_t auxctrl; /**< 0x014: Auxiliary control (ELA-600 ATB only) */
 } cs_ela_atb_config_t;
 
 
@@ -124,22 +123,22 @@ typedef struct {
    Signal fields can be set using cs_ela_set_compare_value().
  */
 typedef struct {
-    unsigned int signal_group;   /**< 0x100: Signal group select 1<<(0..11): one-hot */
-    uint32_t trigger_control;    /**< 0x104: Trigger control */
-    uint32_t next_state;         /**< 0x108: Next state: one-hot or zero */
-    cs_ela_action_t action;      /**< 0x10C: Action on match */
-    uint32_t alt_next_state;     /**< 0x110: Alternative next state */
-    cs_ela_action_t alt_action;  /**< 0x114: Alternative action */
-    uint32_t comp_control;       /**< 0x118: Comparator control (ELA-600) */
-    uint32_t alt_comp_control;   /**< 0x11C: Alternative comparator control (ELA-600) */
-    uint32_t counter_compare;    /**< 0x120: Counter compare */
-    uint32_t twbsel;             /**< 0x128: Trace write byte select (ELA-600 ATB) */
-    uint32_t external_mask;      /**< 0x130: External mask */
-    uint32_t external_value;     /**< 0x134: External compare value */
-    uint32_t qualifier_mask;     /**< 0x138: Qualifier mask (ELA-600) */
-    uint32_t qualifier_value;    /**< 0x13C: Qualifier value (ELA-600) */
-    cs_ela_signals_t compare_mask;    /**< 0x140: Signal mask bit vector */
-    cs_ela_signals_t compare_value;   /**< 0x180: Signal compare bit vector */
+    unsigned int signal_group;      /**< 0x100: Signal group select 1<<(0..11): one-hot */
+    uint32_t trigger_control;       /**< 0x104: Trigger control */
+    uint32_t next_state;            /**< 0x108: Next state: one-hot or zero */
+    cs_ela_action_t action;         /**< 0x10C: Action on match */
+    uint32_t alt_next_state;        /**< 0x110: Alternative next state */
+    cs_ela_action_t alt_action;     /**< 0x114: Alternative action */
+    uint32_t comp_control;          /**< 0x118: Comparator control (ELA-600) */
+    uint32_t alt_comp_control;      /**< 0x11C: Alternative comparator control (ELA-600) */
+    uint32_t counter_compare;       /**< 0x120: Counter compare */
+    uint32_t twbsel;                /**< 0x128: Trace write byte select (ELA-600 ATB) */
+    uint32_t external_mask;         /**< 0x130: External mask */
+    uint32_t external_value;        /**< 0x134: External compare value */
+    uint32_t qualifier_mask;        /**< 0x138: Qualifier mask (ELA-600) */
+    uint32_t qualifier_value;       /**< 0x13C: Qualifier value (ELA-600) */
+    cs_ela_signals_t compare_mask;  /**< 0x140: Signal mask bit vector */
+    cs_ela_signals_t compare_value; /**< 0x180: Signal compare bit vector */
 } cs_ela_trigconf_t;
 
 
@@ -148,7 +147,7 @@ typedef struct {
    The registers are sampled synchronously.
  */
 typedef struct {
-    unsigned int active:1;   /**< True if ELA is active */
+    unsigned int active : 1; /**< True if ELA is active */
     uint32_t trigger_state;  /**< Current trigger state (one-hot encoded) */
     uint32_t counter;        /**< Current value of the counter for this trigger state */
     uint32_t action;         /**< Current action */
@@ -159,12 +158,12 @@ typedef struct {
     ELA trace record, from internal SRAM.
  */
 typedef struct {
-    unsigned char type;               /**< Record type: counter, signals or timestamp */
-#define CS_ELA_RECORD_COUNTER     0   /**< Record contains counters (ELA-600 only) */
-#define CS_ELA_RECORD_SIGNALS     1   /**< Record contains GRP_WIDTH bits of data */
-#define CS_ELA_RECORD_TS          2   /**< Record contains a timestamp value */
-    unsigned char trigger_state;      /**< Trigger state when captured */
-    cs_ela_signals_t signals;         /**< Payload */
+    unsigned char type;          /**< Record type: counter, signals or timestamp */
+#define CS_ELA_RECORD_COUNTER 0  /**< Record contains counters (ELA-600 only) */
+#define CS_ELA_RECORD_SIGNALS 1  /**< Record contains GRP_WIDTH bits of data */
+#define CS_ELA_RECORD_TS 2       /**< Record contains a timestamp value */
+    unsigned char trigger_state; /**< Trigger state when captured */
+    cs_ela_signals_t signals;    /**< Payload */
 } cs_ela_record_t;
 
 

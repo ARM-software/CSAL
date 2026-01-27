@@ -113,7 +113,7 @@ int cs_device_write_only(cs_device_t dev, unsigned int offset, uint32_t data);
   *   \param bitmask bits to write - a '1' bit in the mask will write the bit from the data value.
   */
 int cs_device_write_masked(cs_device_t dev, unsigned int offset,
-			   uint32_t data, uint32_t bitmask);
+                           uint32_t data, uint32_t bitmask);
 
 /**
  *   Set bit(s) in a device register, using a read-modify-write operation.
@@ -148,8 +148,8 @@ int cs_device_clear(cs_device_t dev, unsigned int offset, uint32_t bits);
  * 
  */
 int cs_device_wait(cs_device_t dev, unsigned int offset,
-		   uint32_t bit_mask, cs_reg_waitbits_op_t operation,
-		   uint32_t pattern, uint32_t *p_last_val);
+                   uint32_t bit_mask, cs_reg_waitbits_op_t operation,
+                   uint32_t pattern, uint32_t *p_last_val);
 
 
 /**
@@ -226,14 +226,14 @@ int cs_device_lock(cs_device_t dev);
  *   \param dev     device descriptor
  */
 int cs_device_is_powered(cs_device_t dev);
-#define CS_POWER_UNKNOWN  -1
-#define CS_POWER_OFF       0
-#define CS_POWER_ON        1
+#define CS_POWER_UNKNOWN -1
+#define CS_POWER_OFF 0
+#define CS_POWER_ON 1
 
 
 /** @} */
 
-#endif				/* _included_cs_reg_access_h */
+#endif /* _included_cs_reg_access_h */
 
 #ifdef __cplusplus
 }

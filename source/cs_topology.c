@@ -106,7 +106,7 @@ static int cs_is_romtable(struct cs_device *d)
 static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
 {
     unsigned int cs_class;
-    struct cs_device protod;  /* Temporary device while we're probing */
+    struct cs_device protod; /* Temporary device while we're probing */
     struct cs_device *d = NULL;
 
     assert(is_4k_page_address(addr));
@@ -135,7 +135,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         /* Recursively scan a secondary ROM table */
         cs_scan_romtable(&protod);
         _cs_unmap(&protod);
-        return CS_ERRDESC;		/* not a device */
+        return CS_ERRDESC; /* not a device */
     }
 
     if (cs_class == CS_CLASS_CORESIGHT) {
@@ -159,8 +159,8 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         devarch = cs_device_read(d, CS_DEVARCH);
         /* Get the 3-digit PrimeCell device number */
         d->part_number =
-            ((_cs_read(d, CS_PIDR1) & 0xF) << 8) | (_cs_read(d, CS_PIDR0) &
-                                                    0xFF);
+                ((_cs_read(d, CS_PIDR1) & 0xF) << 8) | (_cs_read(d, CS_PIDR0) &
+                                                        0xFF);
 
         /* For example, device type 0x13 is major=3, minor=1 */
         major = (d->devtype_from_id >> 0) & 15;
@@ -202,21 +202,21 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 d->type = DEV_ETB;
                 d->devclass |= CS_DEVCLASS_BUFFER;
                 /* Find buffer size */
-                if (d->part_number == 0x961 || d->part_number == 0x9e8 || d->part_number == 0x9e9 || d->part_number == 0x9ea) {	/* TMC */
+                if (d->part_number == 0x961 || d->part_number == 0x9e8 || d->part_number == 0x9e9 || d->part_number == 0x9ea) { /* TMC */
                     d->v.etb.is_tmc_device = 1;
                     /* The TMC configuration type is a static property of the way the RTL was configured:
                        0 for ETB, 1 for ETR, 2 for ETF, 3 for ETS. */
                     d->v.etb.tmc.config_type = ((devid >> 6) & 0x3);
                     d->v.etb.buffer_size_bytes =
-                        _cs_read(d, CS_ETB_RAM_DEPTH) << 2;
+                            _cs_read(d, CS_ETB_RAM_DEPTH) << 2;
                     d->v.etb.pointer_scale_shift = 0;
                     d->v.etb.tmc.memory_width = ((devid >> 8) & 0x7);
                 } else {
                     d->v.etb.is_tmc_device = 0;
                     d->v.etb.buffer_size_bytes =
-                        _cs_read(d,
-                                 CS_ETB_RAM_DEPTH) <<
-                        ETB_WIDTH_SCALE_SHIFT;
+                            _cs_read(d,
+                                     CS_ETB_RAM_DEPTH)
+                            << ETB_WIDTH_SCALE_SHIFT;
                     d->v.etb.pointer_scale_shift = ETB_WIDTH_SCALE_SHIFT;
                 }
             }
@@ -247,9 +247,9 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 d->v.etb.is_tmc_device = 1;
                 /* Find buffer size - for TMC this is always in 32-bit words */
                 d->v.etb.buffer_size_bytes =
-                    _cs_read(d, CS_ETB_RAM_DEPTH) << 2;
+                        _cs_read(d, CS_ETB_RAM_DEPTH) << 2;
                 d->v.etb.pointer_scale_shift = 0;
-                d->v.etb.tmc.config_type = ((devid >> 6) & 0x3);	/* For a link, expect ETF */
+                d->v.etb.tmc.config_type = ((devid >> 6) & 0x3); /* For a link, expect ETF */
                 d->v.etb.tmc.memory_width = ((devid >> 8) & 0x7);
             } else if (minor == 2) {
                 d->type = DEV_REPLICATOR;
@@ -260,7 +260,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         } else if (major == 3) {
             /* Trace sources e.g. ETM, STM (but not ELA-600 even wehn ATB-configured) */
             d->devclass |= CS_DEVCLASS_SOURCE;
-            d->n_out_ports = 1;	/* ETMv4 might have two */
+            d->n_out_ports = 1; /* ETMv4 might have two */
             if (minor == 1) {
                 /* CPU trace source - be careful, the CPU might be powered off */
                 d->type = DEV_ETM;
@@ -274,7 +274,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                    d->v.etm.etmidr = 0;
                    } */
                 /* always read the ETMIDR - establish the ETM architecture version */
-                d->v.etm.etmidr = _cs_read(d, CS_ETMIDR);	/* same place on each etm */
+                d->v.etm.etmidr = _cs_read(d, CS_ETMIDR); /* same place on each etm */
 
                 /* Store static configuration of ETM/PTM in device struct */
 
@@ -296,7 +296,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 d->v.stm.n_ports = devid & 0x1FFFF;
                 _cs_stm_config_static_init(d);
                 d->v.stm.n_masters =
-                    d->v.stm.s_config.spfeat3.bits.nummast + 1;
+                        d->v.stm.s_config.spfeat3.bits.nummast + 1;
                 /* [17:16] SPTYPE Stimulus Port type support:
                    b00 = Only Basic Stimulus Ports implemented.
                    b01 = Only Extended Stimulus Ports implemented.
@@ -305,8 +305,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 switch (d->v.stm.s_config.spfeat2.bits.sptype) {
                 case 0x0:
                     if (d->v.stm.n_ports > 32) {
-                        cs_report_error
-                            ("STM can handle max. 32 basic ports");
+                        cs_report_error("STM can handle max. 32 basic ports");
                         return CS_ERRDESC;
                     }
                     d->v.stm.basic_ports = 1;
@@ -317,8 +316,8 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 case 0x1:
                     /* Allocate the array of pointers to the port ranges */
                     d->v.stm.ext_ports =
-                        (unsigned char **) malloc(sizeof(unsigned char *) *
-                                                  d->v.stm.n_masters);
+                            (unsigned char **)malloc(sizeof(unsigned char *) *
+                                                     d->v.stm.n_masters);
                     memset(d->v.stm.ext_ports, 0,
                            sizeof(unsigned char *) * d->v.stm.n_masters);
                     d->v.stm.current_master = 0;
@@ -387,14 +386,14 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 /* Check for ATB output. Although this wasn't available in ELA-500,
                    it's still documented as having the relevant ID field. */
                 if ((devid & 0xf) == 1) {
-                    d->devclass |= CS_DEVCLASS_SOURCE;   /* ATB, not SRAM */
+                    d->devclass |= CS_DEVCLASS_SOURCE; /* ATB, not SRAM */
                     d->v.ela.ram_size = 0;
                 } else {
                     d->v.ela.ram_size = 1 << ((devid >> 8) & 0xFF);
                     d->v.ela.is_scrambled = ((devid >> 25) & 0xF) == 1;
                 }
                 d->v.ela.signal_width = 8 * (1 + ((devid1 >> 8) & 0xFF));
-                d->v.ela.comp_width = !(devid2 & 0xff00) ? d->v.ela.signal_width : ((((devid2 >> 8) & 0xff)+1)*8);
+                d->v.ela.comp_width = !(devid2 & 0xff00) ? d->v.ela.signal_width : ((((devid2 >> 8) & 0xff) + 1) * 8);
                 d->v.ela.n_trigger_states = (devid1 >> 16) & 0xFF;
             }
         } else if (major == 6) {
@@ -418,15 +417,15 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 d->v.pmu.snapshot = ((devid >> 4) & 0xf) != 0;
                 /* Set up the scale for indexing into the PMU counters in memory */
                 d->v.pmu.map_scale =
-                    ((d->v.pmu.cfgr & 0x00003f00) == 0x00003f00) ? 3 : 2;
+                        ((d->v.pmu.cfgr & 0x00003f00) == 0x00003f00) ? 3 : 2;
             } else {
                 /* Device PMU */
-                d->v.pmu.n_counters = -1;	/* unknown */
+                d->v.pmu.n_counters = -1; /* unknown */
             }
         } else if (devarch != 0) {
             if ((devarch & 0xFFFF) == CS_ARM_ARCHID_MEMAP) {
                 unsigned int cfg = _cs_read(d, CS_MEMAP_CFG);
-                d->devclass |= CS_DEVCLASS_MEMAP;                
+                d->devclass |= CS_DEVCLASS_MEMAP;
                 d->v.memap.DAR_present = (((cfg >> 4) & 0xF) == 0xA);
                 d->v.memap.memap_LPAE = (cfg >> 1) & 1;
             } else {
@@ -448,8 +447,8 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         /* Wouldn't normally be seen in a CoreSight ROM table. */
         /* CoreSight timestamp generators do have these non-CoreSight ids though. */
         unsigned int part_number =
-            ((_cs_read(&protod, CS_PIDR1) & 0xF) << 8) |
-            (_cs_read(&protod, CS_PIDR0) & 0xFF);
+                ((_cs_read(&protod, CS_PIDR1) & 0xF) << 8) |
+                (_cs_read(&protod, CS_PIDR0) & 0xFF);
         if (part_number == 0x101 || part_number == 0x193) {
             d = cs_device_new(protod.phys_addr, protod.local_addr);
             assert(d != NULL);
@@ -481,8 +480,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
 }
 
 
-void
-cs_device_diag_summary(cs_device_t dev)
+void cs_device_diag_summary(cs_device_t dev)
 {
     struct cs_device *d = DEV(dev);
     if (d != NULL) {
@@ -503,11 +501,7 @@ cs_device_diag_summary(cs_device_t dev)
                   cs_trace_swstim_get_port_count(DEVDESC(d)));
             if (d->type == DEV_STM) {
                 diagf(" [STM %s, %u-bit, %u masters]",
-                      (d->v.stm.
-                       basic_ports ? ((d->v.stm.ext_ports == 0) ?
-                                      "basic ports only" :
-                                      "basic and ext ports") :
-                       "ext ports only"),
+                      (d->v.stm.basic_ports ? ((d->v.stm.ext_ports == 0) ? "basic ports only" : "basic and ext ports") : "ext ports only"),
                       (d->v.stm.s_config.spfeat2.bits.dsize ? 64 : 32),
                       d->v.stm.n_masters);
             }
@@ -522,8 +516,7 @@ cs_device_diag_summary(cs_device_t dev)
         if (d->devclass & CS_DEVCLASS_SINK)
             diagf(" SINK");
         if (d->devclass & CS_DEVCLASS_BUFFER) {
-            if ((d->type == DEV_ETB) && d->v.etb.is_tmc_device
-                && (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETR)) {
+            if ((d->type == DEV_ETB) && d->v.etb.is_tmc_device && (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETR)) {
                 diagf(" BUFFER(ETR r/w size: %uK)",
                       cs_get_buffer_size_bytes(DEVDESC(d)) / 1024);
             } else
@@ -534,8 +527,7 @@ cs_device_diag_summary(cs_device_t dev)
             diagf(" PORT");
         if (d->devclass & CS_DEVCLASS_CTI)
             diagf(" CTI");
-        if ((d->devclass & CS_DEVCLASS_LINK)
-            || (d->devclass & CS_DEVCLASS_SINK)) {
+        if ((d->devclass & CS_DEVCLASS_LINK) || (d->devclass & CS_DEVCLASS_SINK)) {
             switch (d->type) {
             case DEV_ETF:
                 assert(d->v.etb.is_tmc_device);
@@ -545,8 +537,7 @@ cs_device_diag_summary(cs_device_t dev)
                 if (d->v.etb.is_tmc_device) {
                     /* can't be ETF as this is filtered out earlier */
                     diagf(" [TMC: %s configuration]",
-                          (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETR) ? "ETR" :
-                          (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETS) ? "ETS" : "ETB");
+                          (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETR) ? "ETR" : (d->v.etb.tmc.config_type == CS_TMC_CONFIG_TYPE_ETS) ? "ETS" : "ETB");
                 } else {
                     diagf(" [ETB]");
                 }
@@ -569,7 +560,7 @@ cs_device_diag_summary(cs_device_t dev)
         }
         if (d->devclass & CS_DEVCLASS_DEBUG) {
             diagf(" DEBUG");
-            if (d->v.debug.debug_arch == 0x8) {   /* v8 debug */
+            if (d->v.debug.debug_arch == 0x8) { /* v8 debug */
                 /* Report features from EDDFR */
                 /* "Debuggers must use EDDEVARCH to determine the Debug architecture version" */
                 switch (d->v.debug.didr & 0xF) {
@@ -602,7 +593,7 @@ cs_device_diag_summary(cs_device_t dev)
                         break;
                     }
                 }
-            } else {		/* v7 debug */
+            } else { /* v7 debug */
                 switch ((d->v.debug.didr >> 16) & 0xF) {
                 case 1:
                     diagf(" v6");
@@ -669,18 +660,15 @@ cs_device_diag_summary(cs_device_t dev)
             }
         }
         switch (d->type) {
-        case DEV_ETM:
-	    {
+        case DEV_ETM: {
             /* Major version number: 2: ETMv3, 3: PTM, 4: ETMv4 */
             unsigned int major = ((d->v.etm.etmidr) >> 8) & 0xF;
             unsigned int minor = ((d->v.etm.etmidr) >> 4) & 0xF;
             diagf(" %cTMv%u.%u",
                   ((major == 3) ? 'P' : 'E'),
-                  ((major < 3) ? (major + 1) : (major ==
-                                                3) ? 1 : major),
+                  ((major < 3) ? (major + 1) : (major == 3) ? 1 : major),
                   minor);
-	    }
-	    break;
+        } break;
         default:
             break;
         }
@@ -734,7 +722,7 @@ static int cs_scan_romtable(struct cs_device *d)
             /* Entry not present */
         } else {
             cs_physaddr_t dev_addr;
-            signed int offset = (entry & 0xFFFFF000);   /* May be -ve */
+            signed int offset = (entry & 0xFFFFF000); /* May be -ve */
             cs_power_domain_t power_domain = (entry & 4) ? ((entry >> 4) & 31) : CS_UNKNOWN_POWER_DOMAIN;
             cs_set_default_power_domain(power_domain);
             dev_addr = d->phys_addr + offset;
@@ -750,7 +738,7 @@ static void _cs_link_affinity(struct cs_device *dbg,
     assert(dbg->type == DEV_CPU_DEBUG);
     switch (other->type) {
     case DEV_CPU_DEBUG:
-        assert(dbg == other);    /* ok to add self, adding another CPU doesn't make sense */
+        assert(dbg == other); /* ok to add self, adding another CPU doesn't make sense */
         break;
     case DEV_CPU_PMU:
         dbg->v.debug.pmu = other;
@@ -835,11 +823,10 @@ cs_device_t cs_device_register(cs_physaddr_t addr)
 }
 
 
-
 int cs_exclude_range(cs_physaddr_t from, cs_physaddr_t to)
 {
     struct addr_exclude *a =
-        (struct addr_exclude *) malloc(sizeof(struct addr_exclude));
+            (struct addr_exclude *)malloc(sizeof(struct addr_exclude));
     if (a == NULL) {
         return -1;
     }
@@ -873,7 +860,7 @@ int cs_device_set_affinity(cs_device_t dev, cs_cpu_t cpu)
         }
     } else {
         cs_device_t ed =
-            cs_cpu_get_device(cpu, CS_DEVCLASS_CPU | CS_DEVCLASS_DEBUG);
+                cs_cpu_get_device(cpu, CS_DEVCLASS_CPU | CS_DEVCLASS_DEBUG);
         if (ed != CS_ERRDESC) {
             _cs_link_affinity(DEV(ed), d);
         }
@@ -951,8 +938,6 @@ int cs_registration_completed(void)
 {
     return !G.registration_open;
 }
-
-
 
 
 /*  ========= topology iteration group =========== */

@@ -39,9 +39,8 @@ static int print_ptm_config(const struct board *board, int ptm_no)
     /* While programming, ensure we are not collecting trace */
     cs_sink_disable(devices.etb);
     for (i = 0; i < board->n_cpu; ++i) {
-        printf
-            ("CS_ETM_DEMO: Configuring trace source id for CPU #%d ETM/PTM...\n",
-             i);
+        printf("CS_ETM_DEMO: Configuring trace source id for CPU #%d ETM/PTM...\n",
+               i);
         devices.ptm[i] = cs_cpu_get_device(i, CS_DEVCLASS_SOURCE);
         if (cs_set_trace_source_id(devices.ptm[i], 0x10 + i) < 0) {
             return -1;
@@ -58,8 +57,8 @@ static int print_ptm_config(const struct board *board, int ptm_no)
     }
 
     for (; i < end; ++i) {
-        cs_etm_config_t tconfig;	/* PTM/ETMv3 config */
-        cs_etmv4_config_t t4config;	/* ETMv4 config */
+        cs_etm_config_t tconfig;    /* PTM/ETMv3 config */
+        cs_etmv4_config_t t4config; /* ETMv4 config */
         void *p_config = 0;
 
         if (init_etm)
@@ -104,9 +103,8 @@ static int dump_ptm_config(const struct board *board, int ptm_no)
         fwrite(&data, sizeof(unsigned int), 1, fp);
     }
 
-    printf
-        ("CS_ETM_DEMO: ETM registers for CPU #%d dumped to: etmdump.bin\n",
-         ptm_no);
+    printf("CS_ETM_DEMO: ETM registers for CPU #%d dumped to: etmdump.bin\n",
+           ptm_no);
     fclose(fp);
     return 0;
 }
@@ -115,7 +113,7 @@ int main(int argc, char **argv)
 {
     int ptm_no = -1;
     bool dump = false;
-    board_name[0] = 0;    
+    board_name[0] = 0;
 
     if (argc >= 2) {
         int i = 1;
@@ -155,7 +153,7 @@ int main(int argc, char **argv)
 
     if (strlen(board_name) > 0) {
         if (setup_known_board_by_name(board_name, &board, &devices) < 0) {
-            printf("Failed to setup board named %s.\n",board_name);
+            printf("Failed to setup board named %s.\n", board_name);
             return EXIT_FAILURE;
         }
     } else {

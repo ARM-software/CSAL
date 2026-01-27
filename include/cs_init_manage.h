@@ -82,7 +82,7 @@ unsigned short cs_library_version();
 
 /** @} */
 
-#endif				/* _included_cs_init_manage_h */
+#endif /* _included_cs_init_manage_h */
 
 /* end of  cs_init_manage.h */
 #ifdef __cplusplus

@@ -29,11 +29,11 @@
 
 void show_mem(void const *vav, unsigned long size, unsigned long phys_addr)
 {
-    unsigned char const *va = (unsigned char const *) vav;
+    unsigned char const *va = (unsigned char const *)vav;
     int i;
     for (i = 0; i < size && i < 4096; i += 32) {
         int j;
-        printf("V:0x%lx P:0x%lx ", (unsigned long) (va + i),
+        printf("V:0x%lx P:0x%lx ", (unsigned long)(va + i),
                phys_addr + i);
         for (j = 0; j < 32; ++j) {
             printf(" %02x", va[i + j]);
@@ -64,8 +64,8 @@ int main(int argc, char **argv)
     page_size = sysconf(_SC_PAGE_SIZE);
     fprintf(stderr, "page size: %lu\n", page_size);
     fprintf(stderr, "sizeof(void *) == %u\n",
-            (unsigned int) sizeof(void *));
-    fprintf(stderr, "sizeof(off_t) == %u\n", (unsigned int) sizeof(off_t));
+            (unsigned int)sizeof(void *));
+    fprintf(stderr, "sizeof(off_t) == %u\n", (unsigned int)sizeof(off_t));
 
     while (*++argv) {
         char const *arg = *argv;
@@ -117,9 +117,9 @@ int main(int argc, char **argv)
     }
     /* Now try seeking */
     seek_rc = lseek64(fd, phys_addr, SEEK_SET);
-    if (seek_rc != (off_t) (-1)) {
+    if (seek_rc != (off_t)(-1)) {
         int n;
-        unsigned char *buf = (unsigned char *) malloc(size);
+        unsigned char *buf = (unsigned char *)malloc(size);
         fprintf(stderr, "seeked ok\n");
         n = read(fd, buf, size);
         if (n < 0) {

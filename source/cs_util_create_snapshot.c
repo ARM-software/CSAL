@@ -25,8 +25,8 @@
 #define _GNU_SOURCE
 #endif
 
-#include <sched.h>		/* for CPU_* family, requires glibc 2.6 or later */
-#include <unistd.h>		/* for usleep() */
+#include <sched.h>  /* for CPU_* family, requires glibc 2.6 or later */
+#include <unistd.h> /* for usleep() */
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -43,11 +43,10 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#endif				/* UNIX_USERSPACE */
+#endif /* UNIX_USERSPACE */
 
 
-
-#define INVALID_ADDRESS 1	/* never a valid address */
+#define INVALID_ADDRESS 1 /* never a valid address */
 static unsigned long snapshot_trace_start_address = INVALID_ADDRESS;
 static unsigned long snapshot_trace_end_address = INVALID_ADDRESS;
 
@@ -90,7 +89,7 @@ static unsigned long kernel_virtual_address(void)
             /* Pick the address of whichever kernel symbol happens to be first,
                and round down to a page boundary */
             if (fscanf(fd, "%lx", &addr) == 1) {
-                addr &= ~0xfff;	/* assume 4K pages */
+                addr &= ~0xfff; /* assume 4K pages */
                 if (registration_verbose)
                     printf("Found kernel symbol @ 0x%lX as kernel VA\n",
                            addr);
@@ -115,7 +114,7 @@ static void create_dump_ini(int index, cs_device_t device, bool zeroindex,
         perror("can't open trace metadata output file");
     } else {
         int n;
-        if (zeroindex) {    /* handle the case of ITM_0 */
+        if (zeroindex) { /* handle the case of ITM_0 */
             n = cs_get_trace_metadata(CS_METADATA_INI, device, 0, buf,
                                       sizeof buf, name_buf, name_buf_size);
         } else {
@@ -190,16 +189,15 @@ int dump_kernel_memory(char const *fn, unsigned long start,
     fd_mem = open("/dev/kmem", O_RDONLY);
     if (fd_mem >= 0) {
         local =
-            (unsigned char *) mmap(0, mapsize, PROT_READ, MAP_SHARED,
-                                   fd_mem, mapstart);
+                (unsigned char *)mmap(0, mapsize, PROT_READ, MAP_SHARED,
+                                      fd_mem, mapstart);
         close(fd_mem);
     } else {
         unsigned long pkcba;
         printf("can't open /dev/kmem, trying /dev/mem instead...\n");
         pkcba = physical_kernel_code_base_address();
         if (pkcba == 1) {
-            printf
-                ("can't read the physical kernel code base address from /proc/iomem\n");
+            printf("can't read the physical kernel code base address from /proc/iomem\n");
             local = (unsigned char *)MAP_FAILED;
         } else {
             fd_mem = open("/dev/mem", O_RDONLY);
@@ -209,9 +207,9 @@ int dump_kernel_memory(char const *fn, unsigned long start,
                     printf("Using 0x%lX as mapping address, 0x%lX size\n",
                            (mapstart - kernel_va + pkcba), mapsize);
                 local =
-                    (unsigned char *) mmap(0, mapsize, PROT_READ,
-                                           MAP_SHARED, fd_mem,
-                                           (mapstart - kernel_va + pkcba));
+                        (unsigned char *)mmap(0, mapsize, PROT_READ,
+                                              MAP_SHARED, fd_mem,
+                                              (mapstart - kernel_va + pkcba));
                 close(fd_mem);
             } else {
                 printf("can't open /dev/mem either\n");
@@ -222,19 +220,14 @@ int dump_kernel_memory(char const *fn, unsigned long start,
 
     if (local == MAP_FAILED) {
         printf("Cannot mmap device at 0x%lx, errno=%d\n", mapstart, errno);
-        printf
-            ("so cannot dump kernel memory automatically to the file kernel_dump.bin.\n");
-        printf
-            ("This may be because the kernel has been built with CONFIG_STRICT_DEVMEM set.\n");
-        printf
-            ("Try rebuilding the kernel without this flag, alternatively:\n");
-        printf
-            ("1) Use DS-5 Debugger to dump this kernel memory from the target\n");
+        printf("so cannot dump kernel memory automatically to the file kernel_dump.bin.\n");
+        printf("This may be because the kernel has been built with CONFIG_STRICT_DEVMEM set.\n");
+        printf("Try rebuilding the kernel without this flag, alternatively:\n");
+        printf("1) Use DS-5 Debugger to dump this kernel memory from the target\n");
         printf("2) Extract this kernel memory from the kernel Image\n");
-        printf
-            ("Program execution will now continue to generate the other necessary files...\n\n");
+        printf("Program execution will now continue to generate the other necessary files...\n\n");
         err = 1;
-    } else {			/* mmap() succeeded */
+    } else { /* mmap() succeeded */
         fd_kernel_dump = fopen(fn, "wb");
         if (fd_kernel_dump) {
             fwrite(local + (start & 0xfff), size, 1, fd_kernel_dump);
@@ -244,8 +237,8 @@ int dump_kernel_memory(char const *fn, unsigned long start,
         }
     }
 
-#else				/* for bare-metal */
-    local = (unsigned char *) start;
+#else  /* for bare-metal */
+    local = (unsigned char *)start;
     fd_kernel_dump = fopen(fn, "wb");
     if (fd_kernel_dump) {
         fwrite(local, size, 1, fd_kernel_dump);
@@ -253,7 +246,7 @@ int dump_kernel_memory(char const *fn, unsigned long start,
     } else {
         err = 1;
     }
-#endif				/* UNIX_USERSPACE */
+#endif /* UNIX_USERSPACE */
     return err;
 }
 
@@ -292,7 +285,7 @@ static void do_fetch_trace_etb(cs_device_t etb, char const *name,
             printf("** %d bytes of trace\n", n);
             printf("The first %d bytes of trace are:\n", todo);
             for (i = 0; i < todo; ++i) {
-                printf(" %02X", ((unsigned char *) buf)[i]);
+                printf(" %02X", ((unsigned char *)buf)[i]);
                 if ((i % 32) == 31 || (i == todo - 1))
                     printf("\n");
                 else if ((i % 32) == 15)
@@ -328,11 +321,11 @@ void do_dump_config(const struct board *board,
 #ifdef CS_VA64BIT
     aarch64 = 1;
     CPSR_VAL = 0x1C5;
-    SCTLR_EL1_val = 0x1007;	/* fake value to let debugger figure memory endianness (little in this case) */
+    SCTLR_EL1_val = 0x1007; /* fake value to let debugger figure memory endianness (little in this case) */
 #else
     aarch64 = 0;
     CPSR_VAL = 0x1D3;
-    SCTLR_EL1_val = 0;		/* not really used here */
+    SCTLR_EL1_val = 0; /* not really used here */
 #endif
 
     /* Top level contents file */
@@ -344,9 +337,9 @@ void do_dump_config(const struct board *board,
     fputs("[device_list]\n", fdContents);
 
     dumped_kernel =
-        !dump_kernel_memory("kernel_dump.bin",
-                            snapshot_trace_start_address,
-                            snapshot_trace_end_address);
+            !dump_kernel_memory("kernel_dump.bin",
+                                snapshot_trace_start_address,
+                                snapshot_trace_end_address);
 
     /* CPU state */
     /* Create separate files for each device */
@@ -361,7 +354,7 @@ void do_dump_config(const struct board *board,
         fprintf(fdCore, "name=cpu_%u\n", i);
         fputs("class=core\n", fdCore);
         fprintf(fdCore, "type=%s\n\n", get_core_name(devices->cpu_id[i]));
-        fputs("[regs]\n", fdCore);	/* Some basic register information is needed */
+        fputs("[regs]\n", fdCore); /* Some basic register information is needed */
         if (aarch64) {
             fprintf(fdCore, "PC(size:64)=0x%lX\n",
                     snapshot_trace_start_address);
@@ -380,7 +373,7 @@ void do_dump_config(const struct board *board,
                     snapshot_trace_start_address);
             fprintf(fdCore, "length=0x%08lX\n\n",
                     snapshot_trace_end_address -
-                    snapshot_trace_start_address);
+                            snapshot_trace_start_address);
         }
 
         fclose(fdCore);

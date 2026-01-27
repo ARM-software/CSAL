@@ -33,7 +33,7 @@ extern "C" {
  */
 
 
-#define CS_METADATA_INI  1   /**< Metadata format #1: .INI file */
+#define CS_METADATA_INI 1 /**< Metadata format #1: .INI file */
 
 /** Get system-wide trace metadata in textual format
  *
@@ -47,8 +47,8 @@ extern "C" {
  *  \return         Number of bytes written, or needed
  */
 int cs_get_trace_metadata(int mtype, cs_device_t dev, int trace_id,
-			  char *buf, unsigned int size, char *name_buf,
-			  unsigned int name_buf_size);
+                          char *buf, unsigned int size, char *name_buf,
+                          unsigned int name_buf_size);
 
 
 /** @} */

@@ -72,7 +72,7 @@ uint32_t cs_memap_read32(cs_device_t dev, cs_physaddr_t addr)
 
 uint64_t cs_memap_read64(cs_device_t dev, cs_physaddr_t addr)
 {
-    return ((uint64_t)cs_memap_read32(dev, addr+4) << 32) | cs_memap_read32(dev, addr);
+    return ((uint64_t)cs_memap_read32(dev, addr + 4) << 32) | cs_memap_read32(dev, addr);
 }
 
 
@@ -90,7 +90,7 @@ int cs_memap_write32(cs_device_t dev, cs_physaddr_t addr, uint32_t data)
 int cs_memap_write64(cs_device_t dev, cs_physaddr_t addr, uint64_t data)
 {
     cs_memap_write32(dev, addr, (uint32_t)data);
-    return cs_memap_write32(dev, addr+4, (uint32_t)(data >> 32));
+    return cs_memap_write32(dev, addr + 4, (uint32_t)(data >> 32));
 }
 
 
@@ -141,7 +141,7 @@ int cs_memap_check_error(cs_device_t dev, int reset)
     uint32_t trr = _cs_read(d, CS_MEMAP_TRR);
     int error_logged = (trr & CS_MEMAP_TRR_ERR);
     if (reset && error_logged) {
-        _cs_write(d, CS_MEMAP_TRR, CS_MEMAP_TRR_ERR);   /* write the flag to clear it */
+        _cs_write(d, CS_MEMAP_TRR, CS_MEMAP_TRR_ERR); /* write the flag to clear it */
     }
     return error_logged;
 }

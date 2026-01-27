@@ -61,7 +61,7 @@ void set_kernel_trace_dump_range(unsigned long start, unsigned long end);
  * @param end : End address in kernel virtual memory.
  */
 int dump_kernel_memory(char const *fn, unsigned long start,
-		       unsigned long end);
+                       unsigned long end);
 
 /*!
  * Create the set of snapshot configuration files based on the supplied board structure and
@@ -75,8 +75,8 @@ int dump_kernel_memory(char const *fn, unsigned long start,
  *
  */
 void do_dump_config(const struct board *board,
-		    const struct cs_devices_t *devices,
-		    int do_dump_swstim);
+                    const struct cs_devices_t *devices,
+                    int do_dump_swstim);
 
 /*!
  * Fetches trace from configured sinks and saves to files required for the snapshot configuration 
@@ -87,10 +87,10 @@ void do_dump_config(const struct board *board,
  *
  */
 void do_fetch_trace(const struct cs_devices_t *devices,
-		    int do_dump_swstim);
+                    int do_dump_swstim);
 
 /** @}*/
-#endif				/* CS_UTIL_CREATE_SNAPSHOT_H */
+#endif /* CS_UTIL_CREATE_SNAPSHOT_H */
 #ifdef __cplusplus
 }
 #endif

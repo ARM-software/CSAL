@@ -98,12 +98,12 @@ int cs_clear_trace_buffer(cs_device_t dev, unsigned int data);
  *  \param size  Size of the data, in bytes
  */
 int cs_insert_trace_data(cs_device_t dev, void const *buf,
-			 unsigned int size);
+                         unsigned int size);
 
 
 /** @} */
 
-#endif				/* _included_cs_trace_sink_h */
+#endif /* _included_cs_trace_sink_h */
 
 #ifdef __cplusplus
 }

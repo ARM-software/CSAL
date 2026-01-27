@@ -48,7 +48,7 @@ int cs_cti_disable(cs_device_t dev);
  *
  */
 int cs_cti_set_trigin_channels(cs_device_t cti, unsigned int ctiport,
-			       unsigned int mask);
+                               unsigned int mask);
 
 /** Map CTI cross trigger channel(s) to a CTI trigger output port.
  *
@@ -58,7 +58,7 @@ int cs_cti_set_trigin_channels(cs_device_t cti, unsigned int ctiport,
  *
  */
 int cs_cti_set_trigout_channels(cs_device_t cti, unsigned int ctiport,
-				unsigned int mask);
+                                unsigned int mask);
 
 /** Control propagation of the selected channels to the cross-trigger matrix. 
  *
@@ -144,7 +144,7 @@ void cs_cti_diag(void);
    Trigger source object.  This is a trigger output port on some device.
 */
 typedef struct {
-    cs_device_t cti;	  /**< CTI device */
+    cs_device_t cti;      /**< CTI device */
     unsigned int ctiport; /**< CTI input port (0..7) */
 } cs_trigsrc_t;
 
@@ -152,7 +152,7 @@ typedef struct {
    Trigger destination object.  This is a trigger input port on some device.
 */
 typedef struct {
-    cs_device_t cti;	  /**< CTI device */
+    cs_device_t cti;      /**< CTI device */
     unsigned int ctiport; /**< CTI output port (0..7) */
 } cs_trigdst_t;
 
@@ -168,7 +168,7 @@ cs_device_t cs_trigsrc_cti(cs_trigsrc_t src);
 /** Get the CTI input port number from a trigger source object. 
     _FUNCTION NOT IMPLEMENTED_
 */
-unsigned int cs_trigsrc_portid(cs_trigsrc_t src);	/* NOT IMPLEMENTED */
+unsigned int cs_trigsrc_portid(cs_trigsrc_t src); /* NOT IMPLEMENTED */
 
 /** Get the CTI for a trigger destination object */
 cs_device_t cs_trigdst_cti(cs_trigdst_t dst);
@@ -176,41 +176,39 @@ cs_device_t cs_trigdst_cti(cs_trigdst_t dst);
 /** Get the CTI output port number for a trigger destination object.
     _FUNCTION NOT IMPLEMENTED_
 */
-unsigned int cs_trigdst_portid(cs_trigdst_t dst);	/* NOT IMPLEMENTED */
-
-
+unsigned int cs_trigdst_portid(cs_trigdst_t dst); /* NOT IMPLEMENTED */
 
 
 /** @name Device Trigger Signal Port Numbers
     Zero based indexes for the Trigger I/O connected from trace components 
     to CTI devices.
     @{*/
-#define CS_TRIGIN_CPU_EDBGRQ 0	      /**< CPU EDBGRQ - request to enter halted debug state */
-#define CS_TRIGIN_CPU_DBGRESTART 1    /**< CPU DBGRESTART - request to exit halted debug state */
+#define CS_TRIGIN_CPU_EDBGRQ 0     /**< CPU EDBGRQ - request to enter halted debug state */
+#define CS_TRIGIN_CPU_DBGRESTART 1 /**< CPU DBGRESTART - request to exit halted debug state */
 
-#define CS_TRIGOUT_CPU_DBGTRIGGER 0   /**< CPU DBGTRIGGER - CPU has accepted request to enter debug state */
-#define CS_TRIGOUT_CPU_EXTOUT0 1      /**< CPU EXTOUT0 - external output #0 from ETM */
+#define CS_TRIGOUT_CPU_DBGTRIGGER 0 /**< CPU DBGTRIGGER - CPU has accepted request to enter debug state */
+#define CS_TRIGOUT_CPU_EXTOUT0 1    /**< CPU EXTOUT0 - external output #0 from ETM */
 
-#define CS_TRIGIN_ETB_TRIGIN 0	      /**< ETB TRIGIN */
-#define CS_TRIGIN_ETB_FLUSHIN 1	      /**< ETB FLUSHIN */
+#define CS_TRIGIN_ETB_TRIGIN 0  /**< ETB TRIGIN */
+#define CS_TRIGIN_ETB_FLUSHIN 1 /**< ETB FLUSHIN */
 
-#define CS_TRIGOUT_ETB_ACQCOMP 0      /**< ETB ACQCOMP - acquisition complete */
-#define CS_TRIGOUT_ETB_FULL 1	      /**< ETB FULL */
+#define CS_TRIGOUT_ETB_ACQCOMP 0 /**< ETB ACQCOMP - acquisition complete */
+#define CS_TRIGOUT_ETB_FULL 1    /**< ETB FULL */
 
-#define CS_TRIGIN_TPIU_TRIGIN 0	      /**< TPIU TRIGIN */
-#define CS_TRIGIN_TPIU_FLUSHIN 1      /**< TPIU FLUSHIN */
+#define CS_TRIGIN_TPIU_TRIGIN 0  /**< TPIU TRIGIN */
+#define CS_TRIGIN_TPIU_FLUSHIN 1 /**< TPIU FLUSHIN */
 
-#define CS_TRIGOUT_ITM_TRIGOUT 0      /**< ITM TRIGOUT */
+#define CS_TRIGOUT_ITM_TRIGOUT 0 /**< ITM TRIGOUT */
 
-#define CS_TRIGOUT_STM_TRIGOUTSPTE 0  /**< Pulsed on STMSPTER match */
-#define CS_TRIGOUT_STM_TRIGOUTSW   1  /**< Pulsed on write to TRIG extended stimulus port */
-#define CS_TRIGOUT_STM_TRIGOUTHETE 2  /**< Pulsed on STMHETER match */
-#define CS_TRIGOUT_STM_ASYNCOUT    3  /**< STM Async out trigger*/
+#define CS_TRIGOUT_STM_TRIGOUTSPTE 0 /**< Pulsed on STMSPTER match */
+#define CS_TRIGOUT_STM_TRIGOUTSW 1   /**< Pulsed on write to TRIG extended stimulus port */
+#define CS_TRIGOUT_STM_TRIGOUTHETE 2 /**< Pulsed on STMHETER match */
+#define CS_TRIGOUT_STM_ASYNCOUT 3    /**< STM Async out trigger*/
 
-#define CS_TRIGIN_STM_HWEVENT_0    0  /**< CTI output connected to edge triggered STM HW event input */
-#define CS_TRIGIN_STM_HWEVENT_1    1  /**< CTI output connected to edge triggered STM HW event input */
-#define CS_TRIGIN_STM_HWEVENT_2    2  /**< CTI output connected to edge triggered STM HW event input */
-#define CS_TRIGIN_STM_HWEVENT_3    3  /**< CTI output connected to edge triggered STM HW event input */
+#define CS_TRIGIN_STM_HWEVENT_0 0 /**< CTI output connected to edge triggered STM HW event input */
+#define CS_TRIGIN_STM_HWEVENT_1 1 /**< CTI output connected to edge triggered STM HW event input */
+#define CS_TRIGIN_STM_HWEVENT_2 2 /**< CTI output connected to edge triggered STM HW event input */
+#define CS_TRIGIN_STM_HWEVENT_3 3 /**< CTI output connected to edge triggered STM HW event input */
 
 /** @name CTI trigger connections
     @{*/
@@ -228,11 +226,11 @@ typedef unsigned int cs_triginix_t;
 
 /** Register that some device trigger output is connected to a CTI. */
 int cs_cti_connect_trigsrc(cs_device_t dev, cs_trigoutix_t devportid,
-			   cs_trigsrc_t src);
+                           cs_trigsrc_t src);
 
 /** Register that a CTI is connected to some device trigger input. */
 int cs_cti_connect_trigdst(cs_trigdst_t dst, cs_device_t dev,
-			   cs_triginix_t devportid);
+                           cs_triginix_t devportid);
 
 /**
    Find the CTI input port connected to some non-CTI component trigger output port.
@@ -410,8 +408,7 @@ int cs_ect_reset(void);
 /** @}*/
 
 
-
-#endif				/* _included_cs_cti_ect_h */
+#endif /* _included_cs_cti_ect_h */
 
 /* end of  cs_cti_ect.h */
 #ifdef __cplusplus

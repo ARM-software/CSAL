@@ -57,7 +57,7 @@ static void devmemd_req(devmemd_request_t *req, devmemd_response_t *rsp)
     }
     if (rsp->status != DEVMEMD_ERR_OK || rsp->seq != req->seq) {
         fprintf(stderr, "** csaccess: devmemd failed (req=%d, addr=0x%lx), rc=%d\n",
-            req->req, req->phys_addr, rsp->status);
+                req->req, req->phys_addr, rsp->status);
         exit(EXIT_FAILURE);
     }
 }
@@ -103,12 +103,12 @@ void devmemd_init(void)
     }
     ix = strchr(devmemd, ':');
     if (!ix) {
-badaddr:
+    badaddr:
         fprintf(stderr, "** csaccess: DEVMEMD must be <addr>:<port>: %s\n", devmemd);
         exit(EXIT_FAILURE);
     }
     memset(&remote, 0, sizeof remote);
-    port = atoi(ix+1);
+    port = atoi(ix + 1);
     if (port <= 0 || port > 0xffff) {
         goto badaddr;
     }
@@ -120,14 +120,14 @@ badaddr:
     }
     struct sockaddr_in *rp = (struct sockaddr_in *)ainfo->ai_addr;
     fprintf(stderr, "** csaccess: opening connection to %s (%s) port %d\n",
-        devmemd, inet_ntoa(rp->sin_addr), port);
+            devmemd, inet_ntoa(rp->sin_addr), port);
     assert(rp->sin_family == AF_INET);
     rp->sin_port = htons(port);
     devmemd_fd = socket(ainfo->ai_family, ainfo->ai_socktype, 0);
     rc = connect(devmemd_fd, ainfo->ai_addr, sizeof(*ainfo->ai_addr));
     if (rc < 0) {
         fprintf(stderr, "** csaccess: can't connect to devmemd at %s: %s:%u\n",
-            devmemd, inet_ntoa(rp->sin_addr), ntohs(rp->sin_port));
+                devmemd, inet_ntoa(rp->sin_addr), ntohs(rp->sin_port));
         exit(EXIT_FAILURE);
     }
     freeaddrinfo(ainfo);

@@ -49,20 +49,20 @@ int cs_init(void)
 #else
     devmemd_init();
 #endif
-#endif				/* UNIX_USERSPACE */
+#endif /* UNIX_USERSPACE */
     G.init_called = 1;
     G.registration_open = 1;
-    G.force_writes = 1;		/* While we're debugging it... */
+    G.force_writes = 1; /* While we're debugging it... */
 #if CHECK
     G.diag_checking = 1;
 #else
     G.diag_checking = 0;
-#endif				/* CHECK */
+#endif /* CHECK */
 
-    G.diag_tracing_default = 0;	/* tracing off by default */
+    G.diag_tracing_default = 0; /* tracing off by default */
 
 #ifdef LPAE
-    G.phys_addr_lpae = 1;	/* 1 if built with LPAE */
+    G.phys_addr_lpae = 1; /* 1 if built with LPAE */
 #else
     G.phys_addr_lpae = 0;
 #endif
@@ -87,13 +87,13 @@ int cs_diag_set(int n)
     if (n > 0) {
         diagf("CSAL: tracing set to level %d\n", n);
     }
-#else /* !DIAG */
+#else  /* !DIAG */
     if (n > 0) {
         /* Attempts to enable diagnostics when not compiled in -
            we might not have I/O, but we can at least return a fault indication. */
         return -1;
     }
-#endif				/* DIAG */
+#endif /* DIAG */
     return 0;
 }
 
@@ -112,7 +112,7 @@ int cs_diag_set_fd(FILE *fd)
 #ifdef CSAL_MEMAP
 void cs_set_default_memap(cs_device_t dev)
 {
-    if (dev) {    
+    if (dev) {
         assert(cs_device_has_class(dev, CS_DEVCLASS_MEMAP));
         if (DTRACEG) {
             diagf("!Set default MEM-AP\n");
@@ -132,13 +132,13 @@ int cs_shutdown(void)
 {
     if (G.init_called) {
         /* Do anything that needs memory-mapped access */
-        cs_release();      /* claim tags released here */
+        cs_release(); /* claim tags released here */
         cs_checkpoint();
 #ifdef UNIX_USERSPACE
         /* Now remove memory-mapped access */
         close(G.mem_fd);
         G.mem_fd = 0;
-#endif				/* UNIX_USERSPACE */
+#endif /* UNIX_USERSPACE */
         G.init_called = 0;
         G.registration_open = 0;
     }
@@ -162,9 +162,7 @@ int cs_shutdown(void)
    Return the appropriate internal claim tag for the given device. */
 uint32_t _cs_device_internal_claim_tag(struct cs_device *d)
 {
-    return cs_device_has_class(d, CS_DEVCLASS_MEMAP) ?
-           CS_CLAIM_AP_INTERNAL :
-           CS_CLAIM_DEV_INTERNAL;
+    return cs_device_has_class(d, CS_DEVCLASS_MEMAP) ? CS_CLAIM_AP_INTERNAL : CS_CLAIM_DEV_INTERNAL;
 }
 
 
@@ -181,7 +179,7 @@ int _cs_device_is_powered(struct cs_device *d)
     if (cs_device_has_class(d, CS_DEVCLASS_DEBUG)) {
         uint32_t edprsr = _cs_read(d, CS_DBGPRSR);
         return (edprsr & 1) == 1;
-    } else if (cs_device_has_class(d, CS_DEVCLASS_SOURCE|CS_DEVCLASS_CPU)) {
+    } else if (cs_device_has_class(d, CS_DEVCLASS_SOURCE | CS_DEVCLASS_CPU)) {
         uint32_t edpdsr = _cs_read(d, CS_ETMPDSR);
         return (edpdsr & 1) == 1;
     } else {
@@ -244,8 +242,8 @@ int cs_checkpoint(void)
 
 unsigned short cs_library_version()
 {
-    return (((unsigned short) CS_LIB_VERSION_MAJ & 0xFF) << 8) |
-        ((unsigned short) CS_LIB_VERSION_MIN & 0xFF);
+    return (((unsigned short)CS_LIB_VERSION_MAJ & 0xFF) << 8) |
+           ((unsigned short)CS_LIB_VERSION_MIN & 0xFF);
 }
 
 

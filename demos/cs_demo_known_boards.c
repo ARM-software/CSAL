@@ -26,7 +26,8 @@
 
 static int do_registration_snowball(struct cs_devices_t *devices)
 {
-    enum { A9_0, A9_1 };
+    enum { A9_0,
+           A9_1 };
 
     cs_device_t funnel, rep;
     int i;
@@ -68,13 +69,14 @@ static int do_registration_snowball(struct cs_devices_t *devices)
 
 static int do_registration_arndale(struct cs_devices_t *devices)
 {
-    enum { A15_0, A15_1 };
+    enum { A15_0,
+           A15_1 };
     cs_device_t rep_main, rep_itm, funnel, tpiu;
     int i;
 
     if (registration_verbose)
         printf("CSDEMO: Registering Arndale CoreSight devices...\n");
-    cs_exclude_range(0x108A0000, 0x108C0000);	/* exclude the Cortex-A5s */
+    cs_exclude_range(0x108A0000, 0x108C0000); /* exclude the Cortex-A5s */
     cs_register_romtable(0x10880000);
 
     if (registration_verbose)
@@ -109,7 +111,7 @@ static int do_registration_arndale(struct cs_devices_t *devices)
 #ifndef BAREMETAL
         devices->cpu_id[i] = cpu_id[i];
 #else
-        devices->cpu_id[i] = 0xC0F;    
+        devices->cpu_id[i] = 0xC0F;
 #endif
     }
     return 0;
@@ -231,9 +233,14 @@ static int do_registration_tc2(struct cs_devices_t *devices)
 
 static int do_registration_juno(struct cs_devices_t *devices)
 {
-    enum { A53_0, A53_1, A53_2, A53_3, A57_0, A57_1 };
+    enum { A53_0,
+           A53_1,
+           A53_2,
+           A53_3,
+           A57_0,
+           A57_1 };
     cs_device_t rep, etr, etf, fun_main, fun_a53, fun_a57, stm, tpiu,
-        sys_cti;
+            sys_cti;
     cs_device_t r1_fun_scp, r1_fun_common, r1_etf_scp;
 #ifdef LIB_DEVICE_UNSUPPORTED
     cs_device_t r1_cti_2, ela_a53, ela_a57;
@@ -349,7 +356,7 @@ static int do_registration_juno(struct cs_devices_t *devices)
 
     /* populate the devices structure */
     devices->itm = stm;
-    devices->etb = etf;		/* core output through main etf */
+    devices->etb = etf; /* core output through main etf */
 
     /* STM needs to init master address and master 0 by default 
        All Juno cores see a single master @ 0, but other select bits
@@ -389,10 +396,10 @@ static int do_registration_juno(struct cs_devices_t *devices)
                            cs_cti_trigsrc(sys_cti, 7));
 
     /* edges of the CTI outputs are connected to separate HW events in STM */
-    cs_cti_connect_trigdst(cs_cti_trigdst(sys_cti, 4), stm, CS_TRIGIN_STM_HWEVENT_0);	/* rising edge */
-    cs_cti_connect_trigdst(cs_cti_trigdst(sys_cti, 4), stm, CS_TRIGIN_STM_HWEVENT_1);	/* falling edge */
-    cs_cti_connect_trigdst(cs_cti_trigdst(sys_cti, 5), stm, CS_TRIGIN_STM_HWEVENT_2);	/* rising edge */
-    cs_cti_connect_trigdst(cs_cti_trigdst(sys_cti, 5), stm, CS_TRIGIN_STM_HWEVENT_3);	/* falling edge */
+    cs_cti_connect_trigdst(cs_cti_trigdst(sys_cti, 4), stm, CS_TRIGIN_STM_HWEVENT_0); /* rising edge */
+    cs_cti_connect_trigdst(cs_cti_trigdst(sys_cti, 4), stm, CS_TRIGIN_STM_HWEVENT_1); /* falling edge */
+    cs_cti_connect_trigdst(cs_cti_trigdst(sys_cti, 5), stm, CS_TRIGIN_STM_HWEVENT_2); /* rising edge */
+    cs_cti_connect_trigdst(cs_cti_trigdst(sys_cti, 5), stm, CS_TRIGIN_STM_HWEVENT_3); /* falling edge */
 
     /* the linux board probe does not set up CPUIDs correctly for Juno - 
        hardcode here for both linux and BAREMETAL. */
@@ -406,14 +413,15 @@ static int do_registration_juno(struct cs_devices_t *devices)
 
 static int do_registration_altera(struct cs_devices_t *devices)
 {
-    enum { A9_0, A9_1 };
+    enum { A9_0,
+           A9_1 };
     cs_device_t rep, etr, funnel, tpiu;
     int i;
 
     if (registration_verbose)
         printf("CSDEMO: Registering CoreSight devices...\n");
-    cs_exclude_range(0xff007000, 0xff009000);	/* exclude FPGA CTI and ROM */
-    cs_exclude_range(0xff080000, 0xff081000);	/* skipping potentially missing ROM table entry */
+    cs_exclude_range(0xff007000, 0xff009000); /* exclude FPGA CTI and ROM */
+    cs_exclude_range(0xff080000, 0xff081000); /* skipping potentially missing ROM table entry */
     cs_register_romtable(0xff000000);
 
     if (registration_verbose)
@@ -434,7 +442,7 @@ static int do_registration_altera(struct cs_devices_t *devices)
                     1);
     /* 3 is the STM, 2 and 4-7 unused */
 
-    devices->etb = cs_device_get(0xff001000);	/* It's ETF, not ETB actually */
+    devices->etb = cs_device_get(0xff001000); /* It's ETF, not ETB actually */
     cs_atb_register(funnel, 0, devices->etb, 0);
 
     rep = cs_atb_add_replicator(2);
@@ -447,7 +455,7 @@ static int do_registration_altera(struct cs_devices_t *devices)
     tpiu = cs_device_get(0xff003000);
     cs_atb_register(rep, 1, tpiu, 0);
 
-    devices->itm = cs_device_register(0xff005000);	/* STM not ITM */
+    devices->itm = cs_device_register(0xff005000); /* STM not ITM */
     cs_stm_config_master(devices->itm, 0, 0xfc000000);
     cs_stm_config_master(devices->itm, 1, 0xfd000000);
     cs_stm_config_master(devices->itm, 2, 0xfe000000);
@@ -530,7 +538,7 @@ static int do_registration_n1sdp(struct cs_devices_t *devices)
     cs_device_t cluster_funnel[2], cluster_etf[2], clusters_funnel, system_funnel, system_etf, main_funnel, main_replicator, tpiu, etr, stm, stm_etf;
     for (i = 0; i < 4; ++i) {
         cs_device_t debug, pmu, cti, etm;
-        static cs_physaddr_t const cbases[4] = { 0x2000000, 0x2100000, 0x3000000, 0x3100000 };
+        static cs_physaddr_t const cbases[4] = {0x2000000, 0x2100000, 0x3000000, 0x3100000};
         cs_physaddr_t cbase = base + cbases[i];
         debug = cs_device_register(cbase + 0x10000);
         cti = cs_device_register(cbase + 0x20000);
@@ -578,41 +586,47 @@ static int do_registration_n1sdp(struct cs_devices_t *devices)
 
 
 const struct board known_boards[] = {
-    {
-        .do_registration = do_registration_arndale,
-        .n_cpu = 2,
-        .hardware = "ARNDALE",
-    }, {
-        .do_registration = do_registration_tc2,
-        .n_cpu = 5,
-        .hardware = "ARM-Versatile Express",
-    }, {
-        .do_registration = do_registration_juno,
-        .n_cpu = 6,
-        .hardware = "Juno",
-    }, {
-        .do_registration = do_registration_altera,
-        .n_cpu = 2,
-        .hardware = "Altera SOCFPGA",
-    }, {
-        .do_registration = do_registration_snowball,
-        .n_cpu = 2,
-        .hardware = "ST-Ericsson Snowball platform",
-    }, {
-        .do_registration = do_registration_axx5500,
-        .n_cpu = 16,
-        .hardware = "LSI Axxia",
-    }, {
-        .do_registration = do_registration_soc600fpga,
-        .n_cpu = 2,
-        .hardware = "SoC-600 FPGA",
-    }, {
-        .do_registration = do_registration_n1sdp,
-        .n_cpu = 4,
-        .hardware = "N1SDP",
-    },
-    {}
-};
+        {
+                .do_registration = do_registration_arndale,
+                .n_cpu = 2,
+                .hardware = "ARNDALE",
+        },
+        {
+                .do_registration = do_registration_tc2,
+                .n_cpu = 5,
+                .hardware = "ARM-Versatile Express",
+        },
+        {
+                .do_registration = do_registration_juno,
+                .n_cpu = 6,
+                .hardware = "Juno",
+        },
+        {
+                .do_registration = do_registration_altera,
+                .n_cpu = 2,
+                .hardware = "Altera SOCFPGA",
+        },
+        {
+                .do_registration = do_registration_snowball,
+                .n_cpu = 2,
+                .hardware = "ST-Ericsson Snowball platform",
+        },
+        {
+                .do_registration = do_registration_axx5500,
+                .n_cpu = 16,
+                .hardware = "LSI Axxia",
+        },
+        {
+                .do_registration = do_registration_soc600fpga,
+                .n_cpu = 2,
+                .hardware = "SoC-600 FPGA",
+        },
+        {
+                .do_registration = do_registration_n1sdp,
+                .n_cpu = 4,
+                .hardware = "N1SDP",
+        },
+        {}};
 
 int setup_known_board(const struct board **board,
                       struct cs_devices_t *devices)

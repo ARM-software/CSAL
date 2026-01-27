@@ -47,8 +47,7 @@ static const struct board *do_probe_board(const struct board *board_list)
 
     if (!fl) {
         if (registration_verbose)
-            printf
-                ("CSREG: Failed to open /proc/cpuinfo - cannot detect the board\n");
+            printf("CSREG: Failed to open /proc/cpuinfo - cannot detect the board\n");
         return NULL;
     }
 
@@ -112,8 +111,7 @@ static int do_registration(const struct board *board,
     /* No more registrations */
     if (cs_registration_complete() != 0) {
         if (registration_verbose)
-            printf
-                ("CSREG: Registration problems on cs_registration_complete()\n");
+            printf("CSREG: Registration problems on cs_registration_complete()\n");
         return -1;
     }
     if (cs_error_count() > 0) {
@@ -189,9 +187,8 @@ int setup_named_board(const char *board_name, const struct board **board,
 
     if (*board == NULL) {
         if (registration_verbose)
-            printf
-                ("CSREG: Unable to find name %s in setup_named_board()\n",
-                 board_name);
+            printf("CSREG: Unable to find name %s in setup_named_board()\n",
+                   board_name);
         return -1;
     }
 

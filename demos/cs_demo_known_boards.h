@@ -23,9 +23,9 @@ limitations under the License.
 #include "csregistration.h"
 
 extern int setup_known_board(const struct board **board,
-			     struct cs_devices_t *devices);
+                             struct cs_devices_t *devices);
 extern int setup_known_board_by_name(const char *board_name,
-				     const struct board **board,
-				     struct cs_devices_t *devices);
+                                     const struct board **board,
+                                     struct cs_devices_t *devices);
 
-#endif				/* CS_DEMO_KNOWN_BOARDS */
+#endif /* CS_DEMO_KNOWN_BOARDS */

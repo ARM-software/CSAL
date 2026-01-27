@@ -58,7 +58,7 @@ int cs_device_write_only(cs_device_t dev, unsigned int off, uint32_t data)
 int cs_device_write_masked(cs_device_t dev, unsigned int offset,
                            uint32_t data, uint32_t bitmask)
 {
-/* Unlock the device if it is locked */
+    /* Unlock the device if it is locked */
     _cs_unlock(DEV(dev));
     return _cs_write_mask(DEV(dev), offset, bitmask, data);
 }
@@ -80,8 +80,7 @@ int cs_device_wait(cs_device_t dev, unsigned int offset,
                    uint32_t bit_mask, cs_reg_waitbits_op_t operation,
                    uint32_t pattern, uint32_t *p_last_val)
 {
-    assert((operation >= CS_REG_WAITBITS_ALL_1)
-           && (operation < CS_REG_WAITBITS_END));
+    assert((operation >= CS_REG_WAITBITS_ALL_1) && (operation < CS_REG_WAITBITS_END));
     _cs_unlock(DEV(dev));
 
     return _cs_waitbits(DEV(dev), offset, bit_mask, operation, pattern,
@@ -143,7 +142,7 @@ int cs_device_diag_set(cs_device_t dev, int tracing)
 
 void cs_device_data_barrier(cs_device_t dev)
 {
-    (void)dev;    /* Currently none of the barrier methods are device-specific */
+    (void)dev; /* Currently none of the barrier methods are device-specific */
 #ifndef USE_DEVMEMD
 #if __ARM_ARCH >= 7
     __asm__ __volatile__("dmb sy");
@@ -155,7 +154,7 @@ void cs_device_data_barrier(cs_device_t dev)
 
 void cs_device_instruction_barrier(cs_device_t dev)
 {
-    (void)dev;    /* Currently none of the barrier methods are device-specific */
+    (void)dev; /* Currently none of the barrier methods are device-specific */
 #ifndef USE_DEVMEMD
 #if __ARM_ARCH >= 7
     __asm__ __volatile__("dsb sy");

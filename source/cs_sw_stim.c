@@ -72,10 +72,10 @@ int _cs_swstim_set_trace_id(struct cs_device *d, cs_atid_t id)
 {
     if (d->type == DEV_ITM) {
         _cs_set_mask(d, CS_ITM_CTRL, 0x007F0000,
-                     ((unsigned int) id << 16));
+                     ((unsigned int)id << 16));
     } else if (d->type == DEV_STM) {
         _cs_set_mask(d, CS_STM_TCSR, 0x007F0000,
-                     ((unsigned int) id << 16));
+                     ((unsigned int)id << 16));
     } else {
         return cs_report_device_error(d, "not swstim device");
     }
@@ -119,8 +119,7 @@ int cs_trace_stimulus(cs_device_t dev, unsigned int port, uint32_t value)
 {
     struct cs_device *d = DEV(dev);
 
-    assert(cs_device_has_class
-           (dev, CS_DEVCLASS_SOURCE | CS_DEVCLASS_SWSTIM));
+    assert(cs_device_has_class(dev, CS_DEVCLASS_SOURCE | CS_DEVCLASS_SWSTIM));
     assert((int)port < cs_trace_swstim_get_port_count(dev));
 
     if (d->type == DEV_ITM) {
@@ -130,13 +129,13 @@ int cs_trace_stimulus(cs_device_t dev, unsigned int port, uint32_t value)
     } else if (d->type == DEV_STM) {
         if (d->v.stm.ext_ports) {
             unsigned char *master =
-                d->v.stm.ext_ports[d->v.stm.current_master];
+                    d->v.stm.ext_ports[d->v.stm.current_master];
             if (master == NULL)
                 return cs_report_device_error(d,
                                               "STM master memory address not configured.");
-            *(uint32_t volatile *) (master +
-                                        CS_STM_EXT_PORT_I_DMTS(port)) =
-                value;
+            *(uint32_t volatile *)(master +
+                                   CS_STM_EXT_PORT_I_DMTS(port)) =
+                    value;
             return 0;
         } else if (d->v.stm.basic_ports) {
             return _cs_write_wo(d, CS_STM_STIMR(port), value);
@@ -153,8 +152,7 @@ int cs_trace_swstim_enable_trigger(cs_device_t dev, uint32_t mask, uint32_t valu
 {
     int ret = 0;
     struct cs_device *d = DEV(dev);
-    assert(cs_device_has_class
-           (dev, CS_DEVCLASS_SOURCE | CS_DEVCLASS_SWSTIM));
+    assert(cs_device_has_class(dev, CS_DEVCLASS_SOURCE | CS_DEVCLASS_SWSTIM));
 
     _cs_unlock(d);
     if (d->type == DEV_ITM) {
@@ -164,8 +162,8 @@ int cs_trace_swstim_enable_trigger(cs_device_t dev, uint32_t mask, uint32_t valu
         ret = _cs_set_mask(d, CS_STM_SPTER, mask, value);
     } else {
         ret =
-            cs_report_device_error(d,
-                                   "can't enable triggers for this device");
+                cs_report_device_error(d,
+                                       "can't enable triggers for this device");
     }
     return ret;
 }
@@ -222,15 +220,15 @@ int cs_stm_config_master(cs_device_t dev, unsigned int master,
 
     size = cs_stm_get_ext_ports_size(d);
     local_addr =
-        (unsigned char *) io_map(port_0_addr, size, /*writable= */ 1);
+            (unsigned char *)io_map(port_0_addr, size, /*writable= */ 1);
     if (local_addr) {
         /* Check (as far as we can) that this really does look like an STM stimulus area.
            "All STM memory-mapped registers presented on the AXI are write-only.
            Reads always return an AXI OKAY read response and the read data is
            zero regardless of the STM state." */
         unsigned int tw0, tw1;
-        tw0 = *(unsigned int volatile *) local_addr;
-        tw1 = *(unsigned int volatile *) (local_addr + size - 4);
+        tw0 = *(unsigned int volatile *)local_addr;
+        tw1 = *(unsigned int volatile *)(local_addr + size - 4);
         if (tw0 != 0 || tw1 != 0) {
             io_unmap(local_addr, size);
             return cs_report_device_error(d,
@@ -259,22 +257,22 @@ int cs_stm_select_master(cs_device_t dev, unsigned int master)
 }
 
 static unsigned int const s_op_offsets[] = {
-    0x00,			/* G_DMTS   */
-    0x08,			/* G_DM     */
-    0x10,			/* G_DTS    */
-    0x18,			/* G_D      */
-    0x80,			/* I_DMTS   */
-    0x88,			/* I_DM     */
-    0x90,			/* I_DTS    */
-    0x98,			/* I_D      */
-    0x60,			/* G_FLAGTS */
-    0x68,			/* G_FLAG   */
-    0x70,			/* G_TRIGTS */
-    0x78,			/* G_TRIG   */
-    0xE0,			/* I_FLAGTS */
-    0xE8,			/* I_FLAG   */
-    0xF0,			/* I_TRIGTS */
-    0xF8			/* I_TRIG   */
+        0x00, /* G_DMTS   */
+        0x08, /* G_DM     */
+        0x10, /* G_DTS    */
+        0x18, /* G_D      */
+        0x80, /* I_DMTS   */
+        0x88, /* I_DM     */
+        0x90, /* I_DTS    */
+        0x98, /* I_D      */
+        0x60, /* G_FLAGTS */
+        0x68, /* G_FLAG   */
+        0x70, /* G_TRIGTS */
+        0x78, /* G_TRIG   */
+        0xE0, /* I_FLAGTS */
+        0xE8, /* I_FLAG   */
+        0xF0, /* I_TRIGTS */
+        0xF8  /* I_TRIG   */
 };
 
 int cs_stm_ext_write(cs_device_t dev, const unsigned int port,
@@ -282,7 +280,7 @@ int cs_stm_ext_write(cs_device_t dev, const unsigned int port,
                      const int trans_type)
 {
     struct cs_device *d = DEV(dev);
-    int write_unit_size = d->v.stm.s_config.spfeat2.bits.dsize == 1 ? 8 : 4;	/* byte size starts out @ fundamnetal data size for the unit */
+    int write_unit_size = d->v.stm.s_config.spfeat2.bits.dsize == 1 ? 8 : 4; /* byte size starts out @ fundamnetal data size for the unit */
     unsigned char *master = d->v.stm.ext_ports[d->v.stm.current_master];
     int bytes_written = 0;
 
@@ -301,38 +299,38 @@ int cs_stm_ext_write(cs_device_t dev, const unsigned int port,
     if (STM_OP_DATA(trans_type)) {
         while ((length - bytes_written) >= write_unit_size) {
             if (write_unit_size == 4)
-                *(uint32_t volatile *) (master + port * 256 +
-                                        s_op_offsets[trans_type]) =
-                    *(uint32_t *) (value + bytes_written);
+                *(uint32_t volatile *)(master + port * 256 +
+                                       s_op_offsets[trans_type]) =
+                        *(uint32_t *)(value + bytes_written);
             else
-                *(uint64_t volatile *) (master + port * 256 +
-                                        s_op_offsets[trans_type]) =
-                    *(uint64_t *) (value + bytes_written);
+                *(uint64_t volatile *)(master + port * 256 +
+                                       s_op_offsets[trans_type]) =
+                        *(uint64_t *)(value + bytes_written);
             bytes_written += write_unit_size;
         }
 
         while (bytes_written < length) {
             if (length - bytes_written >= 4) {
-                *(uint32_t volatile *) (master + port * 256 +
-                                        s_op_offsets[trans_type]) =
-                    *(uint32_t *) (value + bytes_written);
+                *(uint32_t volatile *)(master + port * 256 +
+                                       s_op_offsets[trans_type]) =
+                        *(uint32_t *)(value + bytes_written);
                 bytes_written += 4;
             } else if (length - bytes_written >= 2) {
-                *(uint16_t volatile *) (master + port * 256 +
-                                        s_op_offsets[trans_type]) =
-                    *(uint16_t *) (value + bytes_written);
+                *(uint16_t volatile *)(master + port * 256 +
+                                       s_op_offsets[trans_type]) =
+                        *(uint16_t *)(value + bytes_written);
                 bytes_written += 2;
             } else {
-                *(uint8_t volatile *) (master + port * 256 +
-                                       s_op_offsets[trans_type]) =
-                    *(uint8_t *) (value + bytes_written);
+                *(uint8_t volatile *)(master + port * 256 +
+                                      s_op_offsets[trans_type]) =
+                        *(uint8_t *)(value + bytes_written);
                 bytes_written++;
             }
         }
     } else {
         /* none data - just write a 0 value */
-        *(uint32_t volatile *) (master + port * 256 +
-                                s_op_offsets[trans_type]) = 0;
+        *(uint32_t volatile *)(master + port * 256 +
+                               s_op_offsets[trans_type]) = 0;
     }
     return 0;
 }
@@ -347,7 +345,7 @@ int cs_stm_ext_write(cs_device_t dev, const unsigned int port,
   #define CS_STMC_ALL     0xFFFF
 */
 
-int cs_stm_config_get(cs_device_t dev, stm_config_t * dyn_config)
+int cs_stm_config_get(cs_device_t dev, stm_config_t *dyn_config)
 {
     struct cs_device *d = DEV(dev);
 
@@ -381,7 +379,7 @@ int cs_stm_config_get(cs_device_t dev, stm_config_t * dyn_config)
     return 0;
 }
 
-int cs_stm_config_put(cs_device_t dev, stm_config_t * dyn_config)
+int cs_stm_config_put(cs_device_t dev, stm_config_t *dyn_config)
 {
     struct cs_device *d = DEV(dev);
 

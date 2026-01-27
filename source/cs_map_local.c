@@ -43,7 +43,7 @@ void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
 #ifdef UNIX_USERSPACE
 #ifndef USE_DEVMEMD
     {
-        cs_physaddr_t addr_to_map = addr;   /* may be rounded down to phys page size */
+        cs_physaddr_t addr_to_map = addr; /* may be rounded down to phys page size */
         {
             unsigned int pagesize = sysconf(_SC_PAGESIZE);
             if (size < pagesize) {
@@ -54,11 +54,11 @@ void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
             }
         }
         localv = mmap(0, size, (writable ? (PROT_READ | PROT_WRITE) : PROT_READ),
-             MAP_SHARED, G.mem_fd, addr_to_map);
+                      MAP_SHARED, G.mem_fd, addr_to_map);
         if (localv == MAP_FAILED) {
             return NULL;
         }
-        localv = (unsigned char *) localv + (addr - addr_to_map);
+        localv = (unsigned char *)localv + (addr - addr_to_map);
     }
 #else
     /* When using devmemd, the local address is not used (the read/write

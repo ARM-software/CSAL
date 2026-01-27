@@ -89,7 +89,20 @@ rebuild: clean all
 # CS Lib API Documentation
 .PHONY: docs
 docs: doxygen-cfg.txt 
-	doxygen doxygen-cfg.txt 
+	doxygen doxygen-cfg.txt
+
+#
+# Check formatting: --dry-run requires clang-format v10
+#
+FMTSRC=source/*.c source/*.h include/*.h demos/*.c demos/*.h
+
+.PHONY: format
+format:
+	clang-format --dry-run -i $(FMTSRC)
+
+.PHONY: format-update
+format-update:
+	clang-format -i $(FMTSRC)
 
 # create a source distribution file.
 libsources = ./source ./include ./build/makefile ./build/readme_buildlib.md

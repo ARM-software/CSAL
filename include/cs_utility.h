@@ -44,7 +44,7 @@ extern "C" {
 #include "cs_util_create_snapshot.h"
 
 /** @}*/
-#endif				/*CS_UTILITY_H */
+#endif /*CS_UTILITY_H */
 #ifdef __cplusplus
 }
 #endif

@@ -24,7 +24,7 @@
 
 int main(int argc, char **argv)
 {
-    unsigned long romAddr = 0x10880000;	/* arndale */
+    unsigned long romAddr = 0x10880000; /* arndale */
     int do_custom = 0;
     int argidx = 1;
     int o_verbose = 0;
@@ -76,9 +76,8 @@ int main(int argc, char **argv)
                     exclude_hi = strtoul(argv[argidx], NULL, 0);
                     if (exclude_lo < exclude_hi) {
                         cs_exclude_range(exclude_lo, exclude_hi);
-                        printf
-                            ("**CSLS excluding range 0x%08lX to 0x%08lX\n",
-                             exclude_lo, exclude_hi);
+                        printf("**CSLS excluding range 0x%08lX to 0x%08lX\n",
+                               exclude_lo, exclude_hi);
                     } else {
                         fprintf(stderr,
                                 "** CSLS::Error: -exclude range 0x%08lX to 0x%08lX invalid\n",
@@ -90,22 +89,15 @@ int main(int argc, char **argv)
                             "** CSLS::Error: -exclude needs two address parameters\n");
                     return EXIT_FAILURE;
                 }
-            } else if ((strcmp(argv[argidx], "-v") == 0)
-                       || (strcmp(argv[argidx], "-verbose") == 0)) {
+            } else if ((strcmp(argv[argidx], "-v") == 0) || (strcmp(argv[argidx], "-verbose") == 0)) {
                 o_verbose = o_verbose ? (o_verbose << 1) : 1;
                 cs_diag_set(o_verbose);
-            } else if ((strcmp(argv[argidx], "--help") == 0)
-                       || (strcmp(argv[argidx], "-help") == 0)) {
-                printf
-                    ("** CSLS: Usage\n   csls [{-snowball} | {-romaddr 0xNNNNNNNN {-exclude <addr_lo> <addr_hi>}*}]\n   No options uses default romaddress 0x10880000 for Arndale platform\n");
-                printf
-                    ("    -snowball - uses snowball rom address - standalone option\n    -romaddr 0xNNNNNNNN uses 0xNNNNNNNN as ROM Address\n");
-                printf
-                    ("    -exclude <addr_low> <addr_hi>  - exclude range from logging. Can be used multiple times with -romaddr. <addr> in 0xNNNNNNNN format\n\n");
-                printf
-                    ("    -memap <addr>    - access devices through a MEM-AP\n");
-                printf
-                    ("    -v/-verbose      - increase verbosity\n");
+            } else if ((strcmp(argv[argidx], "--help") == 0) || (strcmp(argv[argidx], "-help") == 0)) {
+                printf("** CSLS: Usage\n   csls [{-snowball} | {-romaddr 0xNNNNNNNN {-exclude <addr_lo> <addr_hi>}*}]\n   No options uses default romaddress 0x10880000 for Arndale platform\n");
+                printf("    -snowball - uses snowball rom address - standalone option\n    -romaddr 0xNNNNNNNN uses 0xNNNNNNNN as ROM Address\n");
+                printf("    -exclude <addr_low> <addr_hi>  - exclude range from logging. Can be used multiple times with -romaddr. <addr> in 0xNNNNNNNN format\n\n");
+                printf("    -memap <addr>    - access devices through a MEM-AP\n");
+                printf("    -v/-verbose      - increase verbosity\n");
                 return EXIT_SUCCESS;
             } else {
                 fprintf(stderr, "**CSLS Error: unknown option '%s'\n",

@@ -32,8 +32,8 @@
 
 #include "cs_trace_metadata.h"
 
-#include <sched.h>		/* for CPU_* family, requires glibc 2.6 or later */
-#include <unistd.h>		/* for usleep() */
+#include <sched.h>  /* for CPU_* family, requires glibc 2.6 or later */
+#include <unistd.h> /* for usleep() */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -44,13 +44,13 @@
 
 #ifndef UNIX_USERSPACE
 #define UNIX_USERSPACE 1
-#endif				/* UNIX_USERSPACE */
+#endif /* UNIX_USERSPACE */
 
 #if UNIX_USERSPACE
 #include <sys/types.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#endif				/* UNIX_USERSPACE */
+#endif /* UNIX_USERSPACE */
 
 
 /* Change these to capture the specific region of the kernel required
@@ -81,7 +81,7 @@ static unsigned int etb_post_trig_words;
 
 static bool return_stack;
 
-#define INVALID_ADDRESS 1	/* never a valid address */
+#define INVALID_ADDRESS 1 /* never a valid address */
 static unsigned long o_trace_start_address = INVALID_ADDRESS;
 static unsigned long o_trace_end_address = INVALID_ADDRESS;
 
@@ -94,7 +94,7 @@ static unsigned long kernel_virtual_address(void)
             /* Pick the address of whichever kernel symbol happens to be first,
                and round down to a page boundary */
             if (fscanf(fd, "%lx", &addr) == 1) {
-                addr &= ~0xfff;	/* assume 4K pages */
+                addr &= ~0xfff; /* assume 4K pages */
                 printf("kernel symbol found @ 0x%lX\n", addr);
             }
             fclose(fd);
@@ -105,7 +105,7 @@ static unsigned long kernel_virtual_address(void)
 
 #ifndef KERNEL_TRACE_VIRTUAL_ADDR
 #define KERNEL_TRACE_VIRTUAL_ADDR (kernel_virtual_address())
-#endif				/* KERNEL_TRACE_VIRTUAL_ADDR */
+#endif /* KERNEL_TRACE_VIRTUAL_ADDR */
 
 /* Pause after each significant step in the demo */
 int pause_mode;
@@ -188,29 +188,28 @@ static int do_init_etm(cs_device_t dev)
         /* trace enable */
         if (itm_only) {
             printf("No Viewinst, ITM only\n");
-            v4config.victlr = 0x0;	/* Viewinst - trace nothing. */
+            v4config.victlr = 0x0; /* Viewinst - trace nothing. */
         } else {
             printf("Viewinst trace everything\n");
-            v4config.victlr = 0x201;	/* Viewinst - trace all, ss started. */
+            v4config.victlr = 0x201; /* Viewinst - trace all, ss started. */
         }
-        v4config.viiectlr = 0;	/* no address range */
-        v4config.vissctlr = 0;	/* no start stop points */
+        v4config.viiectlr = 0; /* no address range */
+        v4config.vissctlr = 0; /* no start stop points */
         /* event select */
-        v4config.eventctlr0r = 0;	/* disable all event tracing */
+        v4config.eventctlr0r = 0; /* disable all event tracing */
         v4config.eventctlr1r = 0;
         /* config */
-        v4config.stallcrlr = 0;	/* no stall */
-        v4config.syncpr = 0xC;	/* sync 4096 bytes */
+        v4config.stallcrlr = 0; /* no stall */
+        v4config.syncpr = 0xC;  /* sync 4096 bytes */
         cs_etm_config_put_ex(dev, &v4config);
-
     }
     return 0;
 }
 
 static void show_etm_config(unsigned int n)
 {
-    cs_etm_config_t tconfig;	/* PTM/ETMv3 config */
-    cs_etmv4_config_t t4config;	/* ETMv4 config */
+    cs_etm_config_t tconfig;    /* PTM/ETMv3 config */
+    cs_etmv4_config_t t4config; /* ETMv4 config */
     void *p_config = 0;
 
     if (CS_ETMVERSION_MAJOR(cs_etm_get_version(devices.ptm[n])) >=
@@ -241,22 +240,22 @@ static int do_config_etmv3_ptm(int n_core)
         /* Select address comparator #1 as a stop address */
         /* n.b. ETM numbers the comparators from 1. */
         tconfig.flags |= CS_ETMC_ADDR_COMP;
-        tconfig.trace_enable_cr1 = 0x1;	/* address range comparator 0 */
-        tconfig.trace_start_comparators = 0x0000;	/* Select comparator #0 as a start address */
-        tconfig.trace_stop_comparators = 0x0000;	/* Select comparator #1 as a stop address  */
-        tconfig.addr_comp_mask = 0x3;	/* Set address comparators 0 and 1 for programming */
+        tconfig.trace_enable_cr1 = 0x1;           /* address range comparator 0 */
+        tconfig.trace_start_comparators = 0x0000; /* Select comparator #0 as a start address */
+        tconfig.trace_stop_comparators = 0x0000;  /* Select comparator #1 as a stop address  */
+        tconfig.addr_comp_mask = 0x3;             /* Set address comparators 0 and 1 for programming */
         tconfig.addr_comp[0].address = o_trace_start_address & 0xFFFFFFFE;
-//      tconfig.addr_comp[0].access_type = CS_ETMACT_EX|CS_ETMACT_ARMTHUMB|CS_ETMACT_USER;
+        //      tconfig.addr_comp[0].access_type = CS_ETMACT_EX|CS_ETMACT_ARMTHUMB|CS_ETMACT_USER;
         //tconfig.addr_comp[0].access_type = 0x1;
         tconfig.addr_comp[0].access_type = 0x1 | CS_ETMACT_ARMTHUMB;
         tconfig.addr_comp[1].address = o_trace_end_address & 0xFFFFFFFE;
-//      tconfig.addr_comp[1].access_type = CS_ETMACT_EX|CS_ETMACT_ARMTHUMB|CS_ETMACT_USER;
+        //      tconfig.addr_comp[1].access_type = CS_ETMACT_EX|CS_ETMACT_ARMTHUMB|CS_ETMACT_USER;
         tconfig.addr_comp[1].access_type = 0x1 | CS_ETMACT_ARMTHUMB;
     }
     tconfig.flags |= CS_ETMC_COUNTER;
-    tconfig.counter_mask = 0x03;	/* set first 2 bits in mask to ensure first 2 counters are programmed */
+    tconfig.counter_mask = 0x03; /* set first 2 bits in mask to ensure first 2 counters are programmed */
     tconfig.counter[0].value = 0x1000;
-    tconfig.counter[0].enable_event = CS_ETMER_ALWAYS;	/*CS_ETMER_SAC(0); */
+    tconfig.counter[0].enable_event = CS_ETMER_ALWAYS; /*CS_ETMER_SAC(0); */
     tconfig.counter[0].reload_value = 0x2000;
     tconfig.counter[0].reload_event = CS_ETMER_CZERO(0);
     tconfig.counter[1].value = 0x1000;
@@ -267,14 +266,14 @@ static int do_config_etmv3_ptm(int n_core)
     tconfig.flags |= CS_ETMC_SEQUENCER;
     tconfig.sequencer.state = 1;
     tconfig.sequencer.transition_event[CS_ETMSQOFF(1, 2)] =
-        CS_ETMER_SAC(0);
+            CS_ETMER_SAC(0);
     tconfig.sequencer.transition_event[CS_ETMSQOFF(2, 3)] =
-        CS_ETMER_SAC(1);
+            CS_ETMER_SAC(1);
     tconfig.sequencer.transition_event[CS_ETMSQOFF(1, 3)] = CS_ETME_NEVER;
     tconfig.sequencer.transition_event[CS_ETMSQOFF(2, 1)] = CS_ETME_NEVER;
     tconfig.sequencer.transition_event[CS_ETMSQOFF(3, 1)] = CS_ETME_NEVER;
     tconfig.sequencer.transition_event[CS_ETMSQOFF(3, 2)] = CS_ETME_NEVER;
-    
+
     if (trace_timestamps) {
         tconfig.flags |= CS_ETMC_TS_EVENT;
         tconfig.timestamp_event = CS_ETMER_CZERO(0);
@@ -292,9 +291,8 @@ static int do_config_etmv3_ptm(int n_core)
     show_etm_config(n_core);
 
     if (cs_error_count() > 0) {
-        printf
-            ("CSDEMO: %u errors reported in configuration - not running demo\n",
-             cs_error_count());
+        printf("CSDEMO: %u errors reported in configuration - not running demo\n",
+               cs_error_count());
         return -1;
     }
     return 0;
@@ -308,37 +306,36 @@ static int do_config_etmv4(int n_core)
     /* default settings are trace everything - already set. */
     cs_etm_config_init_ex(etm, &tconfig);
     tconfig.flags =
-        CS_ETMC_TRACE_ENABLE | CS_ETMC_CONFIG | CS_ETMC_EVENTSELECT;
+            CS_ETMC_TRACE_ENABLE | CS_ETMC_CONFIG | CS_ETMC_EVENTSELECT;
     cs_etm_config_get_ex(etm, &tconfig);
 
     if (tconfig.scv4->idr2.bits.vmidsize > 0)
-        tconfig.configr.bits.vmid = 1;	/* VMID trace enable */
+        tconfig.configr.bits.vmid = 1; /* VMID trace enable */
     if (tconfig.scv4->idr2.bits.cidsize > 0)
-        tconfig.configr.bits.cid = 1;	/* context ID trace enable. */
+        tconfig.configr.bits.cid = 1; /* context ID trace enable. */
 
     if (return_stack)
         tconfig.configr.bits.rs = 1; /* set the return stack */
-    
+
     if (!full) {
         /*  set up an address range filter - use comparator pair and the view-inst registers */
 
         tconfig.addr_comps[0].acvr_l = o_trace_start_address & 0xFFFFFFFF;
         tconfig.addr_comps[0].acvr_h =
-            (o_trace_start_address >> 32) & 0xFFFFFFFF;
-        tconfig.addr_comps[0].acatr_l = 0x0;	/* instuction address compare, all ELs, no ctxt, vmid, data, etc */
+                (o_trace_start_address >> 32) & 0xFFFFFFFF;
+        tconfig.addr_comps[0].acatr_l = 0x0; /* instuction address compare, all ELs, no ctxt, vmid, data, etc */
         tconfig.addr_comps[1].acvr_l = o_trace_end_address & 0xFFFFFFFF;
         tconfig.addr_comps[1].acvr_h =
-            (o_trace_end_address >> 32) & 0xFFFFFFFF;
-        tconfig.addr_comps[1].acatr_l = 0x0;	/* instuction address compare, all ELs, no ctxt, vmid, data, etc */
+                (o_trace_end_address >> 32) & 0xFFFFFFFF;
+        tconfig.addr_comps[1].acatr_l = 0x0; /* instuction address compare, all ELs, no ctxt, vmid, data, etc */
 
         /* mark the config structure to program the above registers on 'put' */
         tconfig.addr_comps_acc_mask = 0x3;
         tconfig.flags |= CS_ETMC_ADDR_COMP;
 
         /* finally, set up ViewInst to trace according to the resources we have set up */
-        tconfig.viiectlr = 0x1;	/* program the address comp pair 0 for include */
-        tconfig.syncpr = 0x0;	/* no extra sync */
-
+        tconfig.viiectlr = 0x1; /* program the address comp pair 0 for include */
+        tconfig.syncpr = 0x0;   /* no extra sync */
     }
     cs_etm_config_print_ex(etm, &tconfig);
     cs_etm_config_put_ex(etm, &tconfig);
@@ -348,9 +345,8 @@ static int do_config_etmv4(int n_core)
     show_etm_config(n_core);
 
     if (cs_error_count() > 0) {
-        printf
-            ("CSDEMO: %u errors reported in configuration - not running demo\n",
-             cs_error_count());
+        printf("CSDEMO: %u errors reported in configuration - not running demo\n",
+               cs_error_count());
         return -1;
     }
     return 0;
@@ -369,9 +365,8 @@ static int do_configure_trace(const struct board *board)
         cs_sink_disable(devices.itm_etb);
     }
     for (i = 0; i < board->n_cpu; ++i) {
-        printf
-            ("CSDEMO: Configuring trace source id for CPU #%d ETM/PTM...\n",
-             i);
+        printf("CSDEMO: Configuring trace source id for CPU #%d ETM/PTM...\n",
+               i);
         devices.ptm[i] = cs_cpu_get_device(i, CS_DEVCLASS_SOURCE);
         if (devices.ptm[i] == CS_ERRDESC) {
             fprintf(stderr, "** Failed to get trace source for CPU #%d\n",
@@ -402,8 +397,7 @@ static int do_configure_trace(const struct board *board)
 
     printf("CSDEMO: Enabling trace...\n");
     if (cs_sink_enable(devices.etb) != 0) {
-        printf
-            ("CSDEMO: Could not enable trace buffer - not running demo\n");
+        printf("CSDEMO: Could not enable trace buffer - not running demo\n");
         return -1;
     }
     if (devices.itm_etb != NULL) {
@@ -438,17 +432,15 @@ static int do_configure_trace(const struct board *board)
             printf("CSDEMO: setting stop on flush, ETB FFCR = 0x%08X",
                    ffcr_val);
         } else {
-            printf
-                ("CSDEMO: Failed to set stop on flush, ETB FFCR to 0x%08X",
-                 ffcr_val);
+            printf("CSDEMO: Failed to set stop on flush, ETB FFCR to 0x%08X",
+                   ffcr_val);
         }
     }
 
     cs_checkpoint();
     if (cs_error_count() > 0) {
-        printf
-            ("CSDEMO: %u errors reported when enabling trace - not running demo\n",
-             cs_error_count());
+        printf("CSDEMO: %u errors reported when enabling trace - not running demo\n",
+               cs_error_count());
         return -1;
     }
 
@@ -467,16 +459,14 @@ static void cs_etb_flush_and_wait_stop()
     ffcr_val = cs_device_read(devices.etb, CS_ETB_FLFMT_CTRL);
     ffcr_val |= CS_ETB_FLFMT_CTRL_FOnMan;
     cs_device_write(devices.etb, CS_ETB_FLFMT_CTRL, ffcr_val);
-    if (cs_device_wait
-        (devices.etb, CS_ETB_FLFMT_STATUS, CS_ETB_FLFMT_STATUS_FtStopped,
-         CS_REG_WAITBITS_ALL_1, 0, &ffsr_val) == 0) {
+    if (cs_device_wait(devices.etb, CS_ETB_FLFMT_STATUS, CS_ETB_FLFMT_STATUS_FtStopped,
+                       CS_REG_WAITBITS_ALL_1, 0, &ffsr_val) == 0) {
         if (verbose)
             printf("CSDEMO: ETB collection stopped\n");
     } else {
         if (verbose)
             printf("CSDEMO: ETB FFSR=0x%08X\n", ffsr_val);
-        printf
-            ("CSDEMO: Warning ETB collection not stopped on flush on trigger\n");
+        printf("CSDEMO: Warning ETB collection not stopped on flush on trigger\n");
     }
 }
 
@@ -494,7 +484,7 @@ static void do_generate_synthetic_trace_data()
 {
     {
         union {
-            int n;		/* Force alignment */
+            int n; /* Force alignment */
             char s[16];
         } buf;
         strcpy(buf.s, "Hello world");
@@ -509,7 +499,7 @@ static int show_affinity(void)
 {
     int rc, n, i;
     cpu_set_t cpus;
-    rc = sched_getaffinity( /*calling process */ 0, sizeof cpus, &cpus);
+    rc = sched_getaffinity(/*calling process */ 0, sizeof cpus, &cpus);
     if (rc < 0) {
         perror("sched_getaffinity");
         return rc;
@@ -538,7 +528,7 @@ static int set_affinity(unsigned int cpu)
     cpu_set_t cpus;
     CPU_ZERO(&cpus);
     CPU_SET(cpu, &cpus);
-    rc = sched_setaffinity( /*calling process */ 0, sizeof cpus, &cpus);
+    rc = sched_setaffinity(/*calling process */ 0, sizeof cpus, &cpus);
     if (rc < 0) {
         perror("sched_setaffinity");
         fprintf(stderr, "** Failed to set process affinity to CPU=%u\n",
@@ -553,24 +543,17 @@ static int help(void)
     printf("Usage:\n");
     printf("-h\tThis help screen.\n");
     printf("-c <cpu>\tSelect CPU for demo to run on. Default is 0.\n");
-    printf
-        ("-board-name <name>  \tcConfigure according to supplied hardware name rather than probing the board 'cpuinfo'\n");
-    printf
-        ("-trace-start <address>\tStart trace capture at given <address>.\n");
-    printf
-        ("                      \tDefault is address of first code symbol.\n");
-    printf
-        ("-trace-stop <address> \tStop trace capture at <given address>.\n");
-    printf
-        ("                      \tDefault is address of first code symbol + KERNEL_TRACE_SIZE.\n");
+    printf("-board-name <name>  \tcConfigure according to supplied hardware name rather than probing the board 'cpuinfo'\n");
+    printf("-trace-start <address>\tStart trace capture at given <address>.\n");
+    printf("                      \tDefault is address of first code symbol.\n");
+    printf("-trace-stop <address> \tStop trace capture at <given address>.\n");
+    printf("                      \tDefault is address of first code symbol + KERNEL_TRACE_SIZE.\n");
     printf("-itm\tEnable ITM tracing, ITM tracing disabled by default.\n");
     printf("-itm_only\tEnable ITM tracing only, Leave core trace off.\n");
     printf("-cycle-accurate\tEnable Cycle Accurate tracing\n");
     printf("-timestamps\tEnable trace timestamps\n");
-    printf
-        ("-filter\tShow restricted amount of trace - enables extraction of memory area for decode\n");
-    printf
-        ("-fon-stop\tEnable ETB stop on flush. Uses manual flush to halt ETB trace collection\n");
+    printf("-filter\tShow restricted amount of trace - enables extraction of memory area for decode\n");
+    printf("-fon-stop\tEnable ETB stop on flush. Uses manual flush to halt ETB trace collection\n");
     printf("-pause\tRun the demo with a pause after each step.\n");
     return EXIT_FAILURE;
 }
@@ -580,7 +563,7 @@ int main(int argc, char **argv)
 {
     /* Defaults */
     int stage = 2;
-    cpu_to_trace = ALL_CPUS;	// no CPU affinity selected (yet), trace all CPUs
+    cpu_to_trace = ALL_CPUS;    // no CPU affinity selected (yet), trace all CPUs
     itm = false;
     itm_only = false;
     full = true;
@@ -649,10 +632,9 @@ int main(int argc, char **argv)
                 } else if (strncmp(opt, "etb-words", 9) == 0) {
                     if (i + 1 < argc) {
                         etb_post_trig_words =
-                            strtoul(argv[i + 1], NULL, 0);
-                        printf
-                            ("Collecting %d words in ETB after trigger\n",
-                             etb_post_trig_words);
+                                strtoul(argv[i + 1], NULL, 0);
+                        printf("Collecting %d words in ETB after trigger\n",
+                               etb_post_trig_words);
                         ++i;
                     } else {
                         return help();
@@ -665,7 +647,7 @@ int main(int argc, char **argv)
                     return EXIT_SUCCESS;
                 } else if (strcmp(opt, "v") == 0) {
                     verbose += 1;
-                    cs_diag_set(1 << (verbose-1));
+                    cs_diag_set(1 << (verbose - 1));
                 } else if (strncmp(opt, "filter", 6) == 0) {
                     printf("Trace filtering active.\n");
                     full = false;

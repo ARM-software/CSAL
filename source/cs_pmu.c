@@ -31,7 +31,7 @@ int cs_pmu_n_counters(cs_device_t dev)
 static cs_pmu_mask_t cs_pmu_mask(struct cs_device const *d)
 {
     return CS_PMU_MASK_CYCLES |
-        (((cs_pmu_mask_t) 1U << d->v.pmu.n_counters) - 1);
+           (((cs_pmu_mask_t)1U << d->v.pmu.n_counters) - 1);
 }
 
 
@@ -54,7 +54,7 @@ int cs_pmu_get_counts(cs_device_t dev, unsigned int mask,
         } else {
             /* The architecture doesn't guarantee single-copy atomic access,
                and recommends a high-low-high read sequence. */
-            *cycles = (unsigned int) _cs_read64(d, CS_PMEVCNTR64(31));
+            *cycles = (unsigned int)_cs_read64(d, CS_PMEVCNTR64(31));
         }
     }
     if (overflow != NULL) {
@@ -93,7 +93,7 @@ int cs_pmu_get_counts(cs_device_t dev, unsigned int mask,
         for (i = 0, j = 0; mask != 0; ++i) {
             if ((mask & 1) != 0) {
                 counts[j++] =
-                    _cs_read(d, CS_PMEVCNTR(i, d->v.pmu.map_scale));
+                        _cs_read(d, CS_PMEVCNTR(i, d->v.pmu.map_scale));
             }
             mask >>= 1;
         }
@@ -103,7 +103,7 @@ int cs_pmu_get_counts(cs_device_t dev, unsigned int mask,
 
 
 int cs_pmu_read_status(cs_device_t dev, unsigned int flags,
-                       cs_pmu_t * status)
+                       cs_pmu_t *status)
 {
     struct cs_device *d = DEV(dev);
     unsigned int pmcr = 0;
@@ -140,7 +140,7 @@ int cs_pmu_read_status(cs_device_t dev, unsigned int flags,
                 }
                 if (flags & CS_PMU_COUNTS) {
                     status->counts[i] =
-                        _cs_read(d, CS_PMEVCNTR(i, d->v.pmu.map_scale));
+                            _cs_read(d, CS_PMEVCNTR(i, d->v.pmu.map_scale));
                 }
             }
             mask >>= 1;
@@ -157,7 +157,7 @@ int cs_pmu_write_status(cs_device_t dev, unsigned int flags,
                         cs_pmu_t const *status)
 {
     struct cs_device *d = DEV(dev);
-    unsigned int pmcr = 0;	/* Init for compiler benefit only - alwasy read/modify/write */
+    unsigned int pmcr = 0; /* Init for compiler benefit only - alwasy read/modify/write */
     assert(d->type == DEV_CPU_PMU);
 
     _cs_unlock(d);
@@ -290,7 +290,7 @@ int cs_pmu_get_pc_sample(cs_device_t dev, cs_virtaddr_t *pc,
         /* reading low word triggers sample */
         uint32_t lo = _cs_read(d, CS_PMPCSR);
 #ifdef CS_VA64BIT
-        uint32_t hi = _cs_read(d, CS_PMPCSR+4);
+        uint32_t hi = _cs_read(d, CS_PMPCSR + 4);
         pcx = ((cs_virtaddr_t)hi << 32) | lo;
 #else
         pcx = lo;

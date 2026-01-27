@@ -88,7 +88,7 @@ int cs_sink_disable(cs_device_t dev)
     _cs_unlock(d);
     if (d->type == DEV_TPIU) {
         /* TPIU */
-        _cs_set(d, CS_TPIU_FLFMT_CTRL, CS_TPIU_FLFMT_CTRL_StopFl);   /* Stop flush */
+        _cs_set(d, CS_TPIU_FLFMT_CTRL, CS_TPIU_FLFMT_CTRL_StopFl); /* Stop flush */
         /* When we request a flush via FOnMan, the FOnMan reads back as 1 while the
            flush is in progress, then goes to 0.  So don't try to read back. */
         _cs_set_wo(d, CS_TPIU_FLFMT_CTRL, CS_TPIU_FLFMT_CTRL_FOnMan);
@@ -164,8 +164,7 @@ int cs_set_buffer_trigger_counter(cs_device_t dev, unsigned int bytes)
     _cs_unlock(d);
     /* For TMCs this is defined as a count of 32-bit words.  For CoreSight ETBs it's the same. */
     return _cs_write(d, CS_ETB_TRIGGER_COUNT,
-                     bytes >> (d->v.etb.
-                               is_tmc_device ? 2 : ETB_WIDTH_SCALE_SHIFT));
+                     bytes >> (d->v.etb.is_tmc_device ? 2 : ETB_WIDTH_SCALE_SHIFT));
 }
 
 /*
@@ -203,7 +202,7 @@ int cs_get_buffer_unread_bytes(cs_device_t dev)
             unread = (wrptr - rdptr) << shift;
         } else {
             unread = d->v.etb.buffer_size_bytes -
-                (rdptr << shift) + (wrptr << shift);
+                     (rdptr << shift) + (wrptr << shift);
         }
     }
     return unread;
@@ -221,7 +220,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     assert(cs_device_has_class(dev, CS_DEVCLASS_BUFFER));
 
     /* The buffer into which the user wants to read trace, must be 8-byte aligned. */
-    assert(((unsigned long) buf & 3) == 0);
+    assert(((unsigned long)buf & 3) == 0);
 
     _cs_unlock(d);
     /* Put the buffer into a state where the read-pointer is the correct
@@ -248,14 +247,12 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     d->v.etb.currently_reading = 1;
 
     /* Read data into the user's buffer */
-    op = (unsigned int *) buf;
+    op = (unsigned int *)buf;
     if (DTRACE(d)) {
-        diagf
-            ("!ctrl=%08X status=%08X flstatus=%08X readptr=%08X writeptr=%08X unread=%04X\n",
-             _cs_read(d, CS_ETB_CTRL), _cs_read(d, CS_ETB_STATUS),
-             _cs_read(d, CS_ETB_FLFMT_STATUS), _cs_read(d,
-                                                        CS_ETB_RAM_RD_PTR),
-             _cs_read(d, CS_ETB_RAM_WR_PTR), unread);
+        diagf("!ctrl=%08X status=%08X flstatus=%08X readptr=%08X writeptr=%08X unread=%04X\n",
+              _cs_read(d, CS_ETB_CTRL), _cs_read(d, CS_ETB_STATUS),
+              _cs_read(d, CS_ETB_FLFMT_STATUS), _cs_read(d, CS_ETB_RAM_RD_PTR),
+              _cs_read(d, CS_ETB_RAM_WR_PTR), unread);
     }
 
     /* Work out a total amount to read in this call.
@@ -273,7 +270,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
     if (d->v.etb.is_tmc_device) {
         to_read &= ~((1U << d->v.etb.tmc.memory_width) - 1);
     } else {
-        to_read &= ~3;   /* round down to 32-bit words */
+        to_read &= ~3; /* round down to 32-bit words */
     }
 
     words_left_to_read = to_read >> 2;
@@ -316,7 +313,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
                 diagf("  read all 1s (%08X): readptr=%08X\n", data,
                       _cs_read(d, CS_ETB_RAM_RD_PTR));
             }
-            *op++ = data;     /* Write the 0xFFFFFFFF to the output buffer. */
+            *op++ = data; /* Write the 0xFFFFFFFF to the output buffer. */
         }
         /* Reading the RAM data register will have triggered a RAM access cycle
            so we don't need to write the RAM read pointer register again here. */
@@ -444,11 +441,11 @@ int cs_insert_trace_data(cs_device_t dev, void const *buf,
                          unsigned int size)
 {
     struct cs_device *d = DEV(dev);
-    unsigned int const *ip = (unsigned int const *) buf;
+    unsigned int const *ip = (unsigned int const *)buf;
     unsigned int optr, nptr;
 
     assert(cs_device_has_class(dev, CS_DEVCLASS_BUFFER));
-    assert(((unsigned long) buf & 3) == 0);
+    assert(((unsigned long)buf & 3) == 0);
     assert((size & 3) == 0);
 
     _cs_unlock(d);

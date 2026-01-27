@@ -39,7 +39,8 @@ int _cs_path_enable(struct cs_device *d, int enabled)
                 /* Recursively enable this funnel's output path */
                 if (DTRACE(d)) {
                     diagf("!%sable input port %u of funnel %" CS_PHYSFMT
-                          "\n", (enabled ? "en" : "dis"), od_in_port,
+                          "\n",
+                          (enabled ? "en" : "dis"), od_in_port,
                           od->phys_addr);
                 }
                 _cs_path_enable(od, enabled);
@@ -49,7 +50,7 @@ int _cs_path_enable(struct cs_device *d, int enabled)
                                       (enabled << od_in_port));
                     if (DTRACE(od)) {
                         diagf("!funnel inputs now %08X\n",
-                            _cs_read(od, CS_FUNNEL_CTRL));
+                              _cs_read(od, CS_FUNNEL_CTRL));
                     }
                     if (rc != 0) {
                         break;
@@ -104,7 +105,7 @@ int cs_set_trace_source_id(cs_device_t dev, cs_atid_t id)
 
 cs_atid_t cs_get_trace_source_id(cs_device_t dev)
 {
-    cs_atid_t id = (cs_atid_t) (-1);
+    cs_atid_t id = (cs_atid_t)(-1);
 
     struct cs_device *d = DEV(dev);
     assert(cs_device_has_class(dev, CS_DEVCLASS_SOURCE));
@@ -138,7 +139,7 @@ int cs_trace_enable(cs_device_t dev)
             return rc;
         }
         if (_cs_etm_version(d) < CS_ETMVERSION_PTM) {
-            _cs_set(d, CS_ETMCR, CS_ETMCR_ETMEN);	/* ETM v3 only */
+            _cs_set(d, CS_ETMCR, CS_ETMCR_ETMEN); /* ETM v3 only */
         } else {
             /* on PTM that bit is reserved */
         }
@@ -159,7 +160,7 @@ int cs_trace_is_enabled(cs_device_t dev)
     if (cs_device_has_class(dev, CS_DEVCLASS_CPU)) {
         if (CS_ETMVERSION_MAJOR(_cs_etm_version(d)) >= CS_ETMVERSION_ETMv4) {
             is_enabled =
-                _cs_isset(d, CS_ETMV4_PRGCTLR, CS_ETMV4_PRGCTLR_en);
+                    _cs_isset(d, CS_ETMV4_PRGCTLR, CS_ETMV4_PRGCTLR_en);
         } else {
             is_enabled = !_cs_isset(d, CS_ETMCR, CS_ETMCR_ProgBit);
         }
@@ -249,7 +250,7 @@ int cs_trace_enable_cycle_accurate(cs_device_t dev, int enable)
             /* "TRCCCCTLR... must be programmed if TRCCONFIGR_CCI==1." */
             if (enable) {
                 unsigned int const CCITMIN =
-                    _cs_read(d, CS_ETMv4_IDR3) & 0xfff;
+                        _cs_read(d, CS_ETMv4_IDR3) & 0xfff;
                 _cs_write(d, CS_ETMV4_CCCTLR, CCITMIN);
             }
             /* enable cycle count on instruction trace */

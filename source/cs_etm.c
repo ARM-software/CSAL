@@ -39,10 +39,7 @@ int _cs_etm_static_config_init(struct cs_device *d)
         /* Read from ETMSCR */
         d->v.etm.sc.scr.raw.reg = _cs_read(d, CS_ETMSCR);
         d->v.etm.sc.scr.max_port_size =
-            (d->v.etm.sc.scr.raw.sc3x.max_port_size_3 << 3) | (d->v.etm.sc.
-                                                               scr.raw.
-                                                               sc3x.
-                                                               max_port_size_20);
+                (d->v.etm.sc.scr.raw.sc3x.max_port_size_3 << 3) | (d->v.etm.sc.scr.raw.sc3x.max_port_size_20);
         /* Read from ETMCCER */
         d->v.etm.sc.ccer.reg = _cs_read(d, CS_ETMCCER);
     }
@@ -101,8 +98,7 @@ int _cs_etm_enable_programming(struct cs_device *d)
         /* PDSR bit 1: "If the Software Lock mechanism is locked and the ETMPDSR read is
            made through the memory mapped interface, this bit is not cleared." */
         if ((oslsr & 2) != 0) {
-            diagf
-                ("ETM trace registers are locked. Any access to these registers returns a subordinate-generated error response.\n");
+            diagf("ETM trace registers are locked. Any access to these registers returns a subordinate-generated error response.\n");
             /* OS lock is implemented and locked */
             /* ETMOSLSR[3] and ETMOSLSR[0] are specified in [ETM] Table 3-94:
                3.3, 3.4: 0 0   Single Power
@@ -153,7 +149,7 @@ int _cs_etm_disable_programming(struct cs_device *d)
 }
 
 #ifndef UNIX_KERNEL
-#define EVENT_DESCRIPTION 60	/* Space for event description string */
+#define EVENT_DESCRIPTION 60 /* Space for event description string */
 static char const *edesc(char *buf, unsigned int event)
 {
     char *p;
@@ -161,15 +157,14 @@ static char const *edesc(char *buf, unsigned int event)
     unsigned int const fn = (event >> 14) & 0x7;
     unsigned int n_resources = (fn <= 1) ? 1 : 2;
     static char const *const fmt[8][3] = {
-        {"", "", ""},
-        {"NOT(", ")", ""},
-        {"", " AND ", ""},
-        {"NOT(", ") AND ", ""},
-        {"NOT(", ") AND NOT(", ")"},
-        {"", " OR ", ""},
-        {"NOT(", ") OR ", ""},
-        {"NOT(", ") OR NOT(", ")"}
-    };
+            {"", "", ""},
+            {"NOT(", ")", ""},
+            {"", " AND ", ""},
+            {"NOT(", ") AND ", ""},
+            {"NOT(", ") AND NOT(", ")"},
+            {"", " OR ", ""},
+            {"NOT(", ") OR ", ""},
+            {"NOT(", ") OR NOT(", ")"}};
 
     buf[0] = '\0';
     p = buf;
@@ -265,7 +260,7 @@ static char const *edesc(char *buf, unsigned int event)
     return buf;
 }
 
-#endif				/* #ifndef UNIX_KERNEL */
+#endif /* #ifndef UNIX_KERNEL */
 
 /* ----------- ETMv3/PTM -------------------- */
 static void _cs_etm_config_clean(struct cs_etm_config *c)
@@ -377,9 +372,9 @@ int cs_etm_config_get(cs_device_t dev, struct cs_etm_config *c)
         c->cr.raw.reg = _cs_read(d, CS_ETMCR);
         /* Extract the port mode and port size */
         c->cr.port_size =
-            (c->cr.raw.c._port_size_3 << 3) | c->cr.raw.c._port_size_20;
+                (c->cr.raw.c._port_size_3 << 3) | c->cr.raw.c._port_size_20;
         c->cr.port_mode =
-            (c->cr.raw.c._port_mode_2 << 2) | c->cr.raw.c._port_mode_10;
+                (c->cr.raw.c._port_mode_2 << 2) | c->cr.raw.c._port_mode_10;
     }
 
     if (c->flags & CS_ETMC_TRACE_ENABLE) {
@@ -409,8 +404,7 @@ int cs_etm_config_get(cs_device_t dev, struct cs_etm_config *c)
     if (c->flags & CS_ETMC_TRIGGER_EVENT) {
         c->trigger_event = _cs_read(d, CS_ETMTRIGGER);
     }
-    if ((c->flags & CS_ETMC_TS_EVENT)
-        && version >= CS_ETMVERSION(CS_ETMVERSION_ETMv3, 5)) {
+    if ((c->flags & CS_ETMC_TS_EVENT) && version >= CS_ETMVERSION(CS_ETMVERSION_ETMv3, 5)) {
         c->timestamp_event = _cs_read(d, CS_ETMTSEVR);
     }
     c->addr_comp_mask &= onebits(c->sc->ccr.s.n_addr_comp_pairs * 2);
@@ -441,10 +435,10 @@ int cs_etm_config_get(cs_device_t dev, struct cs_etm_config *c)
         for (i = 0; i < c->sc->ccr.s.n_counters; ++i) {
             if (c->counter_mask & (1U << i)) {
                 c->counter[i].reload_value =
-                    _cs_read(d, CS_ETMCNTRLDVR(i));
+                        _cs_read(d, CS_ETMCNTRLDVR(i));
                 c->counter[i].enable_event = _cs_read(d, CS_ETMCNTENR(i));
                 c->counter[i].reload_event =
-                    _cs_read(d, CS_ETMCNTRLDEVR(i));
+                        _cs_read(d, CS_ETMCNTRLDEVR(i));
                 c->counter[i].value = _cs_read(d, CS_ETMCNTVR(i));
             }
         }
@@ -462,7 +456,7 @@ int cs_etm_config_get(cs_device_t dev, struct cs_etm_config *c)
             c->sequencer.state = _cs_read(d, CS_ETMSQR) + 1;
             for (i = 0; i < CS_ETMSEQ_TRANSITIONS; ++i) {
                 c->sequencer.transition_event[i] =
-                    _cs_read(d, CS_ETMSQEVRRAW(i));
+                        _cs_read(d, CS_ETMSQEVRRAW(i));
             }
         } else {
             /* No sequencer configuration/status to read */
@@ -506,7 +500,7 @@ int cs_etm_config_put(cs_device_t dev, struct cs_etm_config *c)
     }
     if (c->flags & CS_ETMC_TRACE_ENABLE) {
         unsigned int trace_start_stop =
-            (c->trace_stop_comparators << 16) | c->trace_start_comparators;
+                (c->trace_stop_comparators << 16) | c->trace_start_comparators;
         _cs_write(d, CS_ETMTEEVR, c->trace_enable_event);
         _cs_write(d, CS_ETMTSSCR, trace_start_stop);
         _cs_write(d, CS_ETMTECR1, c->trace_enable_cr1);
@@ -523,8 +517,7 @@ int cs_etm_config_put(cs_device_t dev, struct cs_etm_config *c)
     if (c->flags & CS_ETMC_TRIGGER_EVENT) {
         _cs_write(d, CS_ETMTRIGGER, c->trigger_event);
     }
-    if ((c->flags & CS_ETMC_TS_EVENT)
-        && version >= CS_ETMVERSION(CS_ETMVERSION_ETMv3, 5)) {
+    if ((c->flags & CS_ETMC_TS_EVENT) && version >= CS_ETMVERSION(CS_ETMVERSION_ETMv3, 5)) {
         _cs_write(d, CS_ETMTSEVR, c->timestamp_event);
     }
     if (c->flags & CS_ETMC_ADDR_COMP) {
@@ -532,10 +525,7 @@ int cs_etm_config_put(cs_device_t dev, struct cs_etm_config *c)
             if (c->addr_comp_mask & (1U << i)) {
                 _cs_write(d, CS_ETMACVR(i), c->addr_comp[i].address);
                 atype = (c->addr_comp[i].access_type & 7);
-                if (is_ptm ?
-                    (atype != 1) :
-                    (atype == 0
-                     && (c->sc->scr.raw.reg & 0x00020000) != 0)) {
+                if (is_ptm ? (atype != 1) : (atype == 0 && (c->sc->scr.raw.reg & 0x00020000) != 0)) {
                     return cs_report_device_error(d,
                                                   "attempt to program comparator #%u with unsupported Fetch comparison",
                                                   i);
@@ -561,8 +551,7 @@ int cs_etm_config_put(cs_device_t dev, struct cs_etm_config *c)
                     return cs_report_device_error(d,
                                                   "attempt to program ETM counter #%u with invalid values 0x%08X (reload 0x%08X)",
                                                   i, c->counter[i].value,
-                                                  c->counter[i].
-                                                  reload_value);
+                                                  c->counter[i].reload_value);
                 }
                 _cs_write(d, CS_ETMCNTRLDVR(i),
                           c->counter[i].reload_value);
@@ -578,7 +567,7 @@ int cs_etm_config_put(cs_device_t dev, struct cs_etm_config *c)
         if (c->counter_mask & ~onebits(c->sc->ccr.s.n_counters)) {
             return cs_report_device_error(d,
                                           "counter mask=0x%x but only %u ETM counters available",
-                                          (unsigned int) c->counter_mask,
+                                          (unsigned int)c->counter_mask,
                                           c->sc->ccr.s.n_counters);
         }
     }
@@ -634,11 +623,11 @@ int cs_etm_config_init_ex(cs_device_t dev, void *etm_config)
     switch (etm_version) {
     case CS_ETMVERSION_ETMv3:
     case CS_ETMVERSION_PTM:
-        rc = cs_etm_config_init((cs_etm_config_t *) etm_config);
+        rc = cs_etm_config_init((cs_etm_config_t *)etm_config);
         break;
 
     case CS_ETMVERSION_ETMv4:
-        rc = _cs_etm_v4_config_init(d, (cs_etmv4_config_t *) etm_config);
+        rc = _cs_etm_v4_config_init(d, (cs_etmv4_config_t *)etm_config);
         break;
     }
     return rc;
@@ -657,11 +646,11 @@ int cs_etm_config_get_ex(cs_device_t dev, void *etm_config)
     switch (etm_version) {
     case CS_ETMVERSION_ETMv3:
     case CS_ETMVERSION_PTM:
-        rc = cs_etm_config_get(dev, (cs_etm_config_t *) etm_config);
+        rc = cs_etm_config_get(dev, (cs_etm_config_t *)etm_config);
         break;
 
     case CS_ETMVERSION_ETMv4:
-        rc = _cs_etm_v4_config_get(d, (cs_etmv4_config_t *) etm_config);
+        rc = _cs_etm_v4_config_get(d, (cs_etmv4_config_t *)etm_config);
         break;
     }
     return rc;
@@ -680,11 +669,11 @@ int cs_etm_config_put_ex(cs_device_t dev, void *etm_config)
     switch (etm_version) {
     case CS_ETMVERSION_ETMv3:
     case CS_ETMVERSION_PTM:
-        rc = cs_etm_config_put(dev, (cs_etm_config_t *) etm_config);
+        rc = cs_etm_config_put(dev, (cs_etm_config_t *)etm_config);
         break;
 
     case CS_ETMVERSION_ETMv4:
-        rc = _cs_etm_v4_config_put(d, (cs_etmv4_config_t *) etm_config);
+        rc = _cs_etm_v4_config_put(d, (cs_etmv4_config_t *)etm_config);
         break;
     }
     return rc;
@@ -704,11 +693,11 @@ int cs_etm_config_print_ex(cs_device_t dev, void *etm_config)
     switch (etm_version) {
     case CS_ETMVERSION_ETMv3:
     case CS_ETMVERSION_PTM:
-        rc = cs_etm_config_print((cs_etm_config_t *) etm_config);
+        rc = cs_etm_config_print((cs_etm_config_t *)etm_config);
         break;
 
     case CS_ETMVERSION_ETMv4:
-        rc = _cs_etm_v4_config_print(d, (cs_etmv4_config_t *) etm_config);
+        rc = _cs_etm_v4_config_print(d, (cs_etmv4_config_t *)etm_config);
         break;
     }
     return rc;
@@ -818,14 +807,9 @@ int cs_etm_config_print(struct cs_etm_config *c)
         printf("  Counters: %u\n", c->sc->ccr.s.n_counters);
         for (i = 0; i < c->sc->ccr.s.n_counters; ++i) {
             if (c->counter_mask & (1U << i)) {
-                printf
-                    ("    #%u: value=%08X enable=%s reload_value=%08X reload_event=%s\n",
-                     i, c->counter[i].value, edesc(buf2,
-                                                   c->counter[i].
-                                                   enable_event),
-                     c->counter[i].reload_value, edesc(buf,
-                                                       c->counter[i].
-                                                       reload_event));
+                printf("    #%u: value=%08X enable=%s reload_value=%08X reload_event=%s\n",
+                       i, c->counter[i].value, edesc(buf2, c->counter[i].enable_event),
+                       c->counter[i].reload_value, edesc(buf, c->counter[i].reload_event));
             }
         }
     }
@@ -835,20 +819,17 @@ int cs_etm_config_print(struct cs_etm_config *c)
         for (i = 0; i < c->sc->ccr.s.n_addr_comp_pairs * 2U; ++i) {
             if (c->addr_comp_mask & (1U << i)) {
                 static char const *const tnames[8] = {
-                    "fetch", "execute", "ex-pass", "ex-fail",
-                    "load/store", "load", "store", "access?"
-                };
+                        "fetch", "execute", "ex-pass", "ex-fail",
+                        "load/store", "load", "store", "access?"};
                 static char const *const msnames[4] = {
-                    "all", "none", "kernel", "user"
-                };
+                        "all", "none", "kernel", "user"};
                 unsigned int type = c->addr_comp[i].access_type;
                 printf("    #%u: address=%08X type=%08X",
                        i,
                        c->addr_comp[i].address,
                        c->addr_comp[i].access_type);
                 printf(" (%s)", tnames[type & 7]);
-                if ((type & 7) == 0
-                    && (c->sc->scr.raw.reg & 0x00020000) != 0) {
+                if ((type & 7) == 0 && (c->sc->scr.raw.reg & 0x00020000) != 0) {
                     /* Fetch comparison when not supported */
                     printf("?");
                 }
@@ -885,8 +866,7 @@ int cs_etm_config_print(struct cs_etm_config *c)
                     printf("    %u -> %u: %s\n",
                            a, b,
                            edesc(buf,
-                                 c->sequencer.
-                                 transition_event[CS_ETMSQOFF(a, b)]));
+                                 c->sequencer.transition_event[CS_ETMSQOFF(a, b)]));
                 }
             }
         }
@@ -914,7 +894,7 @@ int cs_etm_config_print(struct cs_etm_config *c)
     }
     return 0;
 }
-#endif				/* #ifndef UNIX_KERNEL */
+#endif /* #ifndef UNIX_KERNEL */
 
 /*
   ETM function Self-tests
@@ -957,7 +937,7 @@ int main(void)
     test_event_descriptions();
     return 0;
 }
-#endif				/* SELFTEST */
+#endif /* SELFTEST */
 
 
 /* end of cs_etm.c */

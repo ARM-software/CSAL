@@ -163,8 +163,7 @@ int cs_etm_static_config_init(struct cs_etm_static_config *);
 /** @} */
 
 
-
-#endif				/* _included_cs_etm_h */
+#endif /* _included_cs_etm_h */
 
 /* end of  cs_etm.h */
 #ifdef __cplusplus

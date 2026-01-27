@@ -24,12 +24,12 @@ extern "C" {
 #define _included_cs_types_h
 
 #if defined(__KERNEL__) || defined(MODULE)
-#define UNIX_KERNEL 1	     /**< defined if running in kernel (currently experimental) */
-#endif				/* __KERNELi__ */
+#define UNIX_KERNEL 1 /**< defined if running in kernel (currently experimental) */
+#endif                /* __KERNELi__ */
 
 #if !defined(UNIX_USERSPACE) && !defined(UNIX_KERNEL) && !defined(BAREMETAL)
-#define UNIX_USERSPACE 1     /**< defined if running as a userspace device driver */
-#endif				/* UNIX_USERSPACE */
+#define UNIX_USERSPACE 1 /**< defined if running as a userspace device driver */
+#endif                   /* UNIX_USERSPACE */
 
 /** \defgroup cslib_types Global API Type definitions 
  * 
@@ -40,7 +40,7 @@ extern "C" {
 
 #include <stdint.h>
 #ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS   /**< Enable printf formats for physaddr etc. */
+#define __STDC_FORMAT_MACROS /**< Enable printf formats for physaddr etc. */
 #endif
 #ifndef __STDC_CONSTANT_MACROS
 #define __STDC_CONSTANT_MACROS /**< Enable constants for physaddr etc. */
@@ -64,16 +64,16 @@ typedef void *cs_device_t;
 #ifdef LPAE
 typedef uint64_t cs_physaddr_t;
 /** printf format to match cs_physaddr_t */
-#define CS_PHYSFMT "010" PRIX64  /**< printf format for physical address */
+#define CS_PHYSFMT "010" PRIX64 /**< printf format for physical address */
 #define CS_PHYSADDR(x) INT64_C(x)
 #ifdef UNIX_USERSPACE
 #define _FILE_OFFSET_BITS 64
 #endif
-#else				/* !LPAE */
+#else                          /* !LPAE */
 typedef uint32_t cs_physaddr_t;
-#define CS_PHYSFMT "08" PRIX32   /**< printf format for physical address */
+#define CS_PHYSFMT "08" PRIX32 /**< printf format for physical address */
 #define CS_PHYSADDR(x) INT32_C(x)
-#endif				/* LPAE */
+#endif /* LPAE */
 
 /** @brief Virtual address
  *  Defines size type for the virtual addresses - as used in the PC sampling code, and ETM address comparator
@@ -86,10 +86,10 @@ typedef uint32_t cs_physaddr_t;
 
 #ifdef CS_VA64BIT
 typedef uint64_t cs_virtaddr_t;
-#define CS_VAFMT "010" PRIX64   /**< printf format for virtual address */
+#define CS_VAFMT "010" PRIX64 /**< printf format for virtual address */
 #else
 typedef uint32_t cs_virtaddr_t;
-#define CS_VAFMT "08" PRIX32    /**< printf format for virtual address */
+#define CS_VAFMT "08" PRIX32 /**< printf format for virtual address */
 #endif
 
 /*! @name Device classes
@@ -101,20 +101,20 @@ typedef uint32_t cs_virtaddr_t;
  * @{
  */
 
-#define CS_DEVCLASS_SOURCE     0x001  /**< Trace source */
-#define CS_DEVCLASS_SINK       0x002  /**< Trace sink */
-#define CS_DEVCLASS_DEBUG      0x004  /**< CPU debug interface */
-#define CS_DEVCLASS_PMU        0x008  /**< CPU PMU interface */
-#define CS_DEVCLASS_CTI        0x010  /**< Cross-trigger interface (CTI) */
-#define CS_DEVCLASS_LINK       0x020  /**< Trace link (funnel, ETF, replicator) */
-#define CS_DEVCLASS_CPU        0x040  /**< CPU */
-#define CS_DEVCLASS_TIMESTAMP  0x080  /**< Timestamp generator */
-#define CS_DEVCLASS_BUFFER     0x100  /**< Trace buffer */
-#define CS_DEVCLASS_PORT       0x200  /**< External trace port (TPIU) */
-#define CS_DEVCLASS_SWSTIM     0x400  /**< Software trace (ITM, STM) */
-#define CS_DEVCLASS_ELA        0x800  /**< Logic Analyzer (Stygian, ELA-500) */
-#define CS_DEVCLASS_TRIGSRC   0x1000  /**< Generates triggers only, not trace */
-#define CS_DEVCLASS_MEMAP     0x2000  /**< Memory access port e.g. APB-AP, AXI-AP */
+#define CS_DEVCLASS_SOURCE 0x001    /**< Trace source */
+#define CS_DEVCLASS_SINK 0x002      /**< Trace sink */
+#define CS_DEVCLASS_DEBUG 0x004     /**< CPU debug interface */
+#define CS_DEVCLASS_PMU 0x008       /**< CPU PMU interface */
+#define CS_DEVCLASS_CTI 0x010       /**< Cross-trigger interface (CTI) */
+#define CS_DEVCLASS_LINK 0x020      /**< Trace link (funnel, ETF, replicator) */
+#define CS_DEVCLASS_CPU 0x040       /**< CPU */
+#define CS_DEVCLASS_TIMESTAMP 0x080 /**< Timestamp generator */
+#define CS_DEVCLASS_BUFFER 0x100    /**< Trace buffer */
+#define CS_DEVCLASS_PORT 0x200      /**< External trace port (TPIU) */
+#define CS_DEVCLASS_SWSTIM 0x400    /**< Software trace (ITM, STM) */
+#define CS_DEVCLASS_ELA 0x800       /**< Logic Analyzer (Stygian, ELA-500) */
+#define CS_DEVCLASS_TRIGSRC 0x1000  /**< Generates triggers only, not trace */
+#define CS_DEVCLASS_MEMAP 0x2000    /**< Memory access port e.g. APB-AP, AXI-AP */
 
 
 /** @} */
@@ -123,8 +123,8 @@ typedef uint32_t cs_virtaddr_t;
     The choice of index is determined by the caller. */
 typedef int cs_cpu_t;
 
-#define CS_CPU_UNKNOWN ((cs_cpu_t)(-1))	 /**< Device is affine to an unknown CPU */
-#define CS_NO_CPU      ((cs_cpu_t)(-2))	 /**< Device is not affine to a CPU */
+#define CS_CPU_UNKNOWN ((cs_cpu_t)(-1)) /**< Device is affine to an unknown CPU */
+#define CS_NO_CPU ((cs_cpu_t)(-2))      /**< Device is not affine to a CPU */
 
 /** \brief Trace source identifier on the ATB trace bus.
     Valid values are 1..119.  Source ids should be unique within a
@@ -151,33 +151,33 @@ typedef unsigned int cs_power_domain_t;
  * even though there are separate architecture documents.
  */
 typedef enum {
-    DEV_UNKNOWN,  /**< Unknown device */
-    DEV_ETM,	  /**< ETM (v3 or v4), or PTM */
-    DEV_ITM,	  /**< ITM - Software trace stimulus */
-    DEV_STM,	  /**< STM - Software trace stimulus */
-    DEV_FUNNEL,	  /**< Trace Funnel */
-    DEV_REPLICATOR,   /**< Trace Replicator */
-    DEV_ETF,	  /**< Embedded Trace FIFO - Trace memory controller in ETF mode. */
-    DEV_ETB,	  /**< Embedded Trace Buffer - legacy trace buffer or TMC in ETB/ETR */
-    DEV_TPIU,	  /**< Trace Port Interface - external interface to trace system */
-    DEV_SWO,	  /**< Serial Wire Output */
-    DEV_CTI,	  /**< Cross Trigger Interface*/
-    DEV_CPU_DEBUG,    /**< Core Debug registers */
-    DEV_CPU_PMU,      /**< Core PMU registers */
-    DEV_TS,	      /**< Timestamp generator */
-    DEV_ELA,	      /**< Embedded logic analyzer */
-    DEV_MAX	      /**< End of type list */
+    DEV_UNKNOWN,    /**< Unknown device */
+    DEV_ETM,        /**< ETM (v3 or v4), or PTM */
+    DEV_ITM,        /**< ITM - Software trace stimulus */
+    DEV_STM,        /**< STM - Software trace stimulus */
+    DEV_FUNNEL,     /**< Trace Funnel */
+    DEV_REPLICATOR, /**< Trace Replicator */
+    DEV_ETF,        /**< Embedded Trace FIFO - Trace memory controller in ETF mode. */
+    DEV_ETB,        /**< Embedded Trace Buffer - legacy trace buffer or TMC in ETB/ETR */
+    DEV_TPIU,       /**< Trace Port Interface - external interface to trace system */
+    DEV_SWO,        /**< Serial Wire Output */
+    DEV_CTI,        /**< Cross Trigger Interface*/
+    DEV_CPU_DEBUG,  /**< Core Debug registers */
+    DEV_CPU_PMU,    /**< Core PMU registers */
+    DEV_TS,         /**< Timestamp generator */
+    DEV_ELA,        /**< Embedded logic analyzer */
+    DEV_MAX         /**< End of type list */
 } cs_devtype_t;
 
 
 /** Enum type defining the bit operations for the cs_device_wait() function */
 typedef enum {
-    CS_REG_WAITBITS_ALL_1 = 1,/**< operation value for cs_device_wait() : wait for all bits in mask to go high */
-    CS_REG_WAITBITS_ANY_1,  /**< operation value for cs_device_wait() : wait for any bit in mask to go high  */
-    CS_REG_WAITBITS_ALL_0, /**< operation value for cs_device_wait() : wait for all bits in mask to go low */
-    CS_REG_WAITBITS_ANY_0, /**< operation value for cs_device_wait() : wait for any bit in mask to go low  */
-    CS_REG_WAITBITS_PTTRN, /**< operation value for cs_device_wait() : wait for bits to match pattern (both high and low bits) */
-    CS_REG_WAITBITS_END	/**< End marker. Not a valid operation. */
+    CS_REG_WAITBITS_ALL_1 = 1, /**< operation value for cs_device_wait() : wait for all bits in mask to go high */
+    CS_REG_WAITBITS_ANY_1,     /**< operation value for cs_device_wait() : wait for any bit in mask to go high  */
+    CS_REG_WAITBITS_ALL_0,     /**< operation value for cs_device_wait() : wait for all bits in mask to go low */
+    CS_REG_WAITBITS_ANY_0,     /**< operation value for cs_device_wait() : wait for any bit in mask to go low  */
+    CS_REG_WAITBITS_PTTRN,     /**< operation value for cs_device_wait() : wait for bits to match pattern (both high and low bits) */
+    CS_REG_WAITBITS_END        /**< End marker. Not a valid operation. */
 } cs_reg_waitbits_op_t;
 
 
@@ -198,7 +198,7 @@ typedef enum {
 
 /** @} */
 
-#endif				/* _included_cs_types_h */
+#endif /* _included_cs_types_h */
 
 #ifdef __cplusplus
 }

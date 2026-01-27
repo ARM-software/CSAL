@@ -21,7 +21,7 @@
 
 /* ---------- Local functions ------------- */
 /* this called from API fn if V8 core */
-static int cs_debug_v8_pc_sample(struct cs_device *d, cs_virtaddr_t * pc,
+static int cs_debug_v8_pc_sample(struct cs_device *d, cs_virtaddr_t *pc,
                                  uint32_t *cid, uint32_t *vmid)
 {
     uint32_t regval;
@@ -45,11 +45,11 @@ static int cs_debug_v8_pc_sample(struct cs_device *d, cs_virtaddr_t * pc,
 
     /* if we really want the PC then set the output value */
     if (pc != NULL) {
-        if (G.virt_addr_64bit) {     /* built with 64 bit address values */
-            /* only compile this if we have 64 bit VA - will generate compile warning otherwise. */
+        if (G.virt_addr_64bit) { /* built with 64 bit address values */
+                                 /* only compile this if we have 64 bit VA - will generate compile warning otherwise. */
 #ifdef CS_VA64BIT
             uint32_t regval_h = _cs_read(d, CS_V8EDPCSR_h);
-            pc_sample = (((cs_virtaddr_t) regval_h) & 0xFFFFFFFF) << 32;
+            pc_sample = (((cs_virtaddr_t)regval_h) & 0xFFFFFFFF) << 32;
 #endif
         }
         pc_sample |= (regval & 0xFFFFFFFF);
@@ -72,7 +72,7 @@ static int cs_debug_v8_pc_sample(struct cs_device *d, cs_virtaddr_t * pc,
 
 
 /* ========== API functions ================ */
-int cs_debug_get_pc_sample(cs_device_t dev, cs_virtaddr_t * pc,
+int cs_debug_get_pc_sample(cs_device_t dev, cs_virtaddr_t *pc,
                            uint32_t *cid, uint32_t *vmid)
 {
     struct cs_device *d = DEV(dev);
