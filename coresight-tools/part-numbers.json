@@ -88,6 +88,17 @@
         { "part": "0xd80", "name": "Cortex-A520" },
         { "part": "0xd81", "name": "Cortex-A720" },
         { "part": "0xd82", "name": "Cortex-X4" },
+        { "part": "0xd83", "name": "Neoverse V3AE" },
+        { "part": "0xd84", "name": "Neoverse V3" },
+        { "part": "0xd85", "name": "Cortex-X925" },
+        { "part": "0xd87", "name": "Cortex-A725" },
+        { "part": "0xd88", "name": "Cortex-A520AE" },
+        { "part": "0xd89", "name": "Cortex-A720AE" },
+        { "part": "0xd8a", "name": "C1-Nano" },
+        { "part": "0xd8b", "name": "C1-Pro" },
+        { "part": "0xd8c", "name": "C1-Ultra" },
+        { "part": "0xd8e", "name": "Neoverse N3" },
+        { "part": "0xd90", "name": "C1-Premium" },
         { "part": "0xfff", "name": "<0xfff>" }
     ]
 }       
