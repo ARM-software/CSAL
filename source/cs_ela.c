@@ -410,7 +410,8 @@ int cs_ela_read_ram_entry(cs_device_t dev, cs_ela_record_t *rec)
     assert(d->type == DEV_ELA);
     /* "The first read of the RRD after an RRA update returns the trace data header byte value" */
     {
-        unsigned int const header = _cs_read(d, CS_ELA_RRDR);
+        uint32_t const header = _cs_read(d, CS_ELA_RRDR);
+        rec->raw_header = header;
         rec->type = header & 0x3;
         rec->trigger_state = (header >> 2) & 0x7;
     }

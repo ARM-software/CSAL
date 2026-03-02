@@ -164,6 +164,7 @@ typedef struct {
 #define CS_ELA_RECORD_TS 2       /**< Record contains a timestamp value */
     unsigned char trigger_state; /**< Trigger state when captured */
     cs_ela_signals_t signals;    /**< Payload */
+    uint32_t raw_header;         /**< Raw header word, first word from RRDR */
 } cs_ela_record_t;
 
 

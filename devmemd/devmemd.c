@@ -386,7 +386,7 @@ int main(int argc, char **argv)
 listen_for_new_connection:
     printf("devmemd: listening on port %d\n", ntohs(local.sin_port));
     schn = accept(slis, (struct sockaddr *)&remote, &alen);
-    if (rc < 0) {
+    if (schn < 0) {
         perror("accept");
         return EXIT_FAILURE;
     }
