@@ -815,29 +815,29 @@ Register definitions and bitfield values for the Architecture v7 Cortex Core deb
 /**@}*/
 /** @name EDSCR bit values for v8
 @{*/
-#define CS_EDSCR_STATUS 0x0000003F          /**< Debug status */
-#define CS_EDSCR_STATUS_RESTARTING 0x01     /**< Restarting, exiting Debug state (transient) */
-#define CS_EDSCR_STATUS_NON_DEBUG 0x02      /**< Non-Debug state */
-#define CS_EDSCR_STATUS_EXTERNAL_DBG 0x13   /**< External debug request */
-#define CS_EDSCR_STATUS_HALTING_STEP 0x1b   /**< Halting step, normal */
-#define CS_EDSCR_STATUS_HALTING_STEP_X 0x1f /**< Halting step, exclusive */
+#define CS_EDSCR_STATUS 0x0000003F           /**< Debug status */
+#define CS_EDSCR_STATUS_RESTARTING 0x01      /**< Restarting, exiting Debug state (transient) */
+#define CS_EDSCR_STATUS_NON_DEBUG 0x02       /**< Non-Debug state */
+#define CS_EDSCR_STATUS_EXTERNAL_DBG 0x13    /**< External debug request */
+#define CS_EDSCR_STATUS_HALTING_STEP 0x1b    /**< Halting step, normal */
+#define CS_EDSCR_STATUS_HALTING_STEP_X 0x1f  /**< Halting step, exclusive */
 #define CS_EDSCR_STATUS_HALTING_STEP_NS 0x3b /**< Halting step, no syndrome */
-#define CS_EDSCR_ERR 0x00000040             /**< Sticky error */
-#define CS_EDSCR_A 0x00000080               /**< SError interrupt pending */
-#define CS_EDSCR_EL 0x00000300              /**< Exception level (Debug state only) */
-#define CS_EDSCR_RW 0x00003C00              /**< Exception level execution state status (Debug state only) */
-#define CS_EDSCR_HDE 0x00004000             /**< Halting Debug enabled */
-#define CS_EDSCR_SDD 0x00010000             /**< Secure Debug disabled */
-#define CS_EDSCR_SC2 0x00080000             /**< Sample CONTEXTIDR_EL2 rather than VTTBR_EL2 */
-#define CS_EDSCR_MA 0x00100000              /**< Memory access mode */
-#define CS_EDSCR_INTdis 0x00C00000          /**< Disable interrupts in non-debug state (n.b. field is 2 bits) */
-#define CS_EDSCR_ITE 0x01000000             /**< ITR empty and can accept another instruction */
-#define CS_EDSCR_TXU 0x04000000             /**< TX underrun */
-#define CS_EDSCR_RXO 0x08000000             /**< RX overrun */
-#define CS_EDSCR_ITO 0x10000000             /**< ITR overrun - debugger injected when PE not ready */
-#define CS_EDSCR_TXfull 0x20000000          /**< DBGDTRTX full */
-#define CS_EDSCR_RXfull 0x40000000          /**< DBGDTRRX full */
-#define CS_EDSCR_TFO 0x80000000             /**< Trace Filter Override (FEAT_TRF) */
+#define CS_EDSCR_ERR 0x00000040              /**< Sticky error */
+#define CS_EDSCR_A 0x00000080                /**< SError interrupt pending */
+#define CS_EDSCR_EL 0x00000300               /**< Exception level (Debug state only) */
+#define CS_EDSCR_RW 0x00003C00               /**< Exception level execution state status (Debug state only) */
+#define CS_EDSCR_HDE 0x00004000              /**< Halting Debug enabled */
+#define CS_EDSCR_SDD 0x00010000              /**< Secure Debug disabled */
+#define CS_EDSCR_SC2 0x00080000              /**< Sample CONTEXTIDR_EL2 rather than VTTBR_EL2 */
+#define CS_EDSCR_MA 0x00100000               /**< Memory access mode */
+#define CS_EDSCR_INTdis 0x00C00000           /**< Disable interrupts in non-debug state (n.b. field is 2 bits) */
+#define CS_EDSCR_ITE 0x01000000              /**< ITR empty and can accept another instruction */
+#define CS_EDSCR_TXU 0x04000000              /**< TX underrun */
+#define CS_EDSCR_RXO 0x08000000              /**< RX overrun */
+#define CS_EDSCR_ITO 0x10000000              /**< ITR overrun - debugger injected when PE not ready */
+#define CS_EDSCR_TXfull 0x20000000           /**< DBGDTRTX full */
+#define CS_EDSCR_RXfull 0x40000000           /**< DBGDTRRX full */
+#define CS_EDSCR_TFO 0x80000000              /**< Trace Filter Override (FEAT_TRF) */
 /**@}*/
 
 #define CS_DBGDTRTX 0x08C /**< Target to Host Data Transfer */

@@ -344,7 +344,7 @@ int _cs_write_traced(struct cs_device *d, unsigned int off,
     _cs_write_wo_traced(d, off, data, oname);
     if (DCHECK(d)) {
         /* Read the data back */
-        unsigned int ndata;
+        uint32_t ndata;
         ndata = _cs_read(d, off);
         if (ndata != data) {
             diagf("!%" CS_PHYSFMT ": write %03X (%s) = %08X now %08X\n",
@@ -577,21 +577,21 @@ int _cs_waitbits(struct cs_device *d, unsigned int off, uint32_t bits,
     return ret;
 }
 
-int _cs_claim(struct cs_device *d, uint32_t bit)
+int _cs_claim_tag(struct cs_device *d, uint32_t bit)
 {
-    return _cs_write_wo(d, CS_CLAIMSET, bit);
+    return _cs_write_wo_traced(d, CS_CLAIMSET, bit, "CLAIMSET");
 }
 
-int _cs_unclaim(struct cs_device *d, uint32_t bit)
+int _cs_unclaim_tag(struct cs_device *d, uint32_t bit)
 {
-    return _cs_write_wo(d, CS_CLAIMCLR, bit);
+    return _cs_write_wo_traced(d, CS_CLAIMCLR, bit, "CLAIMCLR");
 }
 
 /*
   To read the current settings of the claim bits, use the CLAIMCLR register.
   (Reading the CLAIMSET register indicates which claim bits are implemented.)
 */
-int _cs_isclaimed(struct cs_device *d, uint32_t bit)
+int _cs_isclaimed_tag(struct cs_device *d, uint32_t bit)
 {
     return _cs_isset(d, CS_CLAIMCLR, bit);
 }
@@ -600,13 +600,13 @@ int _cs_isclaimed(struct cs_device *d, uint32_t bit)
 /* Return true if a device is unlocked (where the lock is implemented) */
 int _cs_isunlocked(struct cs_device *d)
 {
-    return (_cs_read(d, CS_LSR) & 3) == 1;
+    return (_cs_read(d, CS_LSR) & (CS_LSR_SLI | CS_LSR_SLK)) == CS_LSR_SLI;
 }
 
 
 int _cs_is_lockable(struct cs_device *d)
 {
-    return (_cs_read(d, CS_LSR) & 1) == 1;
+    return !d->is_permanently_unlocked;
 }
 
 
@@ -630,13 +630,16 @@ int _cs_unlock(struct cs_device *d)
 
 int _cs_lock(struct cs_device *d)
 {
+    if (d->is_permanently_unlocked) {
+        return -1;
+    }
     if (d->is_unlocked) {
         _cs_write_wo_traced(d, CS_LAR, 0, "LAR");
         d->is_unlocked = 0;
     }
     if (DCHECK(d)) {
-        unsigned int lsr = _cs_read(d, CS_LSR);
-        if ((lsr & 3) == 1) {
+        uint32_t lsr = _cs_read(d, CS_LSR);
+        if ((lsr & (CS_LSR_SLI | CS_LSR_SLK)) == CS_LSR_SLI) {
             /* Implemented (bit 0) but not locked (bit 1) */
             diagf("!%" CS_PHYSFMT ": after lock, LSR=%08" PRIX32 "\n",
                   d->phys_addr, lsr);

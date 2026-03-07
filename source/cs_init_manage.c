@@ -58,6 +58,11 @@ int cs_init(void)
 #else
     G.diag_checking = 0;
 #endif /* CHECK */
+#ifndef CS_EXTERNAL
+    G.claim_external = 0;
+#else
+    G.claim_external = CS_EXTERNAL;
+#endif /* CS_EXTERNAL */
 
     G.diag_tracing_default = 0; /* tracing off by default */
 
@@ -117,7 +122,7 @@ void cs_set_default_memap(cs_device_t dev)
         if (DTRACEG) {
             diagf("!Set default MEM-AP\n");
         }
-        _cs_claim(DEV(dev), CS_CLAIM_AP_INTERNAL);
+        _cs_claim(DEV(dev));
     }
     G.memap_default = dev;
 }
@@ -130,10 +135,15 @@ void cs_set_default_memap(cs_device_t dev)
 */
 int cs_shutdown(void)
 {
+#ifdef DIAG
+    if (DTRACEG) {
+        diagf("!shutdown\n");
+    }
+#endif
     if (G.init_called) {
         /* Do anything that needs memory-mapped access */
-        cs_release(); /* claim tags released here */
-        cs_checkpoint();
+        cs_release();    /* claim tags released here */
+        cs_checkpoint(); /* devices relocked here */
 #ifdef UNIX_USERSPACE
         /* Now remove memory-mapped access */
         close(G.mem_fd);
@@ -160,9 +170,35 @@ int cs_shutdown(void)
 
 /* There are conflicting claim tag conventions in use - see csregisters.h.
    Return the appropriate internal claim tag for the given device. */
-uint32_t _cs_device_internal_claim_tag(struct cs_device *d)
+uint32_t _cs_device_claim_tag(struct cs_device *d)
 {
-    return cs_device_has_class(d, CS_DEVCLASS_MEMAP) ? CS_CLAIM_AP_INTERNAL : CS_CLAIM_DEV_INTERNAL;
+    if (cs_device_has_class(d, CS_DEVCLASS_MEMAP)) {
+        return G.claim_external ? CS_CLAIM_AP_EXTERNAL : CS_CLAIM_AP_INTERNAL;
+    } else {
+        return G.claim_external ? CS_CLAIM_DEV_EXTERNAL : CS_CLAIM_DEV_INTERNAL;
+    }
+}
+
+
+int _cs_claim(struct cs_device *d)
+{
+    int rc = 0;
+    if (!d->is_claimed) {
+        rc = _cs_claim_tag(d, _cs_device_claim_tag(d));
+        d->is_claimed = 1;
+    }
+    return rc;
+}
+
+
+int _cs_unclaim(struct cs_device *d)
+{
+    int rc = 0;
+    if (d->is_claimed) {
+        rc = _cs_unclaim_tag(d, _cs_device_claim_tag(d));
+        d->is_claimed = 0;
+    }
+    return rc;
 }
 
 
@@ -199,10 +235,19 @@ int cs_release(void)
     /* Release all CoreSight devices.  The system is now in a state where
        an external debugger has complete control (at least over trace devices
        and cross-triggering, not necessarily CPU hardware breakpoints). */
+#ifdef DIAG
+    if (DTRACEG) {
+        diagf("!device release\n");
+    }
+#endif
     struct cs_device *d;
     for (d = G.device_top; d != NULL; d = d->next) {
-        /* Get the appropriate tag bit for this device type. */
-        uint32_t const tag = _cs_device_internal_claim_tag(d);
+        if (!d->is_claimed) {
+            /* Nothing to do, and don't try to access the device,
+               as the caller may have cleaned up and established a
+               situation where device access is not permitted */
+            continue;
+        }
         /* For certain devices, we might have been able to create
            the device object, but then found that the device is
            powered down. E.g. CPU debug interfaces. In this case,
@@ -210,13 +255,7 @@ int cs_release(void)
         if (_cs_device_is_powered(d) == CS_POWER_OFF) {
             continue;
         }
-        if (_cs_isclaimed(d, tag)) {
-            if (DTRACE(d)) {
-                diagf("!unclaiming device tag 0x%x at %" CS_PHYSFMT "\n",
-                      (unsigned int)tag, d->phys_addr);
-            }
-            _cs_unclaim(d, tag);
-        }
+        _cs_unclaim(d);
     }
     return 0;
 }
@@ -232,10 +271,22 @@ unsigned int cs_error_count(void)
 int cs_checkpoint(void)
 {
     struct cs_device *d;
+#ifdef DIAG
+    if (DTRACEG) {
+        diagf("!device re-lock\n");
+    }
+#endif
     for (d = G.device_top; d != NULL; d = d->next) {
-        if (!cs_device_is_non_mmio(d) && !d->is_permanently_unlocked) {
-            _cs_lock(d);
+        if (cs_device_is_non_mmio(d)) {
+            continue;
         }
+        if (d->is_permanently_unlocked) {
+            continue;
+        }
+        if (!d->is_unlocked) {
+            continue;
+        }
+        _cs_lock(d);
     }
     return 0;
 }

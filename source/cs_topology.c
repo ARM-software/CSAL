@@ -169,7 +169,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         /* Just in case the component's already unlocked when we register it,
            ensure our cached flag of its lock status is correctly set. */
         {
-            unsigned int lsr = _cs_read(d, CS_LSR);
+            uint32_t const lsr = _cs_read(d, CS_LSR);
             d->is_permanently_unlocked = !(lsr & CS_LSR_SLI);
             d->is_unlocked = !(lsr & CS_LSR_SLK);
         }

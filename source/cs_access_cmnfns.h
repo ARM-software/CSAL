@@ -62,7 +62,7 @@ extern "C" {
 
 
 #define CS_LIB_VERSION_MAJ 0x03
-#define CS_LIB_VERSION_MIN 0x02
+#define CS_LIB_VERSION_MIN 0x04
 
 /*
   DIAG defines whether this build is capable of writing diagnostic messages.
@@ -129,6 +129,7 @@ struct cs_device {
     cs_power_domain_t power_domain;
     unsigned int is_unlocked : 1;             /**< Device is (as far as we know) unlocked, either permanently or via LAR */
     unsigned int is_permanently_unlocked : 1; /**< LAR not implemented, device does not need to be unlocked */
+    unsigned int is_claimed : 1;              /**< CSAL user claimed the device */
 
 #if DIAG
     cs_diag_level_t diag_tracing; /**< Diagnostic messages for actions on this device */
@@ -270,6 +271,7 @@ struct cs_global {
     unsigned int phys_addr_lpae : 1;      /**< 1 if built with LPAE */
     unsigned int virt_addr_64bit : 1;     /**< 1 if built with 64 bit virtual addresses */
     unsigned int devaff0_used : 1;        /**< Non-zero DEVAFF0 has been seen */
+    unsigned int claim_external : 1;      /**< For device claiming, CSAL presents as external */
     cs_diag_level_t diag_tracing_default; /**< Default trace setting for new devices */
     unsigned int n_api_errors;
     unsigned int n_devices;
@@ -429,10 +431,16 @@ extern int _cs_waitbits(struct cs_device *d, unsigned int off,
                         uint32_t bits, cs_reg_waitbits_op_t operation,
                         uint32_t pattern, uint32_t *p_last_val);
 
-extern int _cs_claim(struct cs_device *d, uint32_t bit);
-extern int _cs_unclaim(struct cs_device *d, uint32_t bit);
-extern int _cs_isclaimed(struct cs_device *d, uint32_t bit);
+/* Raw primitives for accessing any claim tags */
+extern int _cs_claim_tag(struct cs_device *d, uint32_t bit);
+extern int _cs_unclaim_tag(struct cs_device *d, uint32_t bit);
+extern int _cs_isclaimed_tag(struct cs_device *d, uint32_t bit);
 
+/* Claim/unclaim device according to the global 'claim_external' flag. */
+extern int _cs_claim(struct cs_device *d);
+extern int _cs_unclaim(struct cs_device *d);
+
+/* Unlock/lock device via the LAR (C5ACCE55) register. */
 extern int _cs_isunlocked(struct cs_device *d);
 extern int _cs_is_lockable(struct cs_device *d);
 extern int _cs_unlock(struct cs_device *d);

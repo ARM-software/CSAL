@@ -221,6 +221,25 @@ int cs_device_lock(cs_device_t dev);
 
 
 /**
+ *   Claim a device using the claim tag.
+ *   Whether internal or external claim tag is used is controlled by a
+ *   global flag (claim_external).
+ *   Also registers the device for automatic unclaim on shutdown.
+ *
+ *   \param dev     device desriptor
+ */
+int cs_device_claim(cs_device_t dev);
+
+
+/*
+ *   Unclaim a device.
+ *
+ *   \param dev     device descriptor
+ */
+int cs_device_unclaim(cs_device_t dev);
+
+
+/**
  *   Check if a device is powered, if possible.
  *
  *   \param dev     device descriptor

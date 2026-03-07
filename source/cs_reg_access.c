@@ -118,6 +118,18 @@ int cs_device_lock(cs_device_t dev)
 }
 
 
+int cs_device_claim(cs_device_t dev)
+{
+    return _cs_claim(DEV(dev));
+}
+
+
+int cs_device_unclaim(cs_device_t dev)
+{
+    return _cs_unclaim(DEV(dev));
+}
+
+
 int cs_device_diag_set(cs_device_t dev, int tracing)
 {
 #if DIAG

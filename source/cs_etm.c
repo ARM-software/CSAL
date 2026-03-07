@@ -125,7 +125,7 @@ int _cs_etm_enable_programming(struct cs_device *d)
     /* Set ETMCLAIM[1] to indicate the ETM is claimed by software.
        This follows the protocol described in the (not yet released)
        document on external/internal debug coordination. */
-    _cs_claim(d, CS_CLAIM_DEV_INTERNAL);
+    _cs_claim(d);
 
     /* [ETM] "When setting the Programming bit, you must not change any other
        bits of the ETM Control Register.  You must only change the value
