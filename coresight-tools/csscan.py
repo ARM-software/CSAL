@@ -108,8 +108,9 @@ ARM_ARCHID_ROM      = 0x0af7
 # Multiple parts may have the same architecture identifier.
 #
 # ARCHIDs are mostly described in:
-#   - CoreSight Architecture 3.0 table B2-8
+#   - IHI0029 CoreSight Architecture 3.0 table B2-8
 #   - ADIv6.0 C1.4.5 (for APv2)
+#   - IHI0091 CoreSight PMU Architecture
 #
 arm_archids = {
     0x0a00:"RAS",
@@ -138,10 +139,16 @@ arm_archids = {
     0x0a47:"unk-APv2",   # including APv1s adapted to APv2 (see ADIv6.0 C1.4.5)
     0x0a50:"HSSTP",
     0x0a63:"STM",        # Software Trace Macrocell
-    0x0a66:"AMU32",
-    0x0a67:"AMU64",
+    0x0a66:"AMU32",      # generic AMU, 64-bit prog not implemented
+    0x0a67:"AMU64",      # generic AMU, 64-bit prog implemented
     0x0a75:"ELA",        # CoreSight Embedded Logic Analyzer
-    0x0af7:"ROM"
+    0x0af0:"PMU32-ndp",  # CoreSight PMU, 64-bit n/i, dual-page n/i
+    0x0af1:"PMU32-p0",   # CoreSight PMU Page 0
+    0x0af2:"PMU32-p1",   # CoreSight PMU Page 1
+    0x0af4:"PMU64-ndp",  # CoreSight PMU, 64-bit imp, dual-page n/i
+    0x0af5:"PMU64-p0",   # CoreSight PMU Page 0
+    0x0af6:"PMU64-p1",   # CoreSight PMU Page 1
+    0x0af7:"ROM",
 }
 
 # match [11:0] if the major-rev doesn't match (Arm-defined architecture only)
