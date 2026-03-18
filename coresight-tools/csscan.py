@@ -101,7 +101,9 @@ ARM_ARCHID_PMU      = 0x2a16
 ARM_ARCHID_MEMAP    = 0x0a17
 ARM_ARCHID_STM      = 0x0a63
 ARM_ARCHID_ELA      = 0x0a75
+ARM_ARCHID_CSPMU_list  = [0x0af0, 0x0af1, 0x0af2, 0x0af4, 0x0af5, 0x0af6]
 ARM_ARCHID_ROM      = 0x0af7
+
 
 #
 # Architecture identifiers indicate the programming interface which a device conforms to.
@@ -677,6 +679,12 @@ class Device:
 
     def is_tmc(self):
         return self.arm_part_number() in [0x961, 0x9e8, 0x9e9, 0x9ea]
+
+    def is_cs_pmu(self):
+        """
+        Check for a CoreSight PMU (system PMU: distinct from a CPU PMU)
+        """
+        return self.is_arm_architecture() and (self.architecture() & 0xfff) in ARM_ARCHID_CSPMU_list
 
     def cs_device_type_name(self):
         devtype = self.coresight_device_type()
@@ -1407,7 +1415,7 @@ class CSROM:
                 if bits(devid,24,4):
                     print(" ACR", end="")
         elif d.is_arm_architecture(ARM_ARCHID_PMU):
-            # PMU doesn't have a register of its own to indicate power state - you have to find the affine core.
+            # CPU PMU doesn't have a register of its own to indicate power state - you have to find the affine core.
             if not o_assume_powered_on:
                 if not d.is_affine_to_core():
                     core_powered_off = True
@@ -1444,6 +1452,32 @@ class CSROM:
                     print(" %08x" % (d.read32(r)), end="")
             else:
                 print(" CPU may be powered off: not accessing PMU (use --assume-powered-on to force)", end="")
+        elif d.is_cs_pmu():
+            # CoreSight PMU (IHI0091) - system-level, but done here for similarity with CPU PMU
+            config = d.read32(0xE00)
+            n_counters = config & 0xff
+            csize = bits(config,8,6)+1
+            print(" counters:%u" % (n_counters), end="")
+            print(" %u-bit" % (csize), end="")
+            if bit(config,14):
+                print(" cc", end="")       # dedicated cycle counter as counter 31
+            if bit(config,16):
+                print(" exportable", end="")
+            if bit(config,20):
+                print(" msi", end="")
+            if bit(config,21):
+                print(" freeze", end="")
+            if bit(config,22):
+                print(" snapshot", end="")
+            if bit(config,23):
+                print(" trace", end="")
+            if bit(config,24):
+                print(" halt", end="")
+            ncg = bits(config,28,4)+1
+            if ncg > 1:
+                print(" groups:%u" % ncg, end="")
+            pmiidr = d.read32(0xE08)
+            print(" iid:0x%08x" % pmiidr, end="")
         elif d.is_core_trace_etm():
             # Test if the registers are invalid/unreadable, either because the core power domain
             # is powered off or because the ETM hasn't been initialized since reset.
