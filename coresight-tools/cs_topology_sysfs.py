@@ -23,9 +23,16 @@ limitations under the License.
 
 from __future__ import print_function
 
+
+import sys
+import os
+import struct
+
+
 from cs_topology import *
 
-import os, sys, struct
+
+o_verbose = 0
 
 
 # Device type names as used in /sys/bus/coresight/devices
@@ -47,17 +54,13 @@ devtypes = {
 
 
 def read_file(fn):
-    f = open(fn)
-    s = f.read().strip()
-    f.close()
-    return s
+    with open(fn) as f:
+        return f.read().strip()
 
 
 def read_binary_file(fn):
-    f = open(fn, "rb")
-    s = f.read()
-    f.close()
-    return s
+    with open(fn, "rb") as f:
+        return f.read()
 
 
 class IOMem:
@@ -110,8 +113,12 @@ def get_cs_from_sysfs(p=None):
         p = Platform()
     path_to_d = {}
     iomem = None
+    if o_verbose:
+        print("Scanning CoreSight devices...")
     for sd in os.listdir(cs):
         dp = os.path.join(cs, sd)
+        if o_verbose:
+            print("  %s" % dp)
         base = sysfs_device_type(sd)
         devtype = devtypes[base]
         d = Device(p, devtype, name=sd)
@@ -157,18 +164,25 @@ def get_cs_from_sysfs(p=None):
             if not found and iomem.by_name:
                 print("%s node name %s not found" % (rp, node_name), file=sys.stderr)
     # Populate the ATB links from the 'out:' and 'in:' entries if available
+    if o_verbose:
+        print("Scanning devices for 'out:' links")
     for sd in os.listdir(cs):
-        dp = os.path.realpath(os.path.join(cs, sd))    # somewhere in /sys/devices/platform
-        d = path_to_d[dp]
+        dp = os.path.join(cs, sd)
+        if o_verbose:
+            print("  %s" % (dp))
+        rp = os.path.realpath(dp)    # somewhere in /sys/devices/platform
+        d = path_to_d[rp]
         # Scan the device's outputs.
         for opn in range(0, 2):
-            outp = os.path.join(dp, "out:%u" % opn)
+            outp = os.path.join(dp, "connections/out:%u" % opn)
             if os.path.islink(outp):
                 tp = os.path.realpath(outp)
-                # scan the target's inputs to find the source
+                # scan the target's inputs to find this source
                 ln = None
                 for ipn in range(0, 8):
                     inp = os.path.join(tp, "in:%u" % ipn)
+                    if not os.path.exists(inp):
+                        continue
                     sp = os.path.realpath(inp)
                     if sp == dp:
                         ln = Link(d, path_to_d[tp], CS_LINK_ATB, master_port=opn, slave_port=ipn)
@@ -437,8 +451,14 @@ def list_device_tree_nodes():
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Report OS view of CoreSight")
+    parser.add_argument("--dt-always", action="store_true", help="always check Device Tree")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="increase verbosity")
+    opts = parser.parse_args()
+    o_verbose = opts.verbose
     p = get_cs_from_sysfs()
-    if True or p is None or not p.links:
+    if opts.dt_always or p is None or not p.links:
         p = get_cs_from_device_tree(p)
     if p is not None:
         p.show()

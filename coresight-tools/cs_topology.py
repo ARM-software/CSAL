@@ -136,6 +136,7 @@ class Device:
         elif device_type == CS_DEVTYPE_TRACE_CORE:
             self.etm_architecture = None
         self.mem_address = None     # Ideally, memory address as seen by the core (DAP-relative address may differ)
+        self.dap_name = None
         # Input and output links can be of various types: ATB, CTI etc.
         # The device may also have configured ports that do not have links.
         self.outlinks = []
@@ -661,6 +662,8 @@ class Platform:
         print("Links:")
         for ln in self.links:
             print("  %s" % str(ln))
+        if not self.links:
+            print("  <none>")
         print("CPUs:")
         for c in range(0, self.max_cpu_number+1):
             cd = self.device_by_cpu(c, type=CS_DEVTYPE_TRACE_CORE)
