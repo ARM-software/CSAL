@@ -3017,7 +3017,7 @@ def scan_rom(c, table_addr, recurse=True, indent=True, detect_topology=False, de
             if e.device is None:
                 if not e.is_present():
                     print("empty ROM table entry: 0x%x" % (e.descriptor))
-                else
+                else:
                     print("@0x%x - device excluded: %s" % (e.device_address(), e.is_inaccessible))
             else:
                 c.show_device(e.device)
