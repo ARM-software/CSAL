@@ -870,9 +870,9 @@ class ROMTableEntry:
     An entry in a ROM table. Contains information from the table itself.
     """
     def __init__(self, td, offset, width, e):
-        self.table = td            # ROM table device
+        self.table = td            # ROM table device that owns this entry
         self.offset = offset       # byte offset of the entry within the table
-        self.width = width         # entry width in bytes
+        self.width = width         # entry width in bytes (4 or 8)
         self.descriptor = e        # the 4-byte or 8-byte table entry (device offset, power req)
         self.device = None         # may be populated later
         self.is_inaccessible = None   # set to a reason string if we can't create a device for it
@@ -888,6 +888,15 @@ class ROMTableEntry:
         if self.is_present():
             s += " -> 0x%x" % self.device_address()
         return s
+
+    def depth(self):
+        """
+        Return the entry's depth in the ROM table hierarchy.
+        ROM tables don't have a back-pointer or depth indicator themselves,
+        so this is based on whatever root we were given to explore from.
+        All ROM table entries have depth at least 1 - the root table has depth 0.
+        """
+        return (self.table.rom_table_entry.depth() + 1) if (self.table.rom_table_entry is not None) else 1
 
     def is_present(self):
         return (self.descriptor & 1) != 0
@@ -948,6 +957,9 @@ class AffinityGroup:
             return self.devices[typ]
         else:
             return None
+
+    def __lt__(self, other):
+        return self.id < other.id
 
     def __str__(self):
         return "AffinityGroup(0x%016x)" % self.id
@@ -1194,6 +1206,10 @@ class CSROM:
             else:
                 eword = td.read64(a)
             if eword == 0:
+                # ADI 6.0 D3.2.1 (Class 0x1 ROM Table):
+                # "A marker with the value 0x00000000, which signals the end of the ROM Table"
+                # ADI 6.0 D4.2.1 (Class 0x9 ROM Table):
+                # "A marker that signals the end of the ROM Table, which has an entry that is all zeroes"
                 break
             if (eword & 1) == 0 and not include_empty:
                 continue
@@ -1282,6 +1298,7 @@ class CSROM:
                 # exhausted if we have a 300-core SoC with 5 devices per core.
                 d.unmap()
             else:
+                # device is marked as absent - can't probe for type
                 yield e
 
     @staticmethod
@@ -2967,21 +2984,21 @@ def device_ram_bytes(d):
     return None
 
 
-def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology_cti=False, enable_timestamps=False):
+def scan_rom(c, table_addr, recurse=True, indent=True, detect_topology=False, detect_topology_cti=False, enable_timestamps=False):
     """
-    Scan a ROM Table recursively, showing devices as we go.
+    Scan a ROM Table recursively (depth-first), showing devices as we go.
     We can also use this to list a single device.
     """
     table = c.create_device_at(table_addr)
-    c.show_device(table)                    # Show the ROM table itself
+    c.show_device(table)                    # Show the device itself
     if not table.is_rom_table():
         return
     n = 0
     devices = []
     ts = []
-    for e in c.list_table(table, recurse=recurse):
+    for e in c.list_table(table, recurse=recurse, include_empty=(o_verbose >= 1)):
         # We must have created a device mapping, or had a reason not to
-        assert e.device is not None or e.is_inaccessible is not None
+        assert e.device is not None or e.is_inaccessible is not None or not e.is_present()
         if e.device is not None:
             if e.device.is_coresight():
                 devices.append(e.device)
@@ -2989,8 +3006,19 @@ def scan_rom(c, table_addr, recurse=True, detect_topology=False, detect_topology
                 ts.append(e.device)
         n += 1
         if n <= o_max_devices:
+            depth = e.depth()
+            if indent:
+                print("  " * depth, end="")
+            else:
+                if depth > 1:
+                    print("%u " % depth, end="")
+                else:
+                    print("  ", end="")
             if e.device is None:
-                print("@0x%x - device excluded: %s" % (e.device_address(), e.is_inaccessible))
+                if not e.is_present():
+                    print("empty ROM table entry: 0x%x" % (e.descriptor))
+                else
+                    print("@0x%x - device excluded: %s" % (e.device_address(), e.is_inaccessible))
             else:
                 c.show_device(e.device)
         elif n == (o_max_devices+1):
@@ -3099,10 +3127,12 @@ if __name__ == "__main__":
         print("  --lock               leave device(s) locked")
         print("  --no-write           don't ever map devices as writeable")
         print("  --no-unlock          don't ever unlock devices")
+        print("  --[no-]indent        indent to indicate ROM table hierarchy")
         print("  -v/--verbose         increase verbosity level")
         sys.exit(1)
     c = None
     done = False
+    o_indent = True
     o_detect_topology = False
     o_detect_topology_cti = False
     o_enable_timestamps = False
@@ -3152,6 +3182,8 @@ if __name__ == "__main__":
             o_no_write = True
         elif arg == "--no-unlock":
             o_no_unlock = True
+        elif arg == "--no-indent":
+            o_indent = False
         elif arg == "--assume-powered-on":
             o_assume_powered_on = True
         elif arg.startswith("--limit="):
@@ -3189,7 +3221,7 @@ if __name__ == "__main__":
                     else:
                         print("** failed to access CoreSight devices even as superuser")
                     sys.exit(1)
-            scan_rom(c, table_addr, recurse=(not o_top_only), detect_topology=o_detect_topology, detect_topology_cti=o_detect_topology_cti, enable_timestamps=o_enable_timestamps)
+            scan_rom(c, table_addr, recurse=(not o_top_only), indent=o_indent, detect_topology=o_detect_topology, detect_topology_cti=o_detect_topology_cti, enable_timestamps=o_enable_timestamps)
             done = True
     if not done:
         help()

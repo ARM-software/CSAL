@@ -790,8 +790,8 @@ Register definitions and bitfield values for the Architecture v7 Cortex Core deb
 #define CS_DBGWFAR 0x018    /**< Watchpoint Fault Address */
 #define CS_DBGVCR 0x01C     /**< Vector Catch */
 #define CS_DBGECR 0x024     /**< Event Catch */
-#define CS_DBGDSCCR 0x028   /**< Debug State Cache Control */
-#define CS_DBGDSMCR 0x02C   /**< Debug State MMU Control */
+#define CS_DBGDSCCR 0x028   /**< Debug State Cache Control (n/imp from v7.1) */
+#define CS_DBGDSMCR 0x02C   /**< Debug State MMU Control (n/imp from v7.1) */
 #define CS_DBGDTRRX 0x080   /**< Host to Target Data Transfer */
 #define CS_DBGPCSR_33 0x084 /**< RO: PC sampling register (when 33) */
 #define CS_DBGITR 0x084     /**< WO: Instruction Transfer */
