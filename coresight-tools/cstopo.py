@@ -64,7 +64,7 @@ def save(S, fn):
         sys.exit(1)
 
 
-if __name__ == "__main__":
+def main(argv):
     import argparse
     parser = argparse.ArgumentParser(description="CS topology converter")
     parser.add_argument("-i", "--input", type=str, required=True, help="input file")
@@ -97,3 +97,7 @@ if __name__ == "__main__":
         if S is not None:
             for out in opts.output:
                 save(S, out)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

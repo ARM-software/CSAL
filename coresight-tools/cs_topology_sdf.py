@@ -20,11 +20,12 @@ limitations under the License.
 
 from __future__ import print_function
 
+
 import sys
 import os
 
 
-from xml.dom import minidom
+from xml.dom import minidom, Node
 
 import cs_topology
 
@@ -50,6 +51,7 @@ sdf_map = {
     "CSGPR":           cs_topology.CS_DEVTYPE_POWER,
     "Timestamp Generator": cs_topology.CS_DEVTYPE_TIMESTAMP,
     "Timestamp Generator (SoC-600)": cs_topology.CS_DEVTYPE_TIMESTAMP,
+    "CMNDTCTraceSource": cs_topology.CS_DEVTYPE_CMN_DTC,
 }
 
 
@@ -58,6 +60,13 @@ sdf_map_link = {
     "CoreTrace":       cs_topology.CS_LINK_CORE_TRACE,
 }
 
+
+def parent_with_tag(e, tag):
+    while e is not None:
+        if e.nodeType == Node.ELEMENT_NODE and e.tagName == tag:
+            break
+        e = e.parentNode
+    return e
 
 
 class SDFDeviceInfo:
@@ -70,14 +79,27 @@ class SDFDeviceInfo:
         self.name = xd.attributes["name"].value
         self.base_address = None
         self.ap_index = None
+        self.dp_memspace = False
         self.cti_base_address = None         # for CPUs only
+        self.lock_enable = True              # evidently the default
+        xdap = parent_with_tag(xd, "dap")
+        self.dap = xdap.attributes["name"].value if xdap else None
         for xci in xd.getElementsByTagName("config_item"):
             cname = xci.attributes["name"].value
             cvalue = xci.firstChild.nodeValue
             if cname == "CORESIGHT_BASE_ADDRESS":
-                assert self.base_address is None
-                self.base_address = int(cvalue, 16)
+                if self.base_address is None:
+                    self.base_address = 0
+                self.base_address |= int(cvalue, 16)
+            elif cname == "CORESIGHT_BASE_ADDRESS_MSW":
+                if self.base_address is None:
+                    self.base_address = 0
+                self.base_address |= (int(cvalue, 16) << 32)
             elif cname == "CORESIGHT_AP_INDEX":
+                # For a device, the index of the AP by which the device is accessed.
+                # CORESIGHT_BASE_ADDRESS indicates the device offset.
+                # For an AP, the index of the AP itself. CORESIGHT_AP_ADDRESS
+                # indicates the address of the AP.
                 assert self.ap_index is None
                 self.ap_index = int(cvalue, 0)
             elif cname == "CTI_CORESIGHT_BASE_ADDRESS":
@@ -87,6 +109,11 @@ class SDFDeviceInfo:
                 assert self.base_address is None
                 assert self.type == "CSMEMAP"
                 self.base_address = int(cvalue, 16)
+            elif cname == "CORESIGHT_LOCK_ENABLE":
+                # usually "False" here
+                self.lock_enable = bool(cvalue)
+            elif cname == "CORESIGHT_DP_MEMSPACE":
+                self.dp_memspace = bool(cvalue)
             elif cname == "ROM_ENTRY_OFFSET":
                 pass
             elif cname in ["GPR_BASE_ADDRESS", "GPR_BASE_ADDRESS_MSW"]:
@@ -157,6 +184,8 @@ def sdf_device_type_probably_cpu(dt):
     """
     if dt.startswith("Cortex-"):
         return True
+    if dt.startswith("Neoverse "):
+        return True
     return False
 
 
@@ -176,8 +205,6 @@ def load(fn):
         elif li.type == "ATB":
             atb_master_names[li.master] = True
     for di in S.devices():
-        if p.device_by_name(di.name) is not None:
-            continue    # e.g. a core
         ctype = None
         #print(di.info, file=sys.stderr)
         if di.type in sdf_map:
@@ -208,16 +235,34 @@ def load(fn):
         elif di.type in ["CSMEMAP", "CSDWT", "CSFPB", "CATU"]:
             continue
         elif sdf_device_type_probably_cpu(di.type):
-            continue
+            d = p.device_by_name(di.name)
+            if d is None:
+                print("%s: '%s' looks like a core, but not in CoreTrace list" % (fn, di.name), file=sys.stderr)
+                ctype = cs_topology.CS_DEVTYPE_CORE
+            pass
         else:
             print("%s: '%s' has unknown type '%s'" % (fn, di.name, di.type), file=sys.stderr)
             continue
-        d = p.create_device(ctype, name=di.name, mem_address=di.base_address, dap_name=str(di.ap_index))
+        if (di.ap_index is None) != di.dp_memspace:
+            print("%s: '%s': expect exactly one of DAP index and DP_MEMSPACE" % (fn, di.name), file=sys.stderr)
+        # Check if device already exists - might have already been created from CoreTrace
+        d = p.device_by_name(di.name)
+        dap_name = str(di.ap_index) if di.ap_index else "DP" if di.dp_memspace else "?"
+        if di.dap is not None:
+            dap_name = di.dap + ":" + dap_name
+        if d is None:
+            d = p.create_device(ctype, name=di.name, mem_address=di.base_address, dap_name=dap_name)
+        else:
+            d.set_mem_address(mem_address=di.base_address, dap_name=dap_name)
         if o_verbose:
             print("%s: %s" % (di.type, di.info), file=sys.stderr)
         if "RAM_SIZE_BYTES" in di.info:
             d.ram_size_bytes = int(di.info["RAM_SIZE_BYTES"])
+        if "JEP_ID" in di.info:
+            # The vendor id e.g. 0x43B for Arm
+            d.part_vendor = int(di.info["JEP_ID"], 16)
         if "PERIPHERAL_ID" in di.info:
+            # The peripheral id, usually 3 digits, e.g. 0x9EB for a CSSoC-600 funnel
             d.part_number = int(di.info["PERIPHERAL_ID"], 16)
         if "VERSION" in di.info:
             d.version_string = di.info["VERSION"]
@@ -242,13 +287,23 @@ def load(fn):
     return p.check()
 
 
-if __name__ == "__main__":
+def main(argv):
+    """
+    Basic command-line functionality. Use 'cstopo' for conversions etc.
+    """
     import argparse
     parser = argparse.ArgumentParser(description="read SDF system description files (Arm DS)")
+    parser.add_argument("--print", action="store_true", help="print topology")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase verbosity")
     parser.add_argument("files", type=str, nargs="+", help="SDF files to open")
-    opts = parser.parse_args()
+    opts = parser.parse_args(argv)
     o_verbose = opts.verbose
     for fn in opts.files:
         S = load(fn)
+        cs_topology.check_topology(S)
+        if opts.print:
+            S.show()
 
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

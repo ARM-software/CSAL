@@ -46,6 +46,7 @@ CS_DEVTYPE_ELA = (5,7)
 CS_DEVTYPE_PMU_CORE = (6,1)
 
 CS_DEVTYPE_TIMESTAMP = (0,1)        # Not defined by CoreSight Architecture
+CS_DEVTYPE_CMN_DTC = (3,1000)       # CMN DTC is an ATB trace source, but not in ROM tables
 
 
 devtype_str = {
@@ -63,7 +64,8 @@ devtype_str = {
     CS_DEVTYPE_CORE:       "core",
     CS_DEVTYPE_PMU_CORE:   "core-pmu",
     CS_DEVTYPE_ELA:        "ELA",
-    CS_DEVTYPE_TIMESTAMP:  "timestamp"
+    CS_DEVTYPE_TIMESTAMP:  "timestamp",
+    CS_DEVTYPE_CMN_DTC:    "CMN-DTC",
 }
 
 
@@ -150,6 +152,9 @@ class Device:
         self.sysfs_path = None      # Device path in Linux sysfs or equivalent
 
     def type_str(self):
+        """
+        Generate a string for the device type, e.g. "core", "ETM"
+        """
         if self.type in devtype_str:
             return devtype_str[self.type]
         else:
@@ -265,12 +270,12 @@ class Device:
             assert False, "%s: duplicate device name '%s'" % (self.platform, name)
         self.platform.devices_by_name[name] = self
 
-    def set_mem_address(self, maddr, dap_name=DAP_CORE):
+    def set_mem_address(self, mem_address=None, dap_name=DAP_CORE):
         """
         Set the address of this device, also registering it in the Platform's
         address mapping and checking for multiple devices at the same address.
         """
-        self.mem_address = maddr
+        self.mem_address = mem_address
         self.dap_name = dap_name
         addr = self.address()
         if addr is not None:
@@ -641,8 +646,10 @@ class Platform:
                 name = d.name
             else:
                 name = None
-            print("%20s  " % d.address_str(), end="")
-            print("  %20s" % name, end="")
+            # Allow enough space for the address, as it might include a
+            # DAP name, AP index, and address offset
+            print("%32s  " % d.address_str(), end="")
+            print("  %28s" % name, end="")
             print("  %12s" % (d.type_str()), end="")
             if d.is_affine_to_cpu():
                 if d.cpu_number is not None:
@@ -871,9 +878,9 @@ def test():
     print("Self-tests completed.")
 
 
-if __name__ == "__main__":
+def main(argv):
     done = False
-    for arg in sys.argv[1:]:
+    for arg in argv:
         if arg.startswith("-"):
             print("unrecognized option: %s" % arg)
         elif arg.endswith(".json"):
@@ -884,3 +891,7 @@ if __name__ == "__main__":
         done = True
     if not done:
         test()
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
