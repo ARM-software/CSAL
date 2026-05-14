@@ -816,12 +816,19 @@ Register definitions and bitfield values for the Architecture v7 Cortex Core deb
 /** @name EDSCR bit values for v8
 @{*/
 #define CS_EDSCR_STATUS 0x0000003F           /**< Debug status */
-#define CS_EDSCR_STATUS_RESTARTING 0x01      /**< Restarting, exiting Debug state (transient) */
-#define CS_EDSCR_STATUS_NON_DEBUG 0x02       /**< Non-Debug state */
-#define CS_EDSCR_STATUS_EXTERNAL_DBG 0x13    /**< External debug request */
-#define CS_EDSCR_STATUS_HALTING_STEP 0x1b    /**< Halting step, normal */
-#define CS_EDSCR_STATUS_HALTING_STEP_X 0x1f  /**< Halting step, exclusive */
-#define CS_EDSCR_STATUS_HALTING_STEP_NS 0x3b /**< Halting step, no syndrome */
+#define CS_EDSCR_STATUS_RESTARTING       0x01   /**< Restarting, exiting Debug state (transient) */
+#define CS_EDSCR_STATUS_NON_DEBUG        0x02   /**< Non-Debug state */
+#define CS_EDSCR_STATUS_BREAKPOINT       0x07   /**< Breakpoint */
+#define CS_EDSCR_STATUS_EXTERNAL_DBG     0x13   /**< External debug request */
+#define CS_EDSCR_STATUS_HALTING_STEP     0x1b   /**< Halting step, normal */
+#define CS_EDSCR_STATUS_HALTING_STEP_X   0x1f   /**< Halting step, exclusive */
+#define CS_EDSCR_STATUS_OS_UNLOCK_CATCH  0x23   /**< OS Unlock Catch */
+#define CS_EDSCR_STATUS_RESET_CATCH      0x27   /**< Reset Catch */
+#define CS_EDSCR_STATUS_WATCHPOINT       0x2b   /**< Watchpoint */
+#define CS_EDSCR_STATUS_HLT              0x2f   /**< HLT instruction */
+#define CS_EDSCR_STATUS_SW_DEBUG_REG     0x33   /**< Software access to debug register */
+#define CS_EDSCR_STATUS_EXCEPTION_CATCH  0x37   /**< Exception Catch */
+#define CS_EDSCR_STATUS_HALTING_STEP_NS  0x3b   /**< Halting step, no syndrome */
 #define CS_EDSCR_ERR 0x00000040              /**< Sticky error */
 #define CS_EDSCR_A 0x00000080                /**< SError interrupt pending */
 #define CS_EDSCR_EL 0x00000300               /**< Exception level (Debug state only) */
@@ -913,6 +920,10 @@ Register definitions and bitfield values for the Architecture v8 Cortex Core deb
 #define CS_V8EDPRSR_COREOK_VAL 0x0001 /**< Core Domain accessible value. If masked register value equal to this then we can access core power domain registers. */
 /**@}*/
 
+#define CS_V8DBGBVR(n)  (0x400 + (16 * (n)))    /**< Breakpoint Value Register */
+#define CS_V8DBGBCR(n)  (0x408 + (16 * (n)))    /**< Breakpoint Control Register */
+#define CS_V8DBGWVR(n)  (0x800 + (16 * (n)))    /**< Watchpoint Value Register */
+#define CS_V8DBGWCR(n)  (0x808 + (16 * (n)))    /**< Watchpoint Control Register */
 
 #define CS_V8EDPFR_l 0xD20 /**< Processor feature register (lo) . Available ELs */
 #define CS_V8EDDFR_l 0xD28 /**< Debug Feature register (lo). Defines WP, BP, CTXT etc. */
