@@ -326,7 +326,7 @@ int cs_get_trace_data(cs_device_t dev, void *buf, unsigned int size)
         if (d->v.etb.is_tmc_device) {
             /* The TMC spec says that once we've read all the data in the buffer,
                subsequent reads will read 0xFFFFFFFF. */
-            uint32_t checkff = *etb_read_reg;
+            uint32_t checkff = etb_read_reg ? *etb_read_reg : _cs_read(d, CS_ETB_RAM_DATA);
             if (checkff != 0xFFFFFFFF) {
                 diagf("  TMC ETB read 0x%08X, expected 0xFFFFFFFF\n",
                       checkff);
