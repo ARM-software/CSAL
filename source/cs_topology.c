@@ -47,7 +47,7 @@ static void cs_stm_device_unregister(struct cs_device *d)
         for (i = 0; i < d->v.stm.n_masters; i++) {
             if (d->v.stm.ext_ports[i] != NULL) {
                 /* Unmap the (generally large, multi-page) external stimulus area */
-                io_unmap(d->v.stm.ext_ports, cs_stm_get_ext_ports_size(d));
+                io_unmap(d->v.stm.ext_ports[i], cs_stm_get_ext_ports_size(d));
             }
         }
         free(d->v.stm.ext_ports);
