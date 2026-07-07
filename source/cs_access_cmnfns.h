@@ -222,7 +222,10 @@ struct cs_device {
             unsigned int DAR_present : 1; /**< Direct Access Registers are available */
             unsigned int TAR_valid : 1;   /**< We have a cached copy of the TAR */
             unsigned int memap_LPAE : 1;  /**< Large Physical Addresses implemented */
-            unsigned long cached_TAR;     /**< Cached copy of the TAR */
+            unsigned int data_64bit : 1; /**< 64-bit target transfers supported */
+            unsigned int access_size_valid : 1; /**< cached CSW transfer size is valid */
+            unsigned char current_access_size; /**< Current CSW transfer size in bytes */
+            cs_physaddr_t cached_TAR;     /**< Cached copy of the TAR */
         } memap;
         struct ela_props {
             unsigned char n_trigger_states; /**< Number of trigger states: 4, 5 or 8 */

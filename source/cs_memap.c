@@ -23,16 +23,56 @@
 #include "cs_access_cmnfns.h"
 #include "cs_memap.h"
 
+static int cs_memap_set_access_size_bytes(struct cs_device *d, unsigned int size)
+{
+    uint32_t csw, ncsw, csw_size;
+
+    assert(size == 4 || size == 8);
+    if (size == 8 && !d->v.memap.data_64bit) {
+        return cs_report_device_error(d, "MEM-AP does not support 64-bit transfers");
+    }
+    if (d->v.memap.access_size_valid && d->v.memap.current_access_size == size) {
+        return 0;
+    }
+
+    csw_size = size == 8 ? CS_MEMAP_CSW_SIZE_64 : CS_MEMAP_CSW_SIZE_32;
+    csw = _cs_read(d, CS_MEMAP_CSW);
+    ncsw = (csw & ~CS_MEMAP_CSW_SIZE_MASK) | csw_size;
+    if (ncsw != csw) {
+        int rc = _cs_write(d, CS_MEMAP_CSW, ncsw);
+        if (rc) {
+            d->v.memap.access_size_valid = 0;
+            return rc;
+        }
+    }
+
+    d->v.memap.current_access_size = size;
+    d->v.memap.access_size_valid = 1;
+    return 0;
+}
+
 /*
  * Prepare to read from or write to an address in the MEM-AP's address space,
  * and return a suitable register offset.
  *
- * Note: this deals with word-aligned access only.
+ * Note: this deals with 32-bit and 64-bit aligned accesses only.
  */
-static unsigned int cs_memap_prepare(struct cs_device *d, cs_physaddr_t addr)
+static int cs_memap_prepare(struct cs_device *d, cs_physaddr_t addr,
+                             unsigned int access_size, unsigned int *p_reg)
 {
     cs_physaddr_t base;
     unsigned int reg;
+    int rc;
+
+    if ((addr & (access_size - 1)) != 0) {
+        return cs_report_device_error(d,
+                                      "unaligned MEM-AP %u-bit access at %" CS_PHYSFMT,
+                                      access_size * 8, addr);
+    }
+    rc = cs_memap_set_access_size_bytes(d, access_size);
+    if (rc) {
+        return rc;
+    }
     if (0 && DTRACE(d)) {
         diagf("!MEM-AP 0x%lx\n", (unsigned long)addr);
     }
@@ -46,9 +86,13 @@ static unsigned int cs_memap_prepare(struct cs_device *d, cs_physaddr_t addr)
         reg = CS_MEMAP_BD0 + (addr - base);
     }
     if (!d->v.memap.TAR_valid || d->v.memap.cached_TAR != base) {
-        cs_memap_write_TAR(d, base);
+        rc = cs_memap_write_TAR(d, base);
+        if (rc) {
+            return rc;
+        }
     }
-    return reg;
+    *p_reg = reg;
+    return 0;
 }
 
 
@@ -65,14 +109,28 @@ void cs_memap_invalidate_TAR(cs_device_t dev)
 uint32_t cs_memap_read32(cs_device_t dev, cs_physaddr_t addr)
 {
     struct cs_device *d = DEV(dev);
-    unsigned int reg = cs_memap_prepare(d, addr);
+    unsigned int reg;
+    if (cs_memap_prepare(d, addr, 4, &reg)) {
+        return 0;
+    }
     return _cs_read(d, reg);
 }
 
 
 uint64_t cs_memap_read64(cs_device_t dev, cs_physaddr_t addr)
 {
-    return ((uint64_t)cs_memap_read32(dev, addr + 4) << 32) | cs_memap_read32(dev, addr);
+    struct cs_device *d = DEV(dev);
+    if (!d->v.memap.data_64bit) {
+        uint32_t lo = cs_memap_read32(dev, addr);
+        uint32_t hi = cs_memap_read32(dev, addr + 4);
+        return ((uint64_t)hi << 32) | lo;
+    } else {
+        unsigned int reg;
+        if (cs_memap_prepare(d, addr, 8, &reg)) {
+            return 0;
+        }
+        return _cs_read64(d, reg);
+    }
 }
 
 
@@ -82,15 +140,30 @@ uint64_t cs_memap_read64(cs_device_t dev, cs_physaddr_t addr)
 int cs_memap_write32(cs_device_t dev, cs_physaddr_t addr, uint32_t data)
 {
     struct cs_device *d = DEV(dev);
-    unsigned int reg = cs_memap_prepare(d, addr);
+    unsigned int reg;
+    if (cs_memap_prepare(d, addr, 4, &reg)) {
+        return -1;
+    }
     return _cs_write(d, reg, data);
 }
 
 
 int cs_memap_write64(cs_device_t dev, cs_physaddr_t addr, uint64_t data)
 {
-    cs_memap_write32(dev, addr, (uint32_t)data);
-    return cs_memap_write32(dev, addr + 4, (uint32_t)(data >> 32));
+    struct cs_device *d = DEV(dev);
+    unsigned int reg;
+
+    if (!d->v.memap.data_64bit) {
+        int rc = cs_memap_write32(dev, addr, (uint32_t)data);
+        if (rc) {
+            return rc;
+        }
+        return cs_memap_write32(dev, addr + 4, (uint32_t)(data >> 32));
+    }
+    if (cs_memap_prepare(d, addr, 8, &reg)) {
+        return -1;
+    }
+    return _cs_write64(d, reg, data);
 }
 
 
@@ -123,7 +196,11 @@ int cs_memap_write_TAR(cs_device_t dev, cs_physaddr_t addr)
     }
 #ifdef LPAE
     if (d->v.memap.memap_LPAE) {
-        _cs_write(d, CS_MEMAP_TARHI, (addr >> 32));
+        rc = _cs_write(d, CS_MEMAP_TARHI, (addr >> 32));
+        if (rc) {
+            d->v.memap.TAR_valid = 0;
+            return rc;
+        }
     }
 #endif
     d->v.memap.cached_TAR = addr;
