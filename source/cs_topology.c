@@ -54,6 +54,19 @@ static void cs_stm_device_unregister(struct cs_device *d)
     }
 }
 
+static cs_device_t cs_device_registration_fail(struct cs_device *d)
+{
+    if (d != NULL) {
+        if (G.device_top == d) {
+            G.device_top = d->next;
+            --G.n_devices;
+        }
+        _cs_unmap(d);
+        free(d);
+    }
+    return CS_ERRDESC;
+}
+
 
 /*
  * Test whether a device conforms to a given Arm-defined architecture.
@@ -128,6 +141,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
     }
     if (_cs_read(&protod, CS_CIDR3) != 0xB1) {
         cs_report_error("not a CoreSight component at %" CS_PHYSFMT "", addr);
+        _cs_unmap(&protod);
         return CS_ERRDESC;
     }
     cs_class = CS_CLASS_OF(_cs_read(&protod, CS_CIDR1));
@@ -143,7 +157,10 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         unsigned int devaff0, devaff1, devid, devarch;
 
         d = cs_device_new(addr, protod.local_addr);
-        assert(d != NULL);
+        if (d == NULL) {
+            _cs_unmap(&protod);
+            return CS_ERRDESC;
+        }
 
         if (DTRACEG) {
             diagf("%" CS_PHYSFMT ":", d->phys_addr);
@@ -306,7 +323,7 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 case 0x0:
                     if (d->v.stm.n_ports > 32) {
                         cs_report_error("STM can handle max. 32 basic ports");
-                        return CS_ERRDESC;
+                        return cs_device_registration_fail(d);
                     }
                     d->v.stm.basic_ports = 1;
                     break;
@@ -318,6 +335,10 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                     d->v.stm.ext_ports =
                             (unsigned char **)malloc(sizeof(unsigned char *) *
                                                      d->v.stm.n_masters);
+                    if (d->v.stm.ext_ports == NULL) {
+                        cs_report_device_error(d, "can't allocate STM master port map");
+                        return cs_device_registration_fail(d);
+                    }
                     memset(d->v.stm.ext_ports, 0,
                            sizeof(unsigned char *) * d->v.stm.n_masters);
                     d->v.stm.current_master = 0;
@@ -451,7 +472,10 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
                 (_cs_read(&protod, CS_PIDR0) & 0xFF);
         if (part_number == 0x101 || part_number == 0x193) {
             d = cs_device_new(protod.phys_addr, protod.local_addr);
-            assert(d != NULL);
+            if (d == NULL) {
+                _cs_unmap(&protod);
+                return CS_ERRDESC;
+            }
             d->is_unlocked = 1;
             d->is_permanently_unlocked = 1;
             d->part_number = part_number;
@@ -466,11 +490,13 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         } else {
             diagf("!Unexpected PrimeCell part %03X at %" CS_PHYSFMT "\n",
                   part_number, addr);
+            _cs_unmap(&protod);
             return CS_ERRDESC;
         }
     } else {
         diagf("!Unexpected device class %u at %" CS_PHYSFMT "\n",
               cs_class, addr);
+        _cs_unmap(&protod);
         return CS_ERRDESC;
     }
     if (d != NULL && DTRACEG) {
@@ -909,6 +935,9 @@ int cs_atid_is_valid(cs_atid_t id)
 cs_device_t cs_atb_add_replicator(unsigned int n_outports)
 {
     struct cs_device *d = cs_device_new(CS_NO_PHYS_ADDR, NULL);
+    if (d == NULL) {
+        return CS_ERRDESC;
+    }
     assert(n_outports > 1 && n_outports <= CS_MAX_OUT_PORTS);
     d->devclass |= CS_DEVCLASS_LINK;
     d->n_in_ports = 1;
@@ -920,6 +949,9 @@ cs_device_t cs_atb_add_replicator(unsigned int n_outports)
 cs_device_t cs_atb_add_funnel(unsigned int n_inports)
 {
     struct cs_device *d = cs_device_new(CS_NO_PHYS_ADDR, NULL);
+    if (d == NULL) {
+        return CS_ERRDESC;
+    }
     assert(n_inports > 1 && n_inports <= CS_MAX_IN_PORTS);
     d->devclass |= CS_DEVCLASS_LINK;
     d->n_in_ports = n_inports;

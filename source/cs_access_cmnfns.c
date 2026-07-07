@@ -175,6 +175,10 @@ struct cs_device *cs_device_new(cs_physaddr_t addr,
 {
     struct cs_device *d =
             (struct cs_device *)malloc(sizeof(struct cs_device));
+    if (d == NULL) {
+        cs_report_error("can't allocate device object");
+        return NULL;
+    }
     cs_device_init(d, addr);
     d->local_addr = (unsigned char volatile *)local_addr;
     d->next = G.device_top;

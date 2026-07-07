@@ -27,7 +27,7 @@
 #include "cs_etm_v4.h"
 
 /*create a bitmask for bitwidth n (n 1 -> 31) */
-#define BITMASK(n) (unsigned int)((0x1U << n) - 0x1U)
+#define BITMASK(n) ((n) >= 32 ? ~0U : ((1U << (n)) - 1U))
 
 int _cs_etm_v4_static_config_init(struct cs_device *d)
 {
