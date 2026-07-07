@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <stdint.h>
 #endif /* UNIX_USERSPACE */
 
 #define UNUSED_PARAMETER(x) ((void)(x))
@@ -44,14 +45,14 @@ void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
 #ifndef USE_DEVMEMD
     {
         cs_physaddr_t addr_to_map = addr; /* may be rounded down to phys page size */
-        {
-            unsigned int pagesize = sysconf(_SC_PAGESIZE);
-            if (size < pagesize) {
-                size = pagesize;
-            }
-            if ((addr % pagesize) != 0) {
-                addr_to_map -= (addr % pagesize);
-            }
+        unsigned int pagesize = sysconf(_SC_PAGESIZE);
+        unsigned int page_offset = addr % pagesize;
+        if (page_offset != 0) {
+            addr_to_map -= page_offset;
+            size += page_offset;
+        }
+        if (size < pagesize) {
+            size = pagesize;
         }
         localv = mmap(0, size, (writable ? (PROT_READ | PROT_WRITE) : PROT_READ),
                       MAP_SHARED, G.mem_fd, addr_to_map);
@@ -96,7 +97,16 @@ void io_unmap(void volatile *addr, unsigned int size)
 {
 #ifdef UNIX_USERSPACE
 #ifndef USE_DEVMEMD
-    (void)munmap((void *)addr, size);
+    unsigned int pagesize = sysconf(_SC_PAGESIZE);
+    uintptr_t page_offset = (uintptr_t)addr % pagesize;
+    void *addr_to_unmap = (unsigned char *)addr - page_offset;
+    if (page_offset != 0) {
+        size += page_offset;
+    }
+    if (size < pagesize) {
+        size = pagesize;
+    }
+    (void)munmap(addr_to_unmap, size);
 #else
     UNUSED_PARAMETER(addr);
     UNUSED_PARAMETER(size);
