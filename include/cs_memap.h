@@ -83,6 +83,18 @@ int cs_memap_write64(cs_device_t device, cs_physaddr_t addr, uint64_t data);
 
 
 /**
+ * Set the MEM-AP security state used for target accesses.
+ * CS_SECURITY_NS requires a MEM-AP that supports the NS security bit.
+ * CS_SECURITY_ROOT and CS_SECURITY_REALM require a MEM-AP that supports
+ * both the NS and NSE security bits.
+ *
+ * \param device  the MEM-AP device to update
+ * \param state   the security state
+ * \result        zero on success, non-zero if unsupported or invalid
+ */
+int cs_memap_set_security_state(cs_device_t device, cs_security_t state);
+
+/**
  * Check if the MEM-AP has logged a transfer error, and optionally reset the error.
  *
  * \param device  the MEM-AP device to check

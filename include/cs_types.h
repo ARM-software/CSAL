@@ -141,6 +141,14 @@ typedef int cs_atid_t;
 typedef unsigned int cs_power_domain_t;
 #define CS_UNKNOWN_POWER_DOMAIN (cs_power_domain_t)(-1)
 
+/** \brief Security state */
+typedef enum {
+    CS_SECURITY_S = 0,     /**< Secure */
+    CS_SECURITY_NS = 1,    /**< Non-secure */
+    CS_SECURITY_ROOT = 2,  /**< Root */
+    CS_SECURITY_REALM = 3  /**< Realm */
+} cs_security_t;
+
 /** \brief Device Type
  * 
  * Identifies the type of device.  The type corresponds to the

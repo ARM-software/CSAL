@@ -106,6 +106,14 @@ struct cs_device_ops {
 /*
   Information relating to a single CoreSight component.
   A "component" generally corresponds to a single 4K programmable memory-mapped block.
+
+  Information includes:
+
+   - component properties and features discovered at registration time,
+     which can be assumed to be static and unchanging
+
+   - a cache of component current status, on the assumption that we are
+     currently the only manager of the component
 */
 struct cs_device {
     /* Next device in global list - no particular order */
@@ -223,8 +231,13 @@ struct cs_device {
             unsigned int TAR_valid : 1;   /**< We have a cached copy of the TAR */
             unsigned int memap_LPAE : 1;  /**< Large Physical Addresses implemented */
             unsigned int data_64bit : 1; /**< 64-bit target transfers supported */
-            unsigned int access_size_valid : 1; /**< cached CSW transfer size is valid */
-            unsigned char current_access_size; /**< Current CSW transfer size in bytes */
+            unsigned int memap_RME : 1;   /**< MEM-AP supports RME */
+            unsigned int n_security_bits : 2; /**< Number of security bits: 0, 1 or 2 */
+            /* Dynamic state */
+            unsigned int access_size_valid : 1; /**< cached transfer size is valid */
+            unsigned int security_state_valid : 1; /**< cached security state is valid */
+            unsigned char current_access_size; /**< Current transfer size in bytes */
+            cs_security_t security_state; /**< Current security state */
             cs_physaddr_t cached_TAR;     /**< Cached copy of the TAR */
         } memap;
         struct ela_props {

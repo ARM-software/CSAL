@@ -51,6 +51,60 @@ static int cs_memap_set_access_size_bytes(struct cs_device *d, unsigned int size
     return 0;
 }
 
+static uint32_t cs_memap_security_mask(const struct cs_device *d)
+{
+    if (d->v.memap.n_security_bits == 0) {
+        return 0;
+    }
+    if (d->v.memap.n_security_bits == 1) {
+        return CS_MEMAP_CSW_PROT_NS;
+    }
+    return CS_MEMAP_CSW_SECURITY_MASK;
+}
+
+static int cs_memap_set_security_state_raw(struct cs_device *d, cs_security_t state)
+{
+    uint32_t csw, ncsw;
+    uint32_t mask;
+
+    if (state > 3) {
+        return cs_report_device_error(d, "invalid MEM-AP security state %u", state);
+    }
+    if ((unsigned int)state >= (1U << d->v.memap.n_security_bits)) {
+        return cs_report_device_error(d, "MEM-AP does not support security state %u", state);
+    }
+    if (d->v.memap.security_state_valid && d->v.memap.security_state == state) {
+        return 0;
+    }
+
+    mask = cs_memap_security_mask(d);
+    if (mask == 0) {
+        d->v.memap.security_state = state;
+        d->v.memap.security_state_valid = 1;
+        return 0;
+    }
+
+    csw = _cs_read(d, CS_MEMAP_CSW);
+    ncsw = csw & ~mask;
+    if (state & 1) {
+        ncsw |= CS_MEMAP_CSW_PROT_NS;
+    }
+    if (state & 2) {
+        ncsw |= CS_MEMAP_CSW_NSE;
+    }
+    if (ncsw != csw) {
+        int rc = _cs_write(d, CS_MEMAP_CSW, ncsw);
+        if (rc) {
+            d->v.memap.security_state_valid = 0;
+            return rc;
+        }
+    }
+
+    d->v.memap.security_state = state;
+    d->v.memap.security_state_valid = 1;
+    return 0;
+}
+
 /*
  * Prepare to read from or write to an address in the MEM-AP's address space,
  * and return a suitable register offset.
@@ -93,6 +147,14 @@ static int cs_memap_prepare(struct cs_device *d, cs_physaddr_t addr,
     }
     *p_reg = reg;
     return 0;
+}
+
+
+int cs_memap_set_security_state(cs_device_t dev, cs_security_t state)
+{
+    struct cs_device *d = DEV(dev);
+    assert(d->devclass & CS_DEVCLASS_MEMAP);
+    return cs_memap_set_security_state_raw(d, state);
 }
 
 

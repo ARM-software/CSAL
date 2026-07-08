@@ -996,6 +996,9 @@ Register definitions and bitfield values for MEM-AP devices.
 #define CS_MEMAP_CSW_SIZE_MASK 0x00000007 /**< Transfer size field */
 #define CS_MEMAP_CSW_SIZE_32 0x00000002   /**< 32-bit word transfer */
 #define CS_MEMAP_CSW_SIZE_64 0x00000003   /**< 64-bit doubleword transfer */
+#define CS_MEMAP_CSW_PROT_NS 0x20000000  /**< Non-secure access bit */
+#define CS_MEMAP_CSW_NSE 0x00001000 /**< NSE access bit */
+#define CS_MEMAP_CSW_SECURITY_MASK (CS_MEMAP_CSW_PROT_NS | CS_MEMAP_CSW_NSE) /**< Security state field */
 #define CS_MEMAP_TAR 0xD04    /**< Transfer Address Register */
 #define CS_MEMAP_TARHI 0xD08  /**< TAR high word (LPAE only) */
 #define CS_MEMAP_DRW 0xD0C    /**< Data Read/Write Register */
@@ -1003,9 +1006,12 @@ Register definitions and bitfield values for MEM-AP devices.
 #define CS_MEMAP_MBT 0xD20    /**< Memory Barrier Transfer */
 #define CS_MEMAP_TRR 0xD24    /**< Transfer Response Register */
 #define CS_MEMAP_TRR_ERR 0x01 /**< Read: error was logged; Write: clear error */
+#define CS_MEMAP_CFG1  0xDE0  /**< Configuration Register #1 */
 #define CS_MEMAP_BASEHI 0xDF0 /**< ROM Base Register high word (LPAE only) */
 #define CS_MEMAP_CFG 0xDF4    /**< Configuration Register */
-#define CS_MEMAP_CFG_LD 0x00000001 /**< Large Data extension, 64-bit transfers supported */
+#define CS_MEMAP_CFG_LA   0x00000002   /**< Large Address extension supported */
+#define CS_MEMAP_CFG_LD   0x00000004   /**< Large Data supported */
+#define CS_MEMAP_CFG_RME  0x00000008   /**< Realm Management Extension (RME) supported */
 #define CS_MEMAP_BASE 0xDF8   /**< ROM Base Register */
 #define CS_MEMAP_IDR 0xDFC    /**< Identification Register */
 

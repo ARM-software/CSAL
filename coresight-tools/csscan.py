@@ -79,6 +79,9 @@ jedec_designers = {
     JEDEC_ARM:"Arm"
 }
 
+def jedec_designer_str(n):
+    return jedec_designers[n] if (n in jedec_designers) else ("jedec:0x%03x" % n)
+
 
 # Device architectures defined by Arm (i.e. vaild when Arm is the architect)
 # Sources:
@@ -1349,7 +1352,7 @@ class CSROM:
             print("", end=" ")
 
         print("%-14s %-16s" % (desc, archdesc), end="")
-        if o_verbose:
+        if o_verbose and devid != 0:
             print(" devid=0x%x" % devid, end="")
         if affinity is not None:
             print(" aff=0x%x" % affinity, end="")
@@ -1588,30 +1591,49 @@ class CSROM:
             print(" ports:%u" % n_ports, end="")
         elif d.is_arm_architecture(ARM_ARCHID_MEMAP):
             idr = d.read32(0xDFC)
-            print(" idr:0x%08x" % idr, end="")
             aptype = bits(idr,0,4)
-            aptypes = { 0: "JTAG", 1: "AHB3", 2: "APB2", 4: "AXI", 6: "APB4", 7: "AXI5", 8: "AHB5+HPROT" }
+            apclass = bits(idr,13,4)
+            apvar = bits(idr,4,4)
+            aprev = bits(idr,28,4)
+            apdes = bits(idr,17,11)
+            aptypes = { 0: "JTAG", 1: "AHB3", 2: "APB2", 4: "AXI", 5: "AHB5", 6: "APB4", 7: "AXI5", 8: "AHB5+HPROT" }
             if aptype in aptypes:
                 saptype = aptypes[aptype]
             else:
-                saptype = str(aptype)
-            print(" type:%s" % saptype, end="")
+                saptype = "type:%u" % aptype
+            if apclass != 8:         # not ADIv6?
+                print(" class:%u" % apclass, end="")
+            print(" %s %s" % (jedec_designer_str(apdes), saptype), end="")
+            if apvar > 0:
+                print(" v%u" % apvar, end="")
+            print(" r%u" % aprev, end="")
             cfg = d.read32(0xDF4)
+            cfg1 = d.read32(0xDE0)
             if bit(cfg,1):
                 print(" long-address", end="")
             if bit(cfg,2):
                 print(" large-data", end="")
+            if bit(cfg,3):
+                print(" RME", end="")
+            if bits(cfg1,0,8):
+                tag = bits(cfg1,0,4)
+                gran = 1 << bits(cfg1,4,4)
+                print(" MTE(%u/%u)" % (tag, gran), end="")
             if bits(cfg,4,4):
                 print(" DAR:%u" % (1<<bits(cfg,4,4)), end="")
             if bits(cfg,8,4):
                 print(" TRR", end="")
             if bits(cfg,16,4):
                 print(" TARINC:%u" % (9+bits(cfg,16,4)), end="")
-            if cfg & 0xfff0fe09:
-                print(" CFG:0x%08x" % cfg, end="")
             rombase = d.read32x2(0xDF0,0xDF8)
             if rombase not in [0x0,0x2]:
-                print(" ROM:%#x" % rombase, end="")
+                print(" ROM:%#x" % (rombase & ~3), end="")
+            if (cfg & 0xfff0fe01) or o_verbose:
+                print(" CFG:0x%08x" % cfg, end="")
+            if (cfg1 & 0xffffff00) or (cfg1 != 0 and o_verbose):
+                print(" CFG1:0x%08x" % cfg1, end="")
+            if o_verbose:
+                print(" idr:0x%08x" % idr, end="")
         elif d.is_arm_architecture(ARM_ARCHID_ELA):
             # Core ELA has similar power-off issue as PMU - a core ELA
             # may be inaccessible if the core is powered off, but the ELA
@@ -2277,9 +2299,11 @@ class CSROM:
                 d.write32(0x040,saved_rra)
         elif d.is_arm_architecture(ARM_ARCHID_MEMAP):
             idr = d.read32(0xDFC)
+            cfg = d.read32(0xDF4)
             aptype = bits(idr,0,4)
             csw = d.read32(0xD00)
-            print("  CSW: 0x%08x (%s)" % (csw, ["disabled","enabled"][bit(csw,6)]))
+            lsize = bits(csw,0,3)
+            print("  CSW: 0x%08x (%s, size=%u)" % (csw, ["disabled","enabled"][bit(csw,6)], (8<<lsize)))
             bprot = bits(csw,24,7)
             btype = bits(csw,12,4)
             if bit(csw,7):
@@ -2292,15 +2316,18 @@ class CSROM:
                 print("  Stop on error")
             print("  Type/Prot=0x%x/0x%x" % (btype, bprot), end="")
             # Recommendations for bus-specific CSW fields are defined by ADI Appendix E
-            if aptype == 4:
+            sec = bit(bprot,5)
+            if bit(cfg,3):
+                sec |= (bit(btype,0) << 1)
+            if aptype in [4, 7]:
                 # AXI
-                print(" %s" % (["S","NS"][bit(bprot,5)]), end="")
+                print(" %s" % (["S","NS","ROOT","REALM"][sec]), end="")
                 print(" %s" % (["data","code"][bit(bprot,6)]), end="")
                 print(" %s" % (["unpriv","priv"][bit(bprot,4)]), end="")
                 print(" AxCACHE:0x%x" % bits(bprot,0,4), end="")
             elif aptype == 6:
                 # APB4
-                print(" %s" % (["S","NS"][bit(bprot,5)]), end="")
+                print(" %s" % (["S","NS","ROOT","REALM"][sec]), end="")
             print()
             print("  TAR: 0x%08x" % (d.read32(0xD04)))
             if (d.read32(0xD24) & 1) != 0:

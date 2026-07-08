@@ -446,11 +446,15 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         } else if (devarch != 0) {
             if ((devarch & 0xFFFF) == CS_ARM_ARCHID_MEMAP) {
                 unsigned int cfg = _cs_read(d, CS_MEMAP_CFG);
+                /* unsigned int idr = _cs_read(d, CS_MEMAP_IDR); */
                 d->devclass |= CS_DEVCLASS_MEMAP;
                 d->v.memap.DAR_present = (((cfg >> 4) & 0xF) == 0xA);
-                d->v.memap.memap_LPAE = (cfg >> 1) & 1;
+                d->v.memap.memap_LPAE = (cfg & CS_MEMAP_CFG_LA) != 0;
+                d->v.memap.memap_RME = (cfg & CS_MEMAP_CFG_RME) != 0;
                 d->v.memap.data_64bit = (cfg & CS_MEMAP_CFG_LD) != 0;
+                d->v.memap.n_security_bits = (d->v.memap.memap_RME ? 2 : 1);
                 d->v.memap.access_size_valid = 0;
+                d->v.memap.security_state_valid = 0;
             } else {
                 diagf("!Unclassified CoreSight device, architecture=0x%08X at %" CS_PHYSFMT "\n", devarch, d->phys_addr);
             }
