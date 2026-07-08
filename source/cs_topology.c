@@ -135,6 +135,7 @@ static int cs_primecell_is_tsgen(unsigned int part_number)
 */
 static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
 {
+    int rc;
     unsigned int cs_class;
     struct cs_device protod; /* Temporary device while we're probing */
     struct cs_device *d = NULL;
@@ -149,12 +150,17 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
         return CS_ERRDESC;
     }
 
-    cs_device_init(&protod, addr);
-
-    /* From this point on, we may need to access the device to read ID registers. */
-    if (!_cs_map(&protod, /*writable=*/1)) {
-        cs_report_error("can't map device at %" CS_PHYSFMT "", addr);
+    rc = cs_device_init(&protod, addr);
+    if (rc < 0) {
         return CS_ERRDESC;
+    }
+
+    if (!cs_device_memap(&protod)) {
+        /* From this point on, we may need to access the device to read ID registers. */
+        if (!_cs_map(&protod, /*writable=*/1)) {
+            cs_report_error("can't map device at %" CS_PHYSFMT "", addr);
+            return CS_ERRDESC;
+        }
     }
     if (_cs_read(&protod, CS_CIDR3) != 0xB1) {
         cs_report_error("not a CoreSight component at %" CS_PHYSFMT "", addr);
@@ -730,7 +736,11 @@ static struct cs_device *cs_device_find(cs_physaddr_t addr)
 {
     struct cs_device *d;
     for (d = G.device_top; d != NULL; d = d->next) {
-        if (d->phys_addr == addr) {
+        if (d->phys_addr == addr
+#ifdef CSAL_MEMAP
+            && d->memap == G.memap_default
+#endif
+            ) {
             break;
         }
     }
@@ -844,7 +854,10 @@ int cs_register_romtable(cs_physaddr_t rom_addr)
         diagf("!Registering ROM table at %" CS_PHYSFMT "\n", rom_addr);
     }
     assert(G.init_called);
-    cs_device_init(&protod, rom_addr);
+    rc = cs_device_init(&protod, rom_addr);
+    if (rc < 0) {
+        return rc;
+    }
     if (!_cs_map(&protod, /*writable=*/0)) {
         return cs_report_error("can't map ROM table at %" CS_PHYSFMT "",
                                rom_addr);

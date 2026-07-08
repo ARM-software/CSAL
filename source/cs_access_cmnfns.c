@@ -148,7 +148,7 @@ int cs_report_device_error(struct cs_device *d, char const *fmt, ...)
 /*
  * Initialize a device object.
  */
-void cs_device_init(struct cs_device *d, cs_physaddr_t addr)
+int cs_device_init(struct cs_device *d, cs_physaddr_t addr)
 {
     memset(d, 0, sizeof(struct cs_device));
     d->glob = &G; /* Back-pointer to global state */
@@ -160,8 +160,17 @@ void cs_device_init(struct cs_device *d, cs_physaddr_t addr)
     d->diag_tracing = G.diag_tracing_default;
 #endif /* DIAG */
 #ifdef CSAL_MEMAP
-    d->memap = G.memap_default;
-#endif
+    if (addr != CS_NO_PHYS_ADDR) {
+#ifdef LPAE
+        if (G.memap_default && !DEV(G.memap_default)->v.memap.memap_LPAE && addr >= 0x100000000) {
+            cs_report_error("device out of range for non-LA MEM-AP");
+            return -1;
+        }
+#endif /* LPAE */
+        d->memap = G.memap_default;
+    }
+#endif /* CSAL_MEMAP */
+    return 0;
 }
 
 
@@ -179,7 +188,12 @@ struct cs_device *cs_device_new(cs_physaddr_t addr,
         cs_report_error("can't allocate device object");
         return NULL;
     }
-    cs_device_init(d, addr);
+    int rc;
+    rc = cs_device_init(d, addr);
+    if (rc < 0) {
+        free(d);
+        return NULL;
+    }
     d->local_addr = (unsigned char volatile *)local_addr;
     d->next = G.device_top;
     G.device_top = d;

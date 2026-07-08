@@ -405,7 +405,7 @@ extern int cs_report_error(char const *fmt, ...);
 extern int cs_report_device_error(struct cs_device *d, char const *fmt,
                                   ...);
 extern struct cs_device *cs_get_device_struct(cs_device_t dev);
-extern void cs_device_init(struct cs_device *d, cs_physaddr_t addr);
+extern int cs_device_init(struct cs_device *d, cs_physaddr_t addr);
 extern struct cs_device *cs_device_new(cs_physaddr_t addr,
                                        void volatile *local_addr);
 

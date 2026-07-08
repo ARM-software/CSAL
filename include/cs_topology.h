@@ -127,6 +127,7 @@ cs_device_t cs_atb_add_funnel(unsigned int n_in_ports);
 
 /**
  *  Set the default MEM-AP for devices (needs CSAL_MEMAP)
+ *  Set to MULL for direct access.
  *
  *  The MEM-AP device must already have been created.
  */

@@ -30,6 +30,8 @@
 #include <fcntl.h>
 #endif /* UNIX_USERSPACE */
 
+#define UNUSED_PARAMETER(x) ((void)(x))
+
 
 /* *** init and management API *** */
 int cs_init(void)
@@ -259,6 +261,18 @@ int cs_release(void)
     }
     return 0;
 }
+
+
+cs_device_t cs_device_memap(cs_device_t d)
+{
+#ifdef CSAL_MEMAP
+    return DEV(d)->memap;
+#else
+    UNUSED_PARAMETER(d);
+    return NULL;
+#endif
+}
+
 
 unsigned int cs_error_count(void)
 {

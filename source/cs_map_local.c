@@ -88,6 +88,11 @@ void *io_map(cs_physaddr_t addr, unsigned int size, int writable)
 
 int _cs_map(struct cs_device *d, int writable)
 {
+#ifdef CSAL_MEMAP
+    if (d->memap != NULL) {
+        return 1;     /* Already accessible */
+    }
+#endif
     d->local_addr = (unsigned char volatile *)io_map(d->phys_addr, 4096, writable);
     return d->local_addr != NULL;
 }
