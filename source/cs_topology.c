@@ -95,6 +95,23 @@ static int cs_is_romtable(struct cs_device *d)
 
 
 /*
+ * Check if a PrimeCell ID indicates a timestamp generator / generic counter.
+ * This may be incomplete (return false negatives). TS generators are not
+ * strictly CoreSight devices (CIDR1.CLASS is 15 not 9) and do not implement
+ * DEVARCH. Some may be encountered in ROM tables (e.g. TM101 / 0x101, and
+ * SoC-600 TS / TM200 / 0x193). Others may have other ids. Generally we should
+ * only return true here if the component is known to implement a TM101/TM200
+ * compatible programmer's model.
+ */
+static int cs_primecell_is_tsgen(unsigned int part_number)
+{
+    return part_number == 0x09C ||         /* Columbus TS generator */
+           part_number == 0x101 ||         /* TM101 */
+           part_number == 0x193;           /* TM200 from SoC-600 */
+}
+
+
+/*
   Register a device (or ROM table) at a given address.
 
   For a device, a device object is created and the local memory mapping
@@ -471,12 +488,12 @@ static cs_device_t cs_device_or_romtable_register(cs_physaddr_t addr)
             d->affine_cpu = CS_NO_CPU;
         }
     } else if (cs_class == CS_CLASS_PRIMECELL) {
-        /* Wouldn't normally be seen in a CoreSight ROM table. */
+        /* CIDR1.CLASS == 0x0F. Wouldn't normally be seen in a CoreSight ROM table. */
         /* CoreSight timestamp generators do have these non-CoreSight ids though. */
         unsigned int part_number =
                 ((_cs_read(&protod, CS_PIDR1) & 0xF) << 8) |
                 (_cs_read(&protod, CS_PIDR0) & 0xFF);
-        if (part_number == 0x101 || part_number == 0x193) {
+        if (cs_primecell_is_tsgen(part_number)) {
             d = cs_device_new(protod.phys_addr, protod.local_addr);
             if (d == NULL) {
                 _cs_unmap(&protod);
