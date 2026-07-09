@@ -331,10 +331,12 @@ class Link:
         assert master != slave
         assert linktype in link_types
         if linktype == CS_LINK_CORE_TRACE:
+            # CoreTrace is the internal link between a CPU and its trace sources
             assert master.type == CS_DEVTYPE_CORE
             # Normally a core would have a trace interface to an ETM, but with
             # the Cortex-M MTB, a core can output trace directly into a buffer.
-            assert slave.type in [CS_DEVTYPE_TRACE_CORE, CS_DEVTYPE_BUFFER]
+            # ITM is also possible.
+            assert slave.type in [CS_DEVTYPE_TRACE_CORE, CS_DEVTYPE_BUFFER, CS_DEVTYPE_TRACE_SW], "unexpected core trace type: %s" % str(slave.type)
         elif linktype == CS_LINK_CTI:
             assert master.type not in [CS_DEVTYPE_FUNNEL, CS_DEVTYPE_REPLICATOR]
             assert slave.type not in [CS_DEVTYPE_FUNNEL, CS_DEVTYPE_REPLICATOR]
@@ -749,7 +751,7 @@ def path_can_be_disabled(p):
 
 class TopologyChecker:
     """
-    Check that topology is compliant with CoreSight architectural constraints.
+    Check that ATB topology is compliant with CoreSight architectural constraints.
     Basically there can't be multiple paths between any two devices
     (and by implication, no cycles).
 
@@ -805,12 +807,13 @@ class TopologyChecker:
 
     def report(self, d, p1, p2):
         """
-        Report that a device is reachable by two paths, at least one
+        Report that a device is reachable by two ATB paths, at least one
         of which cannot be dynamically disabled.
         """
         self.n_issues += 1
         print()
         print("%s: [%u] %s seen from two paths:" % (self.S.name_str(), self.n_issues, d))
+        # For reporting purposes, pop matching nodes off the start of each path
         while len(p1.links) >= 2 and len(p2.links) >= 2 and p1.links[0] == p2.links[0] and p1.links[1] == p2.links[1]:
             p1.links.pop(0)
             p2.links.pop(0)
@@ -828,7 +831,7 @@ class TopologyChecker:
     def explore(self, d, path):
         nd = not path_can_be_disabled(path)
         if not d.is_hidden:
-            if d in self.seen and (self.strict or not nd):
+            if d in self.seen and (self.strict or nd):
                 self.report(d, self.seen[d], path)
                 return
             elif d in self.seen_non_disabled:

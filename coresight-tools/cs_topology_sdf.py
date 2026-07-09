@@ -33,6 +33,10 @@ import cs_topology
 o_verbose = 0
 
 
+#
+# Map SDF component types to our enumeration of CoreSight component types.
+# "CSTMC" is excluded, as further checks find out its static configuration.
+#
 sdf_map = {
     "CSETM":           cs_topology.CS_DEVTYPE_TRACE_CORE,
     "CSPTM":           cs_topology.CS_DEVTYPE_TRACE_CORE,
@@ -49,8 +53,8 @@ sdf_map = {
     "CSPMU":           cs_topology.CS_DEVTYPE_PMU_CORE,
     "CSCTI":           cs_topology.CS_DEVTYPE_CTI,
     "CSGPR":           cs_topology.CS_DEVTYPE_POWER,
-    "Timestamp Generator": cs_topology.CS_DEVTYPE_TIMESTAMP,
-    "Timestamp Generator (SoC-600)": cs_topology.CS_DEVTYPE_TIMESTAMP,
+    "Timestamp Generator": cs_topology.CS_DEVTYPE_TIMESTAMP,              # TM101
+    "Timestamp Generator (SoC-600)": cs_topology.CS_DEVTYPE_TIMESTAMP,    # TM200
     "CMNDTCTraceSource": cs_topology.CS_DEVTYPE_CMN_DTC,
 }
 
@@ -132,6 +136,14 @@ class SDFDeviceInfo:
             except Exception:
                 pass
 
+    def __str__(self):
+        s = "%s %s" % (self.type, self.name)
+        if self.ap_index is not None:
+            s += " ap:%u" % self.ap_index
+        if self.base_address is not None:
+            s += " 0x%x" % self.base_address
+        return "{" + s + "}"
+
 
 class SDFLinkInfo:
     """
@@ -199,15 +211,21 @@ def load(fn):
     if False and len(list(S.links("ATB"))) == 0:
         print("%s: no ATB topology" % fn, file=sys.stderr)
         return None
+    # First process the core trace links, which help us identify cores.
+    # This is useful, as there is no other reliable way of identifying cores in SDF.
+    # Some cores have both an ETM and ITM, so may have multiple CoreTrace links
     for li in S.links():
         if li.type == "CoreTrace":
-            p.create_device(cs_topology.CS_DEVTYPE_CORE, name=li.master)
+            if not p.device_by_name(li.master):
+                p.create_device(cs_topology.CS_DEVTYPE_CORE, name=li.master)
         elif li.type == "ATB":
             atb_master_names[li.master] = True
     for di in S.devices():
         ctype = None
-        #print(di.info, file=sys.stderr)
+        if o_verbose >= 2:
+            print(di, file=sys.stderr)
         if di.type in sdf_map:
+            # Funnels, replicators, ELAs etc.
             ctype = sdf_map[di.type]
         elif di.type == "CSTMC":
             if "CONFIG_TYPE" not in di.info:
@@ -232,7 +250,13 @@ def load(fn):
                 ctype = cs_topology.CS_DEVTYPE_ROUTER
             else:
                 print("%s: '%s' has unknown TMC config type '%s'" % (fn, di.name, tmc_type), file=sys.stderr)
-        elif di.type in ["CSMEMAP", "CSDWT", "CSFPB", "CATU"]:
+        elif di.type in ["CSMEMAP", "CSAPBCOM", "CSDWT", "CSFPB", "CATU", "DCSU"]:
+            continue
+        elif di.type == "CMNMesh":
+            """
+            Arm CMN interconnect: this includes one or more DTCs which are ATB trace sources
+            and occur individually as CMNDTCTraceSource objects.
+            """
             continue
         elif sdf_device_type_probably_cpu(di.type):
             d = p.device_by_name(di.name)
@@ -241,8 +265,11 @@ def load(fn):
                 ctype = cs_topology.CS_DEVTYPE_CORE
             pass
         else:
-            print("%s: '%s' has unknown type '%s'" % (fn, di.name, di.type), file=sys.stderr)
-            continue
+            # Type is unknown (possibly an internal code name) - but we might have encountered it as a CoreTrace source
+            d = p.device_by_name(di.name)
+            if d is None:
+                print("%s: '%s' has unknown type '%s' and is not a CoreTrace source" % (fn, di.name, di.type), file=sys.stderr)
+                continue
         if (di.ap_index is None) != di.dp_memspace:
             print("%s: '%s': expect exactly one of DAP index and DP_MEMSPACE" % (fn, di.name), file=sys.stderr)
         # Check if device already exists - might have already been created from CoreTrace
@@ -250,6 +277,10 @@ def load(fn):
         dap_name = str(di.ap_index) if di.ap_index else "DP" if di.dp_memspace else "?"
         if di.dap is not None:
             dap_name = di.dap + ":" + dap_name
+        if di.type == "CMNDTCTraceSource":
+            # DTCs for a mesh all have the same base address (the root node of the mesh).
+            # To avoid duplicate address warnings, fake a unique address by adding in the DTC number.
+            di.base_address += 0x100 + int(di.info["DTC_DOMAIN_NUM"])
         if d is None:
             d = p.create_device(ctype, name=di.name, mem_address=di.base_address, dap_name=dap_name)
         else:
@@ -291,6 +322,7 @@ def main(argv):
     """
     Basic command-line functionality. Use 'cstopo' for conversions etc.
     """
+    global o_verbose
     import argparse
     parser = argparse.ArgumentParser(description="read SDF system description files (Arm DS)")
     parser.add_argument("--print", action="store_true", help="print topology")

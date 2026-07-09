@@ -20,6 +20,9 @@ import cs_topology_dot
 import cs_topology_sysfs
 
 
+o_verbose = 0
+
+
 def load(fn):
     """
     Load a CoreSight topology description
@@ -65,12 +68,15 @@ def save(S, fn):
 
 
 def main(argv):
+    global o_verbose
     import argparse
     parser = argparse.ArgumentParser(description="CS topology converter")
     parser.add_argument("-i", "--input", type=str, required=True, help="input file")
     parser.add_argument("-o", "--output", type=str, action="append", default=[], help="output file(s)")
     parser.add_argument("--check", action="store_true", help="check topology")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="increase verbosity")
     opts = parser.parse_args()
+    o_verbose = opts.verbose
     def process(fn):
         S = load(fn)
         if S is None:
