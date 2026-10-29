@@ -35,6 +35,7 @@ To do:
 from __future__ import print_function
 
 import os, sys, struct, time, json
+from contextlib import contextmanager
 
 # We provide our own implementation of the mmap module which gives us
 # more control over access to volatile registers.
@@ -737,6 +738,13 @@ class Device:
     def atb_out_ports(self):
         if self.is_replicator():
             return 2
+        elif self.is_coresight_device_type(3,1) and self.is_arm_architecture(ARM_ARCHID_ETM):
+            # ETMv4 data trace has a separate ATB output. TRCIDR0.TRCDATA
+            # is 0b11 when data tracing is implemented. Trace ID registers
+            # are inaccessible when the trace unit is powered off.
+            if self.read32(0x314) & 1:    # TRCPDSR.POWER
+                return 2 if bits(self.read32(0x1E0),3,2) == 3 else 1
+            return 1
         elif self.coresight_device_type()[0] in [2,3]:   # link or source
             return 1
         elif self.is_arm_architecture(ARM_ARCHID_ELA):
@@ -2631,25 +2639,86 @@ def show_device(d):
     CSROM.show_device(d)
 
 
-def topology_detection_atb(atb_devices, topo):
+@contextmanager
+def integration_mode_session(devices, clear_device, name, prepare_device=None):
     """
-    Run the CoreSight topology detection procedure as described in
-    [CoreSight Architecture 2.0] D6.4, Detection Algorithm.
-    We put the devices into integration mode, and toggle integration
-    registers that cause signal changes (on ATVALID and ATREADY lines)
-    to be observable in other devices.
+    Clear device ports on entry and exit, then restore mode and locks.
     """
-    print("\nATB topology detection")
-    # Set integration mode. Ideally, we would quiesce and disable each device,
-    # using a device-specific procedure - e.g. wait for a trace buffer formatter
-    # to drain. For the time being, we assume that the CoreSight subsystem
-    # has not been in use.
-    def enable_funnel_input(d, n):
-        # Funnels don't have separate bits in the ingration register for
+    prepared = []
+    failed = False
+    try:
+        for d in devices:
+            was_unlocked = d.is_unlocked()
+            # Record the device before unlocking so a partial unlock can be restored.
+            prepared.append([d, was_unlocked, False])
+            d.unlock()
+            if prepare_device is not None:
+                prepare_device(d)
+            # A failed write can still have changed the integration-mode bit.
+            prepared[-1][2] = True
+            d.set_integration_mode(True)
+            if not d.is_in_integration_mode():
+                raise RuntimeError("%s: failed to enter integration mode" % d)
+            clear_device(d)
+        yield
+    except BaseException:
+        failed = True
+        raise
+    finally:
+        cleanup_errors = []
+        for d, was_unlocked, mode_attempted in reversed(prepared):
+            if mode_attempted:
+                try:
+                    if d.is_in_integration_mode():
+                        clear_device(d)
+                except Exception as error:
+                    cleanup_errors.append((d, error))
+                try:
+                    d.set_integration_mode(False)
+                    if d.is_in_integration_mode():
+                        raise RuntimeError("integration mode remains enabled")
+                except Exception as error:
+                    cleanup_errors.append((d, error))
+            try:
+                if o_lock or (not was_unlocked and not o_unlock):
+                    d.lock()
+            except Exception as error:
+                cleanup_errors.append((d, error))
+        for d, error in cleanup_errors:
+            print("** %s: %s cleanup failed: %s" % (d, name, error), file=sys.stderr)
+        if cleanup_errors and not failed:
+            raise RuntimeError("%s topology detection cleanup failed" % name)
+
+
+class TopologyDetectionATB:
+    """
+    Discover ATB links by driving and observing integration signals.
+    """
+
+    def __init__(self, devices, topo):
+        self.devices = devices
+        self.topo = topo
+        self.diagnosed_funnel = False
+
+    @staticmethod
+    def prepare_device(d):
+        # ELA-600 requires ITATBCTR0 to be initialized before ITCTRL.IME=1.
+        if d.is_arm_architecture(ARM_ARCHID_ELA) and d.atb_out_ports():
+            d.write32(0xEF4, 0, check=False)
+
+    def enable_funnel_input(self, d, n):
+        # Funnels don't have separate bits in the integration register for
         # each input ATB port. Instead, you have to select the input.
         assert n < d.atb_in_ports()
-        d.write32(0x000, ((d.read32(0x000) & 0xFFFFFF00) | (1<<n)))
-    def set_ATVALIDM(d, n, flag):
+        selected = 1 << n
+        if selected & ~0xFF:
+            raise RuntimeError("%s port %u: funnel input selector only supports ports 0-7" % (d, n))
+        d.write32(0x000, (d.read32(0x000) & 0xFFFFFF00) | selected, check=False)
+        readback = d.read32(0x000) & 0xFF
+        if readback != selected:
+            raise RuntimeError("%s port %u: funnel input selection failed (read back 0x%02x)" % (d, n, readback))
+
+    def set_ATVALIDM(self, d, n, flag):
         # Set ATVALID on a downstream ATB interface.
         reg = 0xEF8
         mask = 0x01
@@ -2688,9 +2757,10 @@ def topology_detection_atb(atb_devices, topo):
         if False and flag:
             print("    set ATVALIDM: 0x%03x %08x" % (reg, mask))
         d.write32(reg, flag*mask, check=False)
-    def set_ATREADYS(d, n, flag):
+
+    def set_ATREADYS(self, d, n, flag):
         if d.is_funnel():
-            enable_funnel_input(d, n)
+            self.enable_funnel_input(d, n)
         if d.is_arm_part_number(0x9eb):
             # CSSoC-600 funnel
             (reg, mask) = (0xEF4, 0x01)
@@ -2702,9 +2772,10 @@ def topology_detection_atb(atb_devices, topo):
         else:
             (reg, mask) = (0xEF0, 0x01)
         d.write32(reg, flag*mask, check=False)
-    def get_ATVALIDS(d, n):
+
+    def get_ATVALIDS(self, d, n):
         if d.is_funnel():
-            enable_funnel_input(d, n)
+            self.enable_funnel_input(d, n)
         (reg, mask) = (0xEF8, 0x01)
         if d.is_arm_part_number(0x9eb):
             # CSSoC-600 funnel
@@ -2715,82 +2786,258 @@ def topology_detection_atb(atb_devices, topo):
         elif d.is_replicator():
             mask = 0x08
         return (d.read32(reg) & mask) != 0
-    for d in atb_devices:
-        d.unlock()
-        d.set_integration_mode(True)
-        def clear_integration_regs(d):
-            d.write32(0xEF0, 0, check=False)
-            if d.is_arm_part_number(0x9eb):
-                # CSSoC-600 funnel
-                d.write32(0xEF4, 0, check=False)
-            d.write32(0xEF8, 0, check=False)
-            d.write32(0xEFC, 0, check=False)
-            if d.is_coresight_device_type(2,3):  # ETF
-                d.write32(0xEDC, 0, check=False)
+
+    @staticmethod
+    def atdata0_source_register(d, n):
+        # These registers drive ATDATA_M[0] in integration mode. A dual-port
+        # ETMv4 has separate instruction (port 0) and data (port 1) registers.
+        if d.is_arm_part_number(0x908) or d.is_arm_part_number(0x9eb):
+            return 0xEEC             # SoC-400/SoC-600 funnel ITATBDATA0
+        if d.is_arm_architecture(ARM_ARCHID_ELA):
+            return 0xEEC             # ELA ITATBDATA0
+        if d.is_coresight_device_type(2, 3):
+            return 0xED0             # TMC ETF ITATBMDATA0
+        if d.is_arm_part_number(0x963):
+            return 0xEEC             # STM-500 STMITATBDATA0
+        if d.is_arm_architecture(ARM_ARCHID_ETM) and d.is_coresight_device_type(3, 1):
+            if d.atb_out_ports() == 2:
+                return (0xEEC, 0xEE8)[n]  # TRCITIDATAR, TRCITDDATAR
+            return 0xEEC             # Single-port ETM TRCITATBDATA0
+        return None
+
+    @staticmethod
+    def get_ATREADYM(d, n=0):
+        # Used for the reverse-path diagnostic and to avoid changing data
+        # while an ATB transfer is stalled.
+        if d.is_arm_part_number(0x9eb):
+            return (d.read32(0xEF4) & 1) != 0
+        if d.is_arm_part_number(0x908):
+            return (d.read32(0xEF0) & 1) != 0
+        if d.is_coresight_device_type(2, 3):
+            return (d.read32(0xED4) & 1) != 0
+        if d.is_arm_architecture(ARM_ARCHID_ETM) and d.is_coresight_device_type(3, 1):
+            reg = (0xEF4, 0xEF0)[n] if d.atb_out_ports() == 2 else 0xEF0
+            return (d.read32(reg) & 1) != 0
+        if d.is_arm_architecture(ARM_ARCHID_ELA) or d.is_arm_part_number(0x963):
+            return (d.read32(0xEF0) & 1) != 0
+        return None
+
+    def probe_funnel_data(self, dm, mp, ds, ports):
+        # SoC-600 funnel ATVALID readback can retain an arbitrated port when
+        # its input selector changes. Check every input, including ones that
+        # ATVALID did not report, using the selected input's ATDATA[0].
+        if not (ds.is_arm_part_number(0x908) or ds.is_arm_part_number(0x9eb)):
+            return None
+        data_reg = self.atdata0_source_register(dm, mp)
+        if data_reg is None:
+            return None
+        # ATDATA can change while ATVALID is held high only if the previous
+        # transfer was accepted. The caller has asserted every slave ATREADY.
+        if not self.get_ATREADYM(dm, mp):
+            return None
+        samples = {sp: [] for sp in ports}
+        try:
+            for value in (0, 1, 0):
+                dm.write32(data_reg, value, check=False)
+                time.sleep(0.001)
+                for sp in ports:
+                    self.enable_funnel_input(ds, sp)
+                    time.sleep(0.001)
+                    samples[sp].append(ds.read32(0xEEC) & 1)
+        finally:
+            dm.write32(data_reg, 0, check=False)
+            ds.clr32(0x000, 0xFF)
+        return samples
+
+    def diagnose_funnel_inputs(self, dm, mp, ds, ports):
+        baseline = self.get_ATREADYM(dm, mp)
+        if baseline is None:
+            return False
+        settled_valid = []
+        responses = []
+        try:
+            for sp in ports:
+                self.enable_funnel_input(ds, sp)
+                time.sleep(0.001)
+                status_reg = 0xEFC if ds.is_arm_part_number(0x9eb) else 0xEF8
+                settled_valid.append((sp, (ds.read32(status_reg) & 1) != 0))
+            for sp in ports:
+                try:
+                    self.set_ATREADYS(ds, sp, 0)
+                    time.sleep(0.0001)
+                    low = self.get_ATREADYM(dm, mp)
+                    self.set_ATREADYS(ds, sp, 1)
+                    time.sleep(0.0001)
+                    high = self.get_ATREADYM(dm, mp)
+                    responses.append((sp, low, high))
+                finally:
+                    self.set_ATREADYS(ds, sp, 0)
+                    time.sleep(0.0001)
+        finally:
+            ds.clr32(0x000, 0xFF)
+        if o_verbose:
+            print("  ATREADY diagnostic for %s: ATVALID after 1 ms %s; source ATREADY baseline=%u, low/high %s" %
+                  (ds, ", ".join("port %u=%u" % (sp, value) for sp, value in settled_valid),
+                   baseline, ", ".join("port %u=%u/%u" % (sp, low, high) for sp, low, high in responses)), flush=True)
+        return True
+
+    def clear_integration_regs(self, d):
+        d.write32(0xEF0, 0, check=False)
+        if d.is_arm_part_number(0x9eb) or d.is_arm_architecture(ARM_ARCHID_ELA):
+            # CSSoC-600 funnel or ELA-600
+            d.write32(0xEF4, 0, check=False)
+        d.write32(0xEF8, 0, check=False)
+        d.write32(0xEFC, 0, check=False)
+        if d.is_coresight_device_type(2,3):  # ETF
+            d.write32(0xEDC, 0, check=False)
+
+    def clear_device_ports(self, d):
         if d.is_funnel():
             for i in range(0, d.atb_in_ports()):
-                enable_funnel_input(d, i)
-                clear_integration_regs(d)
+                self.enable_funnel_input(d, i)
+                self.clear_integration_regs(d)
             d.clr32(0x000, 0xFF)
         else:
-            clear_integration_regs(d)
-    # Do a preliminary check to see if anything is asserting ATVALIDM on any of our input ports.
-    # That might indicate an unknown trace source that didn't appear in the ROM table.
-    for d in atb_devices:
-        for i in range(0, d.atb_in_ports()):
-            if get_ATVALIDS(d, i):
-                print("** %s port %u: seeing ATVALID asserted" % (d, i))
-    # For each ATB output port, assert its ATVALIDM and look for it to
-    # be observed as ATVALIDS on an input port on one or more downstream devices.
-    # Where there is a non-programmable funnel in between, we might have several
-    # ATB outputs apparently connected to one input.
-    # Where there is a non-programmable replicator in between, we might see
-    # the ATVALIDM observed on several input ports.
-    for dm in atb_devices:
-        if dm.atb_out_ports():
-            print("ATB scan... ", end="")
-            c.show_device(dm)
-        for mp in range(0, dm.atb_out_ports()):
-            n_downstream = 0
-            set_ATVALIDM(dm, mp, 1)
-            # Scan all other devices to see if they are downstream of this one
-            for ds in atb_devices:
-                if ds == dm:
-                    continue    # No loopbacks in ATB, so no point checking
-                if not ds.atb_in_ports():
-                    continue
-                if False:       # Debugging
-                    print("    ", end="")
-                    c.show_device(ds)
-                    print("    ", end="")
-                    for r in range(0xEF0, 0xF00, 4):
-                        print("  0x%03x: %08x " % (r, ds.read32(r)), end="")
-                    print()
+            self.clear_integration_regs(d)
+
+    def asserted_inputs(self, exclude=None):
+        asserted = []
+        for ds in self.devices:
+            if ds == exclude:
+                continue    # ATB has no loopbacks
+            try:
                 for sp in range(0, ds.atb_in_ports()):
-                    if get_ATVALIDS(ds, sp):
-                        def jport(d, p):
-                            return [("0x%x" % d.base_address), p]
-                        ld = {"type": "ATB", "from": jport(dm, mp), "to": jport(ds, sp)}
-                        topo["links"].append(ld)
-                        n_downstream += 1
-                        print("  %u->%u  " % (mp, sp), end="")
-                        c.show_device(ds)   # will be shown indented
-                        set_ATREADYS(ds, sp, 1)
-                        set_ATVALIDM(dm, mp, 0)
-                        set_ATVALIDM(dm, mp, 1) # ready for next time
-                        break
+                    if self.get_ATVALIDS(ds, sp):
+                        asserted.append((ds, sp))
+                        if ds.is_arm_part_number(0x9eb):
+                            # SoC-600 funnel ITATBCTR0 reads the arbiter's
+                            # selected port, which can stay selected after
+                            # FUNNELCONTROL enables the next input. Stop at
+                            # the first assertion; ATDATA can check all ports
+                            # later if the source exposes it.
+                            break
+            finally:
                 if ds.is_funnel():
-                    d.clr32(0x000, 0xFF)
-            set_ATVALIDM(dm, mp, 0)
-            if not n_downstream:
-                print("  %u: no downstream device found" % (mp))
-    # Finally, put the devices back into production mode.
-    for d in atb_devices:
-        d.set_integration_mode(False)
-        d.lock()
-    # At this point, the system isn't guaranteed to be in a usable
-    # (mission-mode) state. In practice, it often works.
-    print("ATB topology detection complete.")
+                    ds.clr32(0x000, 0xFF)
+        return asserted
+
+    def set_all_ATREADYS(self, flag, exclude=None):
+        for ds in self.devices:
+            if ds == exclude:
+                continue
+            try:
+                for sp in range(0, ds.atb_in_ports()):
+                    self.set_ATREADYS(ds, sp, flag)
+            finally:
+                if ds.is_funnel():
+                    ds.clr32(0x000, 0xFF)
+
+    @staticmethod
+    def jport(d, p):
+        return [("0x%x" % d.base_address), p]
+
+    def probe_master_port(self, dm, mp):
+        self.set_ATVALIDM(dm, mp, 1)
+        time.sleep(0.0001)  # Allow the signal to cross asynchronous ATB bridges.
+        if o_verbose:
+            print("  checking asserted inputs", flush=True)
+        observed = self.asserted_inputs(exclude=dm)
+        links_to_record = list(observed)
+        funnel_ports = {}
+        for ds, sp in observed:
+            if ds.is_funnel():
+                funnel_ports.setdefault(ds, []).append(sp)
+        for ds, ports in funnel_ports.items():
+            if o_verbose and len(ports) > 1 and not self.diagnosed_funnel:
+                self.diagnosed_funnel = self.diagnose_funnel_inputs(dm, mp, ds, ports)
+
+        # Complete the slave post-assert step before changing ATDATA. With
+        # ATREADY high, the integration data pattern does not stall a transfer.
+        if o_verbose:
+            print("  asserting ATREADY on slave ports", flush=True)
+        self.set_all_ATREADYS(1, exclude=dm)
+        time.sleep(0.0001)
+        for ds, observed_ports in funnel_ports.items():
+            ports = range(ds.atb_in_ports())
+            samples = self.probe_funnel_data(dm, mp, ds, ports)
+            if samples is not None:
+                matched = [sp for sp in ports if samples[sp] == [0, 1, 0]]
+                if o_verbose:
+                    print("  ATDATA0 diagnostic for %s: source 0/1/0; %s" %
+                          (ds, ", ".join("port %u=%s" % (sp, "/".join(map(str, samples[sp])))
+                                         for sp in ports)), flush=True)
+                first_index = next(i for i, (d, _) in enumerate(links_to_record) if d == ds)
+                links_to_record = [(d, sp) for d, sp in links_to_record if d != ds]
+                links_to_record[first_index:first_index] = [(ds, sp) for sp in matched]
+                if matched:
+                    ignored = [sp for sp in observed_ports if sp not in matched]
+                    newly_found = [sp for sp in matched if sp not in observed_ports]
+                    if o_verbose:
+                        print("  ATDATA0 confirms %s input port(s) %s%s%s" %
+                              (ds, ",".join(map(str, matched)),
+                               "; ignoring ATVALID-only ports %s" % ",".join(map(str, ignored)) if ignored else "",
+                               "; ATVALID missed ports %s" % ",".join(map(str, newly_found)) if newly_found else ""), flush=True)
+                else:
+                    self.topo.setdefault("unresolved_atb", []).append({
+                        "from": self.jport(dm, mp),
+                        "to": [self.jport(ds, sp) for sp in observed_ports],
+                        "reason": "ATVALID asserted but no ATDATA0 input followed the source",
+                    })
+                    if o_verbose:
+                        print("  unresolved ATB connection to %s: ATVALID ports %s, no input followed ATDATA0" %
+                              (ds, ",".join(map(str, observed_ports))), flush=True)
+                    else:
+                        print("  unresolved downstream connection to %s" % ds, flush=True)
+            elif len(observed_ports) > 1:
+                if o_verbose:
+                    print("  ATDATA0 probe unavailable for %s; using ATVALID matches" % ds, flush=True)
+
+        # Complete the ATB deassert sequence for all inputs.
+        self.set_ATVALIDM(dm, mp, 0)
+        time.sleep(0.0001)
+        if o_verbose:
+            print("  checking deasserted inputs", flush=True)
+        still_asserted = self.asserted_inputs(exclude=dm)
+        if o_verbose:
+            print("  deasserting ATREADY on slave ports", flush=True)
+        self.set_all_ATREADYS(0, exclude=dm)
+        if still_asserted:
+            ds, sp = still_asserted[0]
+            raise RuntimeError("%s port %u: ATVALID remained asserted after %s port %u deasserted" % (ds, sp, dm, mp))
+        for ds, sp in links_to_record:
+            self.topo["links"].append({"type": "ATB", "from": self.jport(dm, mp), "to": self.jport(ds, sp)})
+            print("  %u->%u  %s" % (mp, sp, ds), flush=True)
+        if not observed:
+            print("  no downstream device found")
+
+    def detect(self):
+        """
+        Run the CoreSight ATB topology detection procedure.
+        """
+        print("\nATB topology detection")
+        # Assume the CoreSight subsystem has been quiesced before scanning.
+        try:
+            with integration_mode_session(self.devices, self.clear_device_ports, "ATB", self.prepare_device):
+                # An asserted input before probing cannot be attributed to a known master.
+                unexpected = self.asserted_inputs()
+                if unexpected:
+                    ds, sp = unexpected[0]
+                    raise RuntimeError("%s port %u: ATVALID asserted before ATB scan" % (ds, sp))
+
+                # Probe every master port, including connections through hidden links.
+                for dm in self.devices:
+                    n_out = dm.atb_out_ports()
+                    for mp in range(0, n_out):
+                        print("ATB scan: %s port %u" % (dm, mp), flush=True)
+                        self.probe_master_port(dm, mp)
+        finally:
+            if self.devices:
+                print("** Reset the target system after ATB topology detection before using CoreSight again.", file=sys.stderr)
+        print("ATB topology detection complete.")
+
+
+def topology_detection_atb(atb_devices, topo):
+    TopologyDetectionATB(atb_devices, topo).detect()
 
 
 class TopologyDetectionCTI:
@@ -2817,8 +3064,9 @@ class TopologyDetectionCTI:
       4-7: ETM external input
       8-9: ELA trigger input (imp def)
     """
-    def __init__(self, devices, topo):
+    def __init__(self, devices, topo, cs=None):
         self.devices = [d for d in devices if self.has_triggers(d)]
+        self.cs = c if cs is None else cs
         self.out_map = {}
         self.in_map = {}
 
@@ -2828,6 +3076,8 @@ class TopologyDetectionCTI:
         if d.arm_part_number() in [0x907, 0x961, 0x9e8, 0x9e9, 0x9ea]:
             yield ("ACQCOMP", 0xEE0, 0)
             yield ("FULL", 0xEE0, 1)
+            if d.arm_part_number() in [0x9e8, 0x9e9, 0x9ea]:
+                yield ("FLUSHCOMP", 0xEE0, 2)
         elif d.is_coresight_device_type(3,1):
             # ETM
             for i in range(0, 4):
@@ -2863,6 +3113,10 @@ class TopologyDetectionCTI:
         if d.is_arm_part_number(0x907) or d.is_arm_part_number(0x961) or d.is_arm_part_number(0x912):
             yield ("TRIGIN", 0xEE8, 0, 0xEE4)
             yield ("FLUSHIN", 0xEE8, 1, 0xEE4)
+        elif d.arm_part_number() in [0x9e7, 0x9e8, 0x9e9, 0x9ea]:
+            # SoC-600 TPIU and TMC capture both inputs in read-to-clear ITTRFLIN.
+            yield ("TRIGIN", 0xEE8, 0, None)
+            yield ("FLUSHIN", 0xEE8, 1, None)
         elif d.is_coresight_device_type(3,1):
             # ETM - integration registers not architected, may be specific to core, this is a guess
             #etmid5 = d.read32(0x1F4)
@@ -2882,41 +3136,53 @@ class TopologyDetectionCTI:
                 ireg = None
             else:
                 ireg = 0xEF8
+            # SoC-600 CTI has read-to-clear ITTRIGIN, with no input
+            # acknowledge register at 0xEE0.
+            inack = None if d.is_arm_part_number(0x9ed) else 0xEE0
             for i in range(0, n_triggers):
-                yield ("TRIGIN%u" % i, ireg, i, 0xEE0)
+                yield ("TRIGIN%u" % i, ireg, i, inack)
         else:
             pass
 
     def has_triggers(self, d):
         return d.is_cti() or len(list(self.pin_out(d))) > 0 or len(list(self.pin_in(d))) > 0
 
+    def clear_device_ports(self, d):
+        # Clear driven outputs and input acknowledgements before and after probing.
+        for (name, reg, b) in self.pin_out(d):
+            if reg is not None:
+                d.clr32(reg, 1<<b)
+        for (name, reg, b, inack) in self.pin_in(d):
+            if inack is not None:
+                d.clr32(inack, 1<<b)
+
+    def input_status(self, d):
+        """Read each input status register once, preserving all latched bits."""
+        pins = list(self.pin_in(d))
+        registers = {}
+        for _, reg, _, _ in pins:
+            if reg is not None and reg not in registers:
+                registers[reg] = d.read32(reg)
+        return [(name, b, bit(registers[reg], b), inack)
+                for name, reg, b, inack in pins if reg is not None]
+
     def preamble(self):
-        # Put all devices into integration mode, and do the master preamble
+        # Check whether any inputs were asserted before probing.
         for d in self.devices:
-            c.show_device(d)
-            d.unlock()
-            d.set_integration_mode(True)
-            for (name, reg, b) in self.pin_out(d):
-                if reg is not None:
-                    d.clr32(reg, 1<<b)
-        # Slave preamble, and check if any input pins are already asserted...
+            self.cs.show_device(d)
         for ds in self.devices:
-            for (sname, sreg, sb, inack) in self.pin_in(ds):
-                if sreg is None:
-                    continue
-                if inack is not None:
-                    d.clr32(inack, 1<<sb)
-                if bit(ds.read32(sreg), sb):
+            for sname, _, asserted, _ in self.input_status(ds):
+                if asserted:
                     print("%s %s already asserted" % (ds, sname))
 
     def detect(self):
         print("\nCTI topology detection")
-        self.preamble()
-        print("CTI outputs:")
-        for dm in self.devices:
-            if len(list(self.pin_out(dm))):
-                self.detect_master(dm)
-        self.postamble()
+        with integration_mode_session(self.devices, self.clear_device_ports, "CTI"):
+            self.preamble()
+            print("CTI outputs:")
+            for dm in self.devices:
+                if len(list(self.pin_out(dm))):
+                    self.detect_master(dm)
         self.show_inputs()
         print("CTI topology detection complete.")
 
@@ -2956,16 +3222,23 @@ class TopologyDetectionCTI:
                 continue
             mkey = (dm, mname)
             dm.set32(mreg, 1<<mb)
-            for ds in self.devices:
-                for (sname, sreg, sb, inack) in self.pin_in(ds):
-                    if sreg is None:
-                        continue
-                    if bit(ds.read32(sreg), sb):
+            try:
+                for ds in self.devices:
+                    for sname, sb, asserted, inack in self.input_status(ds):
+                        if not asserted:
+                            continue
                         if inack is not None:
                             ds.set32(inack, 1<<sb)
                             ds.clr32(inack, 1<<sb)
                         self.add(dm, mname, ds, sname)
-            dm.clr32(mreg, 1<<mb)
+            finally:
+                dm.clr32(mreg, 1<<mb)
+            # A level-driven SoC-600 CTI input remains latched if read while
+            # asserted. Read once more after deassertion to clear that event
+            # before probing the next source.
+            time.sleep(0.0001)
+            for ds in self.devices:
+                self.input_status(ds)
             if mkey not in self.out_map:
                 print("    %s not connected" % (mname))
 
@@ -2982,14 +3255,9 @@ class TopologyDetectionCTI:
                 else:
                     print("    %s not connected" % (sname))
 
-    def postamble(self):
-        for d in self.devices:
-            d.set_integration_mode(False)
-            d.lock()
 
-
-def topology_detection_cti(devices, topo):
-    d = TopologyDetectionCTI(devices, topo)
+def topology_detection_cti(devices, topo, cs=None):
+    d = TopologyDetectionCTI(devices, topo, cs)
     d.detect()
 
 
@@ -3102,7 +3370,7 @@ def scan_rom(c, table_addr, recurse=True, indent=True, detect_topology=False, de
     if detect_topology:
         topology_detection_atb(atb_devices, topo)
     if detect_topology_cti:
-        topology_detection_cti(devices, topo)
+        topology_detection_cti(devices, topo, c)
     if enable_timestamps:
         n_found = 0
         print("Enabling global timestamps:")
