@@ -293,13 +293,21 @@ class DTWriter:
                             if self.style == 1:
                                 print("%s\t\t/* %s output port%s */" % (self.prefix, self.dt_name(d), plural(len(out_ports))))
                             else:
+                                if in_ports:
+                                    print("%s\t};" % (self.prefix))
                                 print("%s\tout-ports {" % (self.prefix))
                             i = 0
                             first = True
                         if first and self.style >= 2:
                             print("%s\t\t#address-cells = <1>;" % self.prefix)
                             print("%s\t\t#size-cells = <0>;" % self.prefix)
-                        print("%s\t\tport@%u {" % (self.prefix, pn))
+                        # In the style 1 'ports' node, ports are numbered in sequence.
+                        # In 'in-ports' and 'out-ports', the unit address matches 'reg'.
+                        if self.style == 1:
+                            port_unit = pn
+                        else:
+                            port_unit = p.link_port(d)
+                        print("%s\t\tport@%u {" % (self.prefix, port_unit))
                         print("%s\t\t\treg = <%u>;" % (self.prefix, p.link_port(d)))
                         self.print_port(d, p, self.prefix + "\t\t\t")
                         print("%s\t\t};" % self.prefix)
