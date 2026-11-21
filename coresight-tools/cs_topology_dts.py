@@ -293,6 +293,8 @@ class DTWriter:
                             if self.style == 1:
                                 print("%s\t\t/* %s output port%s */" % (self.prefix, self.dt_name(d), plural(len(out_ports))))
                             else:
+                                if in_ports:
+                                    print("%s\t};" % (self.prefix))
                                 print("%s\tout-ports {" % (self.prefix))
                             i = 0
                             first = True
